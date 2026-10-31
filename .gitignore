@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+dist/
+.local/
+.DS_Store
+result
+
+# Separate local repository; never include it in this project.
+/flakey/
