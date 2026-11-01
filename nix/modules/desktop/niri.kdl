@@ -1,0 +1,49 @@
+input {
+    keyboard { xkb { layout "us"; }; }
+    touchpad { tap; natural-scroll; }
+    focus-follows-mouse max-scroll-amount="0%"
+    disable-power-key-handling
+}
+layout {
+    gaps 12
+    background-color "#10131a"
+    default-column-width { proportion 0.5; }
+    focus-ring {
+        width 2
+        active-color "#7ca7ed"
+        inactive-color "#303642"
+    }
+}
+cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
+prefer-no-csd
+spawn-at-startup "waybar"
+spawn-at-startup "mako"
+spawn-at-startup "swaybg" "-c" "#171c29"
+window-rule {
+    geometry-corner-radius 12
+    clip-to-geometry true
+}
+binds {
+    Mod+Return { spawn "foot"; }
+    Mod+Space { spawn "fuzzel"; }
+    Mod+E { spawn "nautilus"; }
+    Mod+B { spawn "firefox"; }
+    Mod+Q { close-window; }
+    Mod+Tab { toggle-overview; }
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+Left { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up { focus-window-up; }
+    Mod+Down { focus-window-down; }
+    Mod+Shift+Left { move-column-left; }
+    Mod+Shift+Right { move-column-right; }
+    Mod+Page_Up { focus-workspace-up; }
+    Mod+Page_Down { focus-workspace-down; }
+    Mod+Shift+Page_Up { move-column-to-workspace-up; }
+    Mod+Shift+Page_Down { move-column-to-workspace-down; }
+    Mod+Minus { set-column-width "-10%"; }
+    Mod+Equal { set-column-width "+10%"; }
+    Mod+Shift+E { quit; }
+    Print { screenshot; }
+}

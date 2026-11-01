@@ -6,6 +6,8 @@ import AppKit
 final class RuntimeApp: NSObject, NSApplicationDelegate {
     private var process: Process?
     private var logHandle: FileHandle?
+    private var preparationWindow: NSWindow?
+    private var preparationTimer: Timer?
 
     static func main() {
         if CommandLine.arguments.contains("--original-vm") {
@@ -32,17 +34,17 @@ final class RuntimeApp: NSObject, NSApplicationDelegate {
         let defaults = UserDefaults.standard
         defaults.register(defaults: ["cpus": 4, "memoryGiB": 4])
         let developmentCopy = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent(".local/gpu-vm")
+            .appendingPathComponent(".local/factory-preview")
         let directory: URL
-        if let saved = defaults.string(forKey: "acceleratedVMDirectory") {
+        if let saved = defaults.string(forKey: "factoryVMDirectory") {
             directory = URL(fileURLWithPath: saved, isDirectory: true)
-        } else if FileManager.default.fileExists(atPath: developmentCopy.appendingPathComponent("disk.raw").path) {
+        } else if FileManager.default.fileExists(atPath: developmentCopy.appendingPathComponent("factory.json").path) {
             directory = developmentCopy
         } else {
             directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Ohmansy/AcceleratedVM")
+                .appendingPathComponent("Ohmansy/FactoryVM")
         }
-        defaults.set(directory.path, forKey: "acceleratedVMDirectory")
+        defaults.set(directory.path, forKey: "factoryVMDirectory")
         let log = directory.appendingPathComponent("app-launcher.log")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -50,8 +52,9 @@ final class RuntimeApp: NSObject, NSApplicationDelegate {
             logHandle = try FileHandle(forWritingTo: log)
             let task = Process()
             task.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/python3")
-            task.arguments = [Bundle.main.resourceURL!.appendingPathComponent("GPURuntime/gpu-probe.py").path,
-                "start-copy", "--state", directory.path, "--helper",
+            task.arguments = [Bundle.main.resourceURL!.appendingPathComponent("GPURuntime/factory-vm.py").path,
+                "--factory", Bundle.main.resourceURL!.appendingPathComponent("Factory").path,
+                "--state", directory.path, "--helper",
                 Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/try ohmansy.app").path,
                 "--cpus", String(max(1, defaults.integer(forKey: "cpus"))),
                 "--memory-mib", String(max(4, defaults.integer(forKey: "memoryGiB")) * 1024)]
@@ -62,7 +65,7 @@ final class RuntimeApp: NSObject, NSApplicationDelegate {
                 Task { @MainActor in
                     if code != 0 {
                         let alert = NSAlert()
-                        alert.messageText = "Could not start NixOS"
+                        alert.messageText = "Could not start ohmansy"
                         alert.informativeText = String(((try? String(contentsOf: log, encoding: .utf8)) ?? "See app-launcher.log.").suffix(2000))
                         alert.runModal()
                     }
@@ -71,6 +74,21 @@ final class RuntimeApp: NSObject, NSApplicationDelegate {
             }
             try task.run()
             process = task
+            showPreparationWindow()
+            preparationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if NSWorkspace.shared.runningApplications.contains(where: {
+                        $0.bundleIdentifier == "dev.hmans.ohmansy.runtime"
+                    }) {
+                        self.preparationWindow?.close()
+                        self.preparationWindow = nil
+                        self.preparationTimer?.invalidate()
+                        self.preparationTimer = nil
+                        _ = self.activateRuntime()
+                    }
+                }
+            }
         } catch {
             let alert = NSAlert()
             alert.messageText = "Could not start try ohmansy"
@@ -78,6 +96,26 @@ final class RuntimeApp: NSObject, NSApplicationDelegate {
             alert.runModal()
             NSApp.terminate(nil)
         }
+    }
+
+    private func showPreparationWindow() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 360, height: 120),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.title = "try ohmansy"
+        window.isReleasedWhenClosed = false
+        let label = NSTextField(labelWithString: "Preparing ohmansy…")
+        label.frame = NSRect(x: 28, y: 65, width: 304, height: 24)
+        label.font = .systemFont(ofSize: 17, weight: .medium)
+        let progress = NSProgressIndicator(frame: NSRect(x: 28, y: 30, width: 304, height: 16))
+        progress.isIndeterminate = true
+        progress.style = .bar
+        progress.startAnimation(nil)
+        window.contentView?.addSubview(label)
+        window.contentView?.addSubview(progress)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        preparationWindow = window
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

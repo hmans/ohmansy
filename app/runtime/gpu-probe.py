@@ -20,7 +20,7 @@ import time
 
 
 DEFAULT_APP = Path('/Applications/Try Omarchy.app')
-DEFAULT_STATE = Path(__file__).resolve().parent.parent / '.local/gpu-probe'
+DEFAULT_STATE = Path(__file__).resolve().parents[2] / '.local/gpu-probe'
 
 
 def qemu_value(value):
@@ -28,7 +28,7 @@ def qemu_value(value):
     return str(value).replace(',', ',,')
 
 
-def launch_arguments(app, iso, state, disk=None, helper=None, cpus=4, memory_mib=4096):
+def launch_arguments(app, iso, state, disk=None, helper=None, cpus=4, memory_mib=4096, ssh_port=2222, install_disk=None):
     resources = app / 'Contents/Resources'
     arguments = [
         str(helper / 'Contents/MacOS/try ohmansy' if helper else resources / 'runtime/bin/Try Omarchy'),
@@ -48,7 +48,8 @@ def launch_arguments(app, iso, state, disk=None, helper=None, cpus=4, memory_mib
     firmware = resources / 'firmware/edk2-aarch64-code.fd'
     if helper:
         arguments += ['-S', '-no-shutdown']
-        arguments[arguments.index('-netdev') + 1] = 'user,id=net,hostfwd=tcp:127.0.0.1:2222-:22'
+        if ssh_port:
+            arguments[arguments.index('-netdev') + 1] = f'user,id=net,hostfwd=tcp:127.0.0.1:{ssh_port}-:22'
         bootstrap = state / 'bootstrap.iso'
         if bootstrap.is_file():
             arguments += [
@@ -68,6 +69,11 @@ def launch_arguments(app, iso, state, disk=None, helper=None, cpus=4, memory_mib
             '-drive', f'if=pflash,format=raw,file={qemu_value(state / "efi-vars.fd")}',
             '-drive', f'if=none,id=root,format=raw,file={qemu_value(disk)}',
             '-device', 'virtio-blk-pci,drive=root,bootindex=0',
+        ]
+    if install_disk:
+        arguments += [
+            '-drive', f'if=none,id=install-target,format=raw,file={qemu_value(install_disk)}',
+            '-device', 'virtio-blk-pci,drive=install-target,bootindex=1',
         ]
     return arguments
 
@@ -211,6 +217,8 @@ def main():
     parser.add_argument('--helper', type=Path)
     parser.add_argument('--cpus', type=int, default=4)
     parser.add_argument('--memory-mib', type=int, default=4096)
+    parser.add_argument('--ssh-port', type=int, default=2222, help='Host SSH port; 0 disables forwarding for live-image tests')
+    parser.add_argument('--install-disk', type=Path, help='Explicit disposable raw target disk for an installer test')
     args = parser.parse_args()
     state = args.state.resolve()
     if args.action == 'console':
@@ -244,9 +252,15 @@ def main():
 
     if not 1 <= args.cpus <= (os.cpu_count() or 1) or args.memory_mib < 2048:
         raise RuntimeError('Choose a supported CPU count and at least 2048 MiB memory.')
+    if not 0 <= args.ssh_port <= 65535:
+        raise RuntimeError('Choose an SSH port from 1 to 65535, or 0 to disable forwarding.')
 
     if args.action == 'start' and (not args.iso or not args.iso.is_file()):
         raise RuntimeError('Pass --iso with a graphical aarch64 NixOS installer ISO.')
+    if args.install_disk:
+        if args.action != 'start':
+            raise RuntimeError('--install-disk is only supported for an ISO boot.')
+        require_regular_file(args.install_disk)
     if ',' in str(state) or len(os.fsencode(state / 'serial.sock')) >= 104:
         raise RuntimeError('Use a shorter state path without commas for the Unix sockets.')
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -260,7 +274,8 @@ def main():
             raise RuntimeError('The graphics probe is already running.') from None
         disk = prepare_vm_copy(args.source.resolve(), state) if args.action == 'start-copy' else None
         arguments = launch_arguments(app, args.iso.resolve() if args.iso else None, state, disk,
-                                     helper, args.cpus, args.memory_mib)
+                                     helper, args.cpus, args.memory_mib, args.ssh_port,
+                                     args.install_disk.resolve() if args.install_disk else None)
         environment = os.environ.copy()
         if helper:
             environment['DYLD_INSERT_LIBRARIES'] = str(helper / 'Contents/Frameworks/OhmansyChrome.dylib')

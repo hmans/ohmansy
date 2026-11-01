@@ -1,0 +1,40 @@
+name: Ohmansy images
+on:
+  workflow_dispatch:
+  push:
+    paths: ['flake.nix', 'flake.lock', 'nix/**', 'app/runtime/**', 'tools/**', '.github/workflows/images.yml']
+  pull_request:
+    paths: ['flake.nix', 'flake.lock', 'nix/**', 'app/runtime/**', 'tools/**', '.github/workflows/images.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  factory:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            max-jobs = 2
+      - name: Check desktop configuration and live-image policy
+        run: nix flake check --no-update-lock-file
+      - name: Check installer disk selection and source boundaries
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_installer.py'
+          python3 -m unittest discover -s tools/tests -p 'test_guest_dev.py'
+          python3 -m unittest discover -s tools/tests -p 'test_factory.py'
+      - name: Build the persistent ARM factory disk
+        run: nix build --no-update-lock-file .#vm-image
+      - name: Package preview artifacts
+        run: python3 tools/release/package-factory.py --image result/*.raw.zst --output dist/release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ohmansy-aarch64-factory-preview
+          path: dist/release/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14

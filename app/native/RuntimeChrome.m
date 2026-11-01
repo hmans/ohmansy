@@ -200,6 +200,7 @@ static void ResizeGuestWithoutShrinkingFrame(NSView *guest, SEL selector) {
 @property(nonatomic, strong) NSTextField *keyboardDetail;
 @property(nonatomic) NSTimeInterval lastCaptureAttempt;
 @property(nonatomic) BOOL inputLocked;
+@property(nonatomic) BOOL hostCursorHidden;
 - (void)install;
 - (void)releaseInput;
 - (void)keyboard:(id)sender;
@@ -207,6 +208,17 @@ static void ResizeGuestWithoutShrinkingFrame(NSView *guest, SEL selector) {
 
 static __weak OhmansyChrome *ActiveChrome;
 static IMP OriginalHandleEvent, OriginalGrabMouse, OriginalUngrabMouse;
+static IMP OriginalHideCursor, OriginalUnhideCursor;
+static void HideGuestHostCursor(NSView *guest, SEL selector) {
+    if (!ActiveChrome.inputLocked || ActiveChrome.stopped || ActiveChrome.hostCursorHidden) return;
+    ((void (*)(id, SEL))OriginalHideCursor)(guest, selector);
+    ActiveChrome.hostCursorHidden = YES;
+}
+static void UnhideGuestHostCursor(NSView *guest, SEL selector) {
+    if (!ActiveChrome.hostCursorHidden) return;
+    ActiveChrome.hostCursorHidden = NO;
+    ((void (*)(id, SEL))OriginalUnhideCursor)(guest, selector);
+}
 // The pinned runtime sends precise scroll events as touch gestures or relative
 // axes. Our USB tablet accepts wheel buttons instead. Preserve event metadata
 // while selecting the runtime's discrete wheel path.
@@ -273,7 +285,7 @@ static bool HandleGuestEvent(NSView *guest, SEL selector, NSEvent *event) {
     return ((bool (*)(id, SEL, id))OriginalHandleEvent)(guest, selector, event);
 }
 static void GrabGuestMouse(NSView *guest, SEL selector) {
-    if (ActiveChrome.stopped) return;
+    if (ActiveChrome.stopped || !ActiveChrome.inputLocked) return;
     ((void (*)(id, SEL))OriginalGrabMouse)(guest, selector);
     guest.window.title = ActiveChrome.inputLocked ? @"try ohmansy — Input locked · ⌃⌥G to release" : @"try ohmansy";
 }
@@ -352,6 +364,8 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
         OriginalHandleEvent = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"handleEvent:")), (IMP)HandleGuestEvent);
         OriginalGrabMouse = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"grabMouse")), (IMP)GrabGuestMouse);
         OriginalUngrabMouse = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"ungrabMouse")), (IMP)UngrabGuestMouse);
+        OriginalHideCursor = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"hideCursor")), (IMP)HideGuestHostCursor);
+        OriginalUnhideCursor = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"unhideCursor")), (IMP)UnhideGuestHostCursor);
         self.previousDelegate = window.delegate;
         Class renderLayer = NSClassFromString(@"QemuCGLLayer");
         EngineLockHeld = (bool (*)(void))dlsym(RTLD_DEFAULT, "bql_locked");
@@ -566,6 +580,12 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
     if (tap && CFMachPortIsValid(tap)) CGEventTapEnable(tap, false);
     if (wasLocked && OriginalUngrabMouse)
         ((void (*)(id, SEL))OriginalUngrabMouse)(self.guest, NSSelectorFromString(@"ungrabMouse"));
+    // QEMU may already have released its grab on mouse exit. Restore our one
+    // outstanding hide even in that path; never decrement AppKit's count twice.
+    UnhideGuestHostCursor(self.guest, NSSelectorFromString(@"unhideCursor"));
+    SEL releaseKeys = NSSelectorFromString(@"raiseAllKeys");
+    if ([self.guest respondsToSelector:releaseKeys])
+        ((void (*)(id, SEL))[self.guest methodForSelector:releaseKeys])(self.guest, releaseKeys);
     self.window.title = @"try ohmansy";
     [self updateKeyboardAccess];
 }

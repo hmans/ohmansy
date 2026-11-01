@@ -1,6 +1,6 @@
 // No application, window server, or VM is started by this regression test.
 #define OHMANSY_CHROME_TESTING 1
-#import "../../macos/RuntimeChrome.m"
+#import "../../native/RuntimeChrome.m"
 
 @interface TestWindow : NSObject
 @property(nonatomic, strong) NSView *contentView;
@@ -28,11 +28,16 @@
 
 static int resizeRequests;
 static int captureAttempts;
+static int cursorHides, cursorShows;
+static int keyReleases;
+static void HideCursor(id guest, SEL selector) { cursorHides++; }
+static void ShowCursor(id guest, SEL selector) { cursorShows++; }
 @interface TestKeyboardGuest : NSView
 - (void)setFullGrab:(id)sender;
 @end
 @implementation TestKeyboardGuest
 - (void)setFullGrab:(id)sender { captureAttempts++; }
+- (void)raiseAllKeys { keyReleases++; }
 @end
 @interface TestKeyboardChrome : OhmansyChrome
 @property(nonatomic) BOOL permissionGranted;
@@ -100,6 +105,20 @@ int main(void) {
         [keyboardChrome windowDidResignKey:[NSNotification notificationWithName:NSWindowDidResignKeyNotification object:nil]];
         NSCAssert(!keyboardChrome.inputLocked, @"Leaving the window must release input.");
         ActiveChrome = keyboardChrome;
+        OriginalHideCursor = (IMP)HideCursor;
+        OriginalUnhideCursor = (IMP)ShowCursor;
+        keyboardChrome.inputLocked = YES;
+        HideGuestHostCursor(keyboardChrome.guest, NSSelectorFromString(@"hideCursor"));
+        HideGuestHostCursor(keyboardChrome.guest, NSSelectorFromString(@"hideCursor"));
+        NSCAssert(cursorHides == 1, @"Repeated grabs must not accumulate cursor hides.");
+        keyboardChrome.inputLocked = NO; // Engine's mouse-exit path clears this first.
+        int previousKeyReleases = keyReleases;
+        [keyboardChrome releaseInput];
+        [keyboardChrome releaseInput];
+        NSCAssert(keyReleases == previousKeyReleases + 2, @"Unlock must clear held keys even after the engine releases its grab.");
+        NSCAssert(cursorShows == 1 && !keyboardChrome.hostCursorHidden, @"Mouse exit must balance exactly one hide, without another click.");
+        HideGuestHostCursor(keyboardChrome.guest, NSSelectorFromString(@"hideCursor"));
+        NSCAssert(cursorHides == 1, @"Unlocked hover must not hide the Mac cursor.");
         keyboardChrome.stopped = YES;
         NSEvent *command = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:NSEventModifierFlagCommand timestamp:0 windowNumber:0 context:nil characters:@"q" charactersIgnoringModifiers:@"q" isARepeat:NO keyCode:12];
         NSCAssert(!HandleGuestEvent(keyboardChrome.guest, @selector(description), command), @"Stopped guest must leave events to AppKit.");

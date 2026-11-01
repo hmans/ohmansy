@@ -4,8 +4,8 @@ import shutil
 import subprocess
 import tempfile
 
-root = Path(__file__).resolve().parent.parent
-source = root / 'macos/Ohmansy.icon'
+root = Path(__file__).resolve().parents[2]
+source = root / 'app/resources/Ohmansy.icon'
 output = root / '.build/app-icon'
 output.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='ohmansy-icon-') as temporary:

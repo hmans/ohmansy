@@ -1,5 +1,5 @@
 import unittest
-from signing import choose_identity
+from tools.build.signing import choose_identity
 
 
 class SigningTests(unittest.TestCase):

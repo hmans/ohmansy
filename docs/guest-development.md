@@ -1,7 +1,12 @@
 # Guest development
 
+This page describes the existing personal development VM and earlier bootstrap
+steps. New product work uses the independent root flake; see
+[Ohmansy development](ohmansy-development.md). Do not add new dependencies on
+the reference `flakey/` checkout.
+
 The accelerated VM forwards `127.0.0.1:2222` on the Mac to guest SSH port 22.
-`guest/ssh/configuration.nix` enables key-only login for `hmans`. It imports the
+`app/legacy/guest/ssh/configuration.nix` enables key-only login for `hmans`. It imports the
 existing `/etc/nixos/ohmansy/configuration.nix` wrapper and does not grant
 passwordless sudo.
 
@@ -14,7 +19,7 @@ ssh -p 2222 -i .local/ssh/id_ed25519 \
   -o UserKnownHostsFile=.local/ssh/known_hosts hmans@127.0.0.1
 ```
 
-For a new guest, place `guest/ssh/configuration.nix`, `guest/ssh/setup.sh`, and
+For a new guest, place `app/legacy/guest/ssh/configuration.nix`, `app/legacy/guest/ssh/setup.sh`, and
 the public key named `id_ed25519.pub` in one guest directory. Run `sudo bash
 setup.sh` there. Compare its displayed host fingerprint with `ssh-keyscan`
 before trusting the host key. Do not transfer the private key into the guest.
@@ -45,7 +50,7 @@ package differences and the initial 1Password/NetBird setup.
 
 ## Earlier Niri experiment
 
-`guest/niri/configuration.nix` was the initial adapter for the separate flakey checkout in this ARM
+`app/legacy/guest/niri/configuration.nix` was the initial adapter for the separate flakey checkout in this ARM
 VM. The guest has a copy of flakey at `/home/hmans/flakey` and the guest modules
 at `/home/hmans/ohmansy-guest`. The SSH public key is next to the SSH module.
 The Mac's `flakey/` repository remains separate and ignored by this repository.

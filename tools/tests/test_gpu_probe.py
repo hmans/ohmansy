@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-spec = importlib.util.spec_from_file_location('gpu_probe', Path(__file__).with_name('gpu-probe.py'))
+spec = importlib.util.spec_from_file_location('gpu_probe', Path(__file__).resolve().parents[2] / 'app/runtime/gpu-probe.py')
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
 
@@ -47,6 +47,23 @@ class GPUProbeTests(unittest.TestCase):
                     probe.prepare_vm_copy(source, target)
             self.assertEqual((source / 'disk.raw').read_bytes(), b'original')
             self.assertFalse((target / 'disk.raw').exists())
+
+    def test_live_helper_can_run_without_exposing_ssh_or_attaching_a_disk(self):
+        args = probe.launch_arguments(Path('/unused'), Path('/tmp/live.iso'), Path('/tmp/live-test'),
+                                      helper=Path('/tmp/helper.app'), ssh_port=0)
+        self.assertFalse(any('hostfwd=' in arg for arg in args))
+        drives = [args[i + 1] for i, arg in enumerate(args) if arg == '-drive']
+        self.assertEqual(len(drives), 1)
+        self.assertIn('readonly=on', drives[0])
+
+    def test_installer_only_attaches_the_explicit_test_disk(self):
+        args = probe.launch_arguments(Path('/unused'), Path('/tmp/live.iso'), Path('/tmp/test'),
+                                      helper=Path('/tmp/helper.app'), ssh_port=0,
+                                      install_disk=Path('/tmp/test/target.raw'))
+        drives = [args[i + 1] for i, arg in enumerate(args) if arg == '-drive']
+        self.assertEqual(len(drives), 2)
+        self.assertIn('readonly=on', drives[0])
+        self.assertEqual(drives[1], 'if=none,id=install-target,format=raw,file=/tmp/test/target.raw')
 
     def test_copy_is_independent_and_is_not_replaced(self):
         with tempfile.TemporaryDirectory() as temporary:

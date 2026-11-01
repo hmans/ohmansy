@@ -4,9 +4,9 @@ The main app now launches an app-owned QEMU helper with `virtio-gpu-gl-pci`,
 VirGL, and native macOS OpenGL. It follows the graphics architecture described by
 [Try Omarchy](https://github.com/omacom/try-omarchy/blob/main/docs/architecture.md).
 
-This is an independent launcher. `scripts/stage-runtime.py` packages a pinned
+This is an independent launcher. `tools/build/stage-runtime.py` packages a pinned
 engine from the locally installed Try Omarchy app under
-`Ohmansy.app/Contents/Helpers/OhmansyVM.app`. Its binaries and libraries stay in
+`Ohmansy.app/Contents/Helpers/try ohmansy.app`. Its binaries and libraries stay in
 ignored build output. The source app is not modified. Local builds include its
 MIT license, credits, and firmware licenses. A distributable release still needs
 a reproducible runtime build and complete third-party source/license compliance.
@@ -15,13 +15,13 @@ a reproducible runtime build and complete third-party source/license compliance.
 
 `RuntimeApp` is a windowless coordinator that starts the helper with saved CPU
 and memory preferences. The helper owns the only window, including its launch
-screen. QEMU starts paused (`-S`); **Start NixOS** resets and resumes it. With
+screen. QEMU starts paused (`-S`); **Start ohmansy** resets and resumes it. With
 `-no-shutdown`, guest shutdown stops emulation and returns to the launch screen
 in that same window. Closing or quitting requests shutdown before exiting.
-The accelerated disk location is saved under `acceleratedVMDirectory`; the
-existing `.local/gpu-vm` copy is adopted in this development checkout. A fresh
-installation defaults to `~/Library/Application Support/Ohmansy/AcceleratedVM`.
-The original Apple Virtualization disk remains separate.
+The factory disk location is saved under `factoryVMDirectory`; an existing
+`.local/factory-preview` is adopted in this development checkout. A fresh
+installation defaults to `~/Library/Application Support/Ohmansy/FactoryVM`.
+The old `.local/gpu-vm` builder and original Apple Virtualization disk remain separate.
 
 The helper loads our `OhmansyChrome.dylib` in its own process. The adapter wraps
 the pinned runtime's Cocoa guest view in a rounded inset, provides native
@@ -99,9 +99,9 @@ Logs are under `.local/gpu-probe/`:
 The CLI equivalent is:
 
 ```sh
-python3 scripts/gpu-probe.py start --iso /path/to/nixos-aarch64.iso
-python3 scripts/gpu-probe.py diagnose
-python3 scripts/gpu-probe.py shutdown
+python3 app/runtime/gpu-probe.py start --iso /path/to/nixos-aarch64.iso
+python3 app/runtime/gpu-probe.py diagnose
+python3 app/runtime/gpu-probe.py shutdown
 ```
 
 The launcher verifies the installed runtime's signature before use. In a
@@ -123,8 +123,8 @@ they do not import subsequent changes from the original VM. Changes in either
 VM stay independent. The probe does not copy the original MAC address.
 
 ```sh
-python3 scripts/gpu-probe.py start-copy --state "$PWD/.local/gpu-vm"
-python3 scripts/gpu-probe.py shutdown --state "$PWD/.local/gpu-vm"
+python3 app/runtime/gpu-probe.py start-copy --state "$PWD/.local/gpu-vm"
+python3 app/runtime/gpu-probe.py shutdown --state "$PWD/.local/gpu-vm"
 ```
 
 The live-guest diagnostic button is specific to the installer ISO's serial
