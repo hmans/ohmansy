@@ -1,8 +1,8 @@
 # Building Ohmansy
 
 The root flake defines the official system. The ignored `flakey/` checkout is
-reference material only. Its VM can serve as an ARM builder, but its accounts,
-configuration, and disk are not inputs to the product.
+reference material only. Its old personal VM has been deleted. Use the official
+development guest or ARM CI for builds; personal configuration is not a product input.
 
 ## Shared system and image targets
 
@@ -68,8 +68,10 @@ paste into a guest terminal. Keep the development account and SSH configuration
 in the guest's local overlay, outside the reusable product modules.
 
 The current factory development VM forwards localhost port 2223 and uses
-`.local/ssh/factory-known-hosts`. The older personal builder uses port 2222 and
-`.local/ssh/known_hosts`. The factory forwarding currently comes from QMP and
+`.local/ssh/factory-known-hosts`. Port 2222 and `.local/ssh/known_hosts` are legacy
+tool defaults for the deleted personal builder; do not use them for this guest.
+Check ignored `.local/SESSION.md` for local handoff details, if present.
+The factory forwarding currently comes from QMP and
 must be restored if the host engine exits; a guest reboot preserves it.
 
 For the current factory VM, pass `--port 2223 --known-hosts
@@ -100,7 +102,7 @@ Use image builds to test provisioning and releases, not for every desktop edit.
 
 The normal app boots the official factory. Open `dist/Ohmansy.app` and click
 **Start ohmansy**. On first launch it prepares a persistent disk; subsequent
-launches reuse it. The old personal VM stays untouched. Development builds reuse
+launches reuse it. Development builds reuse
 an existing `.local/factory-preview` VM; otherwise the app creates
 `~/Library/Application Support/Ohmansy/FactoryVM`. The selected path is saved
 under the separate `factoryVMDirectory` preference.

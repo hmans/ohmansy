@@ -6,6 +6,7 @@ dist/
 result
 __pycache__/
 .direnv/
+.means/
 
 # Local credentials and signing material must not enter source control.
 .env

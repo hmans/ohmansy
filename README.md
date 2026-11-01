@@ -24,6 +24,7 @@ on the separate, ignored `flakey/` reference repository.
 | `tools/release/` | Image packaging, manifests, and source archives |
 | `tools/tests/` | Python tooling and guest-setup regression tests |
 | `docs/` | Development workflows and architecture |
+| `memory/` | Means collection of durable engineering findings and lessons |
 | `.local/`, `.build/`, `dist/` | Ignored local state, build cache, and artifacts |
 
 Keep accounts, keys, and disk identities out of reusable modules. Desktop assets
@@ -77,6 +78,8 @@ a local guest overlay and is excluded from product images.
 
 ## Further reading
 
+- [Agent instructions](AGENTS.md) and [engineering memory](memory/MEANS.md):
+  session workflow and project knowledge. Start with `means list --path memory`.
 - [Ohmansy development](docs/ohmansy-development.md): flake outputs, SSH builds,
   image packaging, and release work.
 - [Graphics integration](docs/graphics.md): the accelerated runtime and input.

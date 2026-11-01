@@ -1,7 +1,8 @@
 # Guest development
 
-This page describes the existing personal development VM and earlier bootstrap
-steps. New product work uses the independent root flake; see
+This page is a historical record of the retired personal development VM and
+earlier bootstrap steps. That VM has been deleted; the commands below are not
+the current development workflow. New product work uses the independent root flake; see
 [Ohmansy development](ohmansy-development.md). Do not add new dependencies on
 the reference `flakey/` checkout.
 
