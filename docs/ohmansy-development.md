@@ -87,8 +87,8 @@ python3 tools/dev/guest-dev.py fetch --host USER@127.0.0.1 --directory /GUEST/PA
 Use the absolute path printed by `sync`. Each sync sends only `flake.nix`,
 `flake.lock`, and `nix/` into a new writable snapshot. Guest edits are not replaced.
 Use `--target iso` or `--target installer-iso` on both build and fetch for an ISO.
-Fetch refuses to overwrite artifacts. Once a remote exists, clone the repository
-inside the guest for normal development. No host home share is needed.
+Fetch refuses to overwrite artifacts. For normal development, clone
+`https://github.com/hmans/ohmansy.git` inside the guest. No host home share is needed.
 
 For routine guest changes, build a local host configuration that imports the
 shared modules and preserves the guest's owner and development overlay. Do not
@@ -138,7 +138,8 @@ Each new VM is decompressed separately; a shared APFS factory cache is future wo
 
 `.github/workflows/images.yml` checks and builds the factory on ARM Linux, then
 uploads the packaged artifacts. Actions are pinned; the workflow does not publish
-releases. Hosted CI has not run because this repository has no remote.
+releases. Runs are available in the repository's GitHub Actions tab. A successful
+image build still needs a separate boot test.
 
 Verify account setup, login, restart persistence, guest rebuild and rollback,
 input, resizing, and clean shutdown before release. The installer needs a separate
