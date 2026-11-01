@@ -1,0 +1,9 @@
+# systemd-repart uses util-linux unshare to assemble images without root.
+# Allow that executable on disposable CI runners; retain Ubuntu's restriction
+# for other unconfined applications.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile ohmansy-nix-unshare /nix/store/*/bin/unshare flags=(unconfined) {
+  userns,
+}
