@@ -3,7 +3,6 @@ import Virtualization
 import UniformTypeIdentifiers
 import VMDisplay
 
-@main
 struct OhmansyApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var vm = VirtualMachine()
@@ -31,7 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.informativeText = "The VM is still running. Shut it down, then quit try ohmansy."
         alert.addButton(withTitle: "Shut Down NixOS")
         alert.addButton(withTitle: "Keep Running")
-        if alert.runModal() == .alertFirstButtonReturn { vm?.shutDown() }
+        if alert.runModal() == .alertFirstButtonReturn {
+            vm?.shutDown()
+        }
         return .terminateCancel
     }
 
@@ -66,7 +67,7 @@ struct ContentView: View {
                         .strokeBorder(.black.opacity(0.3), lineWidth: 1)
                         .allowsHitTesting(false)
                 }
-                .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                .shadow(color: .black.opacity(0.28), radius: 5, y: 2)
                 .padding(10)
             } else {
                 VStack(alignment: .leading, spacing: 22) {

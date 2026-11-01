@@ -4,6 +4,7 @@ dist/
 .local/
 .DS_Store
 result
+__pycache__/
 
 # Separate local repository; never include it in this project.
 /flakey/

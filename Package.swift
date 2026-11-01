@@ -9,6 +9,7 @@ let package = Package(
         .target(name: "VMStorage"),
         .target(name: "VMDisplay"),
         .executableTarget(name: "Ohmansy", dependencies: ["VMStorage", "VMDisplay"]),
+        .executableTarget(name: "GraphicsProbe"),
         .testTarget(name: "VMStorageTests", dependencies: ["VMStorage"]),
         .testTarget(name: "VMDisplayTests", dependencies: ["VMDisplay"]),
     ]

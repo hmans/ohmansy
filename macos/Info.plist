@@ -6,6 +6,8 @@
     <key>CFBundleName</key><string>try ohmansy</string>
     <key>CFBundleDisplayName</key><string>try ohmansy</string>
     <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleIconFile</key><string>Ohmansy.icns</string>
+    <key>CFBundleIconName</key><string>Ohmansy</string>
     <key>CFBundleShortVersionString</key><string>0.1.0</string>
     <key>CFBundleVersion</key><string>1</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
