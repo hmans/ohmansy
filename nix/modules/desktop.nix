@@ -25,18 +25,29 @@
   };
   hardware.graphics.enable = true;
   programs.firefox.enable = true;
-  fonts.packages = with pkgs; [ inter jetbrains-mono ];
+  fonts.packages = with pkgs; [ inter jetbrains-mono ibm-plex ];
 
   # No account, credentials, machine identifiers, or personal services here.
   environment.systemPackages = with pkgs; [
-    foot fuzzel waybar mako swaybg swaylock nautilus
+    foot fuzzel quickshell mako swaybg swaylock nautilus
     xwayland-satellite adwaita-icon-theme wl-clipboard
     git vim curl jq python3
   ];
   environment.sessionVariables.NIRI_CONFIG = lib.mkDefault "/etc/ohmansy/niri.kdl";
   environment.etc."ohmansy/niri.kdl".source = ./desktop/niri.kdl;
-  environment.etc."xdg/waybar/config".text = lib.mkDefault (builtins.readFile ./desktop/waybar.json);
-  environment.etc."xdg/waybar/style.css".source = ./desktop/waybar.css;
+  environment.etc."xdg/quickshell/ohmansy".source = ./desktop/quickshell;
+  systemd.user.services.quickshell = {
+    description = "Ohmansy desktop panel";
+    wantedBy = [ "niri.service" ];
+    after = [ "niri.service" ];
+    partOf = [ "niri.service" ];
+    path = with pkgs; [ niri fuzzel foot networkmanager ];
+    serviceConfig = {
+      ExecStart = "${pkgs.quickshell}/bin/quickshell --path /etc/xdg/quickshell/ohmansy/shell.qml";
+      Restart = "on-failure";
+      RestartSec = 2;
+    };
+  };
   environment.etc."xdg/foot/foot.ini".text = ''
     [main]
     font=JetBrains Mono:size=11

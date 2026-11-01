@@ -16,7 +16,6 @@ layout {
 }
 cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
 prefer-no-csd
-spawn-at-startup "waybar"
 spawn-at-startup "mako"
 spawn-at-startup "swaybg" "-c" "#171c29"
 window-rule {

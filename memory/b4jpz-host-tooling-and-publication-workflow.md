@@ -33,8 +33,17 @@ checking to get around a mismatch or assume the old personal VM still exists.
 
 Sync into a new snapshot. Preserve installed owner, storage, and development
 overlays when building an installed host. Factory/live targets are image outputs,
-not replacements for the current guest configuration. Keep sudo password-protected;
-the user enters credentials directly. Never use terminal UI automation.
+not replacements for the current guest configuration. Private development guests may
+opt in to passwordless sudo with `guest-dev.py prepare-access`. Keep the generated
+overlay under ignored `.local/` and in the installed guest only. The first activation
+needs the owner's password in their own terminal. Never use terminal UI automation.
+
+Image profiles import `nix/modules/image-policy.nix` and reject development markers,
+SSH access or keys, extra owner accounts, and custom sudo rules during system
+build evaluation. The standard live-console wheel rule is allowed. Source archives
+exclude `tools/dev/` and `.local/`. Flake checks exercise rejected configurations;
+Python tests cover generation and archive exclusion. These checks do not certify
+arbitrary input disks passed to the packaging tools.
 
 QMP is the lifecycle/control channel. Use an explicit state directory. The
 gpu-probe `shutdown` action requests a clean shutdown; `stop` sends QEMU `quit`

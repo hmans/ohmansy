@@ -95,8 +95,50 @@ Fetch refuses to overwrite artifacts. For normal development, clone
 For routine guest changes, build a local host configuration that imports the
 shared modules and preserves the guest's owner and development overlay. Do not
 activate the factory or live profile on an existing installation. Build the
-system without sudo, then use password-protected sudo to select it for boot.
+system without sudo, then use sudo to select it for boot. The private development
+overlay below permits unattended activation; shipped installations require a password.
 Use image builds to test provisioning and releases, not for every desktop edit.
+
+### Opt in to development access
+
+Generate an overlay for an existing guest owner and an Ed25519 public key:
+
+```sh
+python3 tools/dev/guest-dev.py prepare-access \
+  --guest-user USER --public-key .local/ssh/id_ed25519.pub
+```
+
+This writes `.local/development-access.nix` with mode 0600 and refuses to replace
+an existing file. `--access-output` can select another path under `.local/`.
+The overlay enables key-only SSH for that account and passwordless sudo. The
+account and anyone with its SSH key can administer this development VM.
+It does not create an owner or change storage.
+
+Transfer the file through an existing trusted SSH connection. Install it as
+`/etc/nixos/development.nix` and include `./development.nix` in the installed
+host's flake modules beside `./owner.nix`. Preserve any other local settings
+when replacing an older development overlay. The first activation requires
+the owner's password in their own terminal; never send that password to an agent.
+After activation, verify `sudo -n true` over SSH. Later builds and activations
+can run unattended. QML preview changes do not need sudo.
+
+Development access stays outside the image pipeline:
+
+- The generator and template live under `tools/dev/`. Generated account/key
+  configuration lives under ignored `.local/`, then on the private guest.
+- `sync` and release source archives contain only the root flake, lock, and
+  `nix/`. They exclude both the template and generated overlay.
+- Factory, live, and installer image profiles assert that no development marker,
+  SSH keys, extra owner accounts, enabled SSH service, or custom sudo rules
+  are present. Direct image builds enforce these assertions too. The live
+  account's standard local wheel sudo rule remains allowed.
+- `nix flake check` includes negative tests that inject development settings
+  and require the image policy to reject them. Python tests check generation
+  and archive exclusion.
+
+Build release images from the official image targets. Never package a private
+development VM disk as a factory. These checks protect configuration builds;
+they do not inspect an arbitrary disk supplied to the packaging tools.
 
 ## Package and boot on macOS
 

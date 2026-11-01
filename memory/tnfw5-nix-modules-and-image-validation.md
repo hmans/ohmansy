@@ -17,6 +17,19 @@ Keep the desktop module usable by people with different accounts and hardware.
 Machine-specific storage and credentials belong to host configurations, not
 `modules/desktop.nix` or `modules/vm.nix`.
 
+The desktop panel uses Quickshell 0.3.0 from the locked Nixpkgs source. Its
+QML lives in `nix/modules/desktop/quickshell/`; the user service starts and
+stops with `niri.service`. This first migration ports flakey's panel, Niri
+state, and audio controls. Fuzzel and Mako remain separate. The installer
+module supplies `OHMANSY_INSTALLER` only to the live installer panel.
+No runtime file or flake input points to the ignored reference checkout.
+
+The migration passed ARM Linux flake checks and an installed-system build
+on 2026-11-01. The generated private development overlay and panel were then activated in the
+installed guest; the installed `quickshell.service` ran under Niri. This is not
+proof of a factory-image build or a new boot. Quickshell uses comment pragmas
+(`//@ pragma`), not a QML `pragma Quickshell` statement.
+
 Use the locked Nixpkgs source to verify module options and package names.
 Do not update the lock file or state versions as a side effect of another task.
 Do not add personal services, private keys, preset installed-user passwords,

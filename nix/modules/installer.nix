@@ -13,20 +13,14 @@ let
     icon = "system-software-install";
     categories = [ "System" ];
   };
+  panelInstaller = pkgs.writeShellScript "ohmansy-panel-install" ''
+    exec ${pkgs.foot}/bin/foot --title=Install-Ohmansy sudo ${installer}/bin/ohmansy-install
+  '';
 in {
   environment.systemPackages = [ installer launcher ];
   environment.etc."ohmansy/source/flake.nix".source = ../../flake.nix;
   environment.etc."ohmansy/source/flake.lock".source = ../../flake.lock;
   environment.etc."ohmansy/source/nix".source = ../.;
   # Live-only launcher button; installed desktops retain the normal panel.
-  environment.etc."xdg/waybar/config".text = builtins.toJSON (
-    (builtins.fromJSON (builtins.readFile ./desktop/waybar.json)) // {
-      modules-left = [ "custom/launcher" "custom/install" "niri/workspaces" ];
-      "custom/install" = {
-        format = "Install Ohmansy";
-        on-click = "${pkgs.foot}/bin/foot --title=Install-Ohmansy sudo ${installer}/bin/ohmansy-install";
-        tooltip = false;
-      };
-    }
-  );
+  systemd.user.services.quickshell.environment.OHMANSY_INSTALLER = "${panelInstaller}";
 }

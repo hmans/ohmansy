@@ -4,6 +4,7 @@
     (modulesPath + "/installer/cd-dvd/installation-cd-base.nix")
     ../modules/desktop.nix
     ../modules/vm.nix
+    (import ../modules/image-policy.nix { live = true; })
   ];
   system.stateVersion = "26.05";
   isoImage = {

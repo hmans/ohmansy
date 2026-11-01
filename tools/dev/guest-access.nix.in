@@ -1,0 +1,23 @@
+# Generated for one private development guest. Never import into image profiles.
+{ config, ... }:
+{
+  assertions = [{
+    assertion = config.users.users.@USER@.isNormalUser;
+    message = "Development access requires an existing installed owner.";
+  }];
+  environment.etc."ohmansy/development-access".text = "Private development guest\n";
+  services.openssh = {
+    enable = true;
+    settings = {
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+      PermitRootLogin = "no";
+      AllowUsers = [ @USER@ ];
+    };
+  };
+  users.users.@USER@.openssh.authorizedKeys.keys = [ @KEY@ ];
+  security.sudo.extraRules = [{
+    users = [ @USER@ ];
+    commands = [{ command = "ALL"; options = [ "NOPASSWD" ]; }];
+  }];
+}

@@ -3,6 +3,11 @@
 **Ohmansy** is a NixOS desktop built around Niri. **try ohmansy** is its native
 macOS host, with an accelerated guest display and a persistent private VM disk.
 
+Quickshell supplies the per-monitor panel, workspace buttons, clock, audio
+controls, network status, and system tray. Its QML files are in
+`nix/modules/desktop/quickshell/`. Fuzzel still launches apps, and Mako handles
+notifications. The panel runs as a user service tied to the Niri session.
+
 The app is independently implemented and inspired by
 [Try Omarchy](https://github.com/omacom/try-omarchy). Development builds package a
 pinned copy of its QEMU/VirGL engine. The official Ohmansy flake does not depend

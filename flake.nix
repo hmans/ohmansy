@@ -19,6 +19,10 @@
         inherit system;
         modules = [ ./nix/profiles/installer.nix ];
       };
+      rejectsDevelopment = base: extra:
+        let candidate = base.extendModules { modules = [ extra ]; };
+        in builtins.any (item: !item.assertion &&
+          nixpkgs.lib.hasPrefix "Image policy:" item.message) candidate.config.assertions;
       vmConfig = pkgs.writeText "ohmansy-vm-validation.kdl" (
         builtins.replaceStrings [ "/etc/ohmansy/desktop.kdl" ]
           [ "${./nix/modules/desktop/niri.kdl}" ]
@@ -38,6 +42,21 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        image-development-boundary =
+          assert builtins.all (base: rejectsDevelopment base {
+            environment.etc."ohmansy/development-access".text = "test";
+          }) [ appliance live installer ];
+          assert rejectsDevelopment appliance {
+            security.sudo.extraRules = [{ users = [ "test-owner" ];
+              commands = [{ command = "ALL"; options = [ "NOPASSWD" ]; }]; }];
+          };
+          assert rejectsDevelopment live {
+            users.users.root.openssh.authorizedKeys.keys = [ "ssh-ed25519 AAAA test" ];
+          };
+          assert rejectsDevelopment installer {
+            services.openssh.enable = nixpkgs.lib.mkOverride 0 true;
+          };
+          pkgs.runCommand "ohmansy-image-development-boundary" {} ''touch "$out"'';
         appliance-policy = assert !appliance.config.services.openssh.enable;
           assert !appliance.config.services.displayManager.autoLogin.enable;
           assert appliance.config.security.sudo.wheelNeedsPassword;

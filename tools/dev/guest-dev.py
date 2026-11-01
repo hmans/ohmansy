@@ -3,12 +3,39 @@
 import argparse
 from datetime import datetime, timezone
 import io
+import json
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def access_module(user, public_key):
+    """Render a private, opt-in overlay; never include it in source_archive()."""
+    if not re.fullmatch(r'[a-z_][a-z0-9_-]*', user) or user in {'root', 'nixos'}:
+        raise ValueError('Use the existing, non-root installed owner account')
+    fields = public_key.strip().split()
+    if len(fields) < 2 or fields[0] != 'ssh-ed25519' or not re.fullmatch(r'[A-Za-z0-9+/]+={0,2}', fields[1]):
+        raise ValueError('Expected an OpenSSH Ed25519 public key')
+    # Drop the optional comment; neither value can contain Nix interpolation.
+    key = ' '.join(fields[:2])
+    template = (ROOT / 'tools/dev/guest-access.nix.in').read_text()
+    return template.replace('@USER@', json.dumps(user)).replace('@KEY@', json.dumps(key))
+
+
+def write_access_module(user, key_path, output):
+    output = output.resolve()
+    if not output.is_relative_to((ROOT / '.local').resolve()):
+        raise ValueError('Development overlays must be written under .local/')
+    content = access_module(user, key_path.read_text())
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open('x') as stream:
+        output.chmod(0o600)
+        stream.write(content)
+    return output
 
 
 def source_archive():
@@ -29,8 +56,11 @@ def source_archive():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['sync', 'check', 'build', 'fetch'])
-    parser.add_argument('--host', required=True, help='SSH destination, e.g. user@127.0.0.1')
+    parser.add_argument('action', choices=['prepare-access', 'sync', 'check', 'build', 'fetch'])
+    parser.add_argument('--host', help='SSH destination, e.g. user@127.0.0.1')
+    parser.add_argument('--guest-user', help='Existing guest owner for prepare-access')
+    parser.add_argument('--public-key', type=Path, help='Ed25519 public key for prepare-access')
+    parser.add_argument('--access-output', type=Path, default=ROOT / '.local/development-access.nix')
     parser.add_argument('--port', type=int, default=2222)
     parser.add_argument('--identity', type=Path, default=ROOT / '.local/ssh/id_ed25519')
     parser.add_argument('--known-hosts', type=Path, default=ROOT / '.local/ssh/known_hosts')
@@ -38,6 +68,16 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT / 'dist/iso')
     parser.add_argument('--target', choices=['vm-image', 'iso', 'installer-iso'], default='vm-image')
     args = parser.parse_args()
+    if args.action == 'prepare-access':
+        if not args.guest_user or not args.public_key:
+            parser.error('prepare-access requires --guest-user and --public-key')
+        try:
+            print(write_access_module(args.guest_user, args.public_key, args.access_output))
+        except (ValueError, OSError) as error:
+            parser.error(str(error))
+        return
+    if not args.host:
+        parser.error('--host is required for SSH actions')
     if args.host.startswith('-'):
         parser.error('Invalid SSH destination')
     ssh = ['ssh', '-p', str(args.port), '-i', str(args.identity),

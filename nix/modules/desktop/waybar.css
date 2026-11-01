@@ -1,6 +1,0 @@
-* { font-family: Inter, sans-serif; font-size: 13px; border: none; }
-window#waybar { background: #10131a; color: #d8dfeb; }
-#custom-launcher { font-weight: bold; padding: 0 16px; color: #9bbdf4; }
-#workspaces button { padding: 0 8px; color: #8a95a8; background: transparent; }
-#workspaces button.active { color: #fff; background: #303c52; border-radius: 8px; }
-#tray { padding-right: 16px; }

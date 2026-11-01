@@ -8,7 +8,8 @@ let
     options init=${config.system.build.toplevel}/init ${toString config.boot.kernelParams}
   '';
 in {
-  imports = [ (modulesPath + "/image/repart.nix") ../modules/persistent-vm.nix ../modules/first-boot.nix ];
+  imports = [ (modulesPath + "/image/repart.nix") ../modules/persistent-vm.nix ../modules/first-boot.nix
+    (import ../modules/image-policy.nix {}) ];
   services.openssh.enable = lib.mkForce false;
   environment.etc."ohmansy/source/flake.lock".source = ../../flake.lock;
   environment.etc."ohmansy/source/nix".source = ../.;
