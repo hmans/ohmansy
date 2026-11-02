@@ -160,3 +160,16 @@ the installed build passed; dark mode and live return to light were visually
 verified, then the original guest preference was restored. No reboot or ISO build.
 The launcher now uses xray false to show underlying windows; its blur remains
 unresolved on virgl. Bar and audio popup retain cached wallpaper blur.
+
+Desktop shortcut migration (2026-11-02): all 58 active reference Niri bindings
+are present; see docs/keyboard-shortcuts.md for the current map. The packaged
+desktop helper (named `ohmansy-desktop`) supplies fixed actions and Quickshell
+menu modes; it never evaluates history content or window titles as commands.
+Cliphist runs as a Niri user service, Mako retains notification history, and
+Swaylock uses PAM with a forking service to establish the lock before suspend.
+Quickshell IPC uses `openMenu`: a `show` method collides with its CLI subcommand.
+SSH IPC must use the same WAYLAND_DISPLAY as the desktop. Set the IconTheme
+Adwaita comment pragma to resolve symbolic menu icons with the portal platform
+theme. The installed build, Niri validation, seven targeted tests, live window
+picker, and power confirmation passed. Final icon loading had no warnings.
+Real unlock, physical media keys, and multiple monitors remain untested.

@@ -14,11 +14,14 @@ PanelWindow {
     required property var audio
     required property var appearance
     property bool launcherActive: false
+    property string launcherMode: "apps"
     signal launcherRequested()
     signal launcherDismissed()
     Launcher {
         barWindow: bar
         opened: bar.launcherActive
+        requestedMode: bar.launcherMode
+        niriState: bar.niriState
         onDismissed: bar.launcherDismissed()
     }
     property alias audioOpen: saved.audioOpen

@@ -1,6 +1,7 @@
 { pkgs }:
 let
   ui = import ./quickshell-ui.nix { inherit pkgs; };
+  desktop = import ./desktop-actions.nix { inherit pkgs; };
   appearance = pkgs.writeShellScript "ohmansy-appearance" ''
     export GSETTINGS_SCHEMA_DIR=${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}/glib-2.0/schemas
     case "$1" in
@@ -37,6 +38,7 @@ in pkgs.writeShellScriptBin "ohmansy-quickshell" ''
   export OHMANSY_APP_LAUNCHER="${launchApp}"
   export OHMANSY_TERMINAL_THEME="${syncTerminalTheme}"
   export OHMANSY_APPEARANCE="${appearance}"
+  export OHMANSY_DESKTOP="${desktop}/bin/ohmansy-desktop"
   export PATH="${pkgs.xdg-terminal-exec}/bin:$PATH"
   exec ${pkgs.quickshell}/bin/quickshell "$@"
 ''

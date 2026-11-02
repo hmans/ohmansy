@@ -3,6 +3,7 @@ let
   shell = import ./desktop-package.nix { inherit pkgs; };
   terminal = import ./terminal-package.nix { inherit pkgs; };
   wallpaper = import ./wallpaper-package.nix { inherit pkgs; };
+  desktop = import ./desktop-actions.nix { inherit pkgs; };
 in {
   imports = [ ./greeter.nix ];
   networking.hostName = lib.mkDefault "ohmansy";
@@ -16,22 +17,48 @@ in {
   services.displayManager.defaultSession = "niri";
   security.polkit.enable = true;
   security.rtkit.enable = true;
+  security.pam.services.swaylock = {};
   services.pipewire = {
     enable = true;
     alsa.enable = true;
     pulse.enable = true;
   };
   hardware.graphics.enable = true;
+  hardware.bluetooth.enable = lib.mkDefault true;
   programs.firefox.enable = true;
   fonts.packages = with pkgs; [ inter jetbrains-mono ibm-plex ];
 
   # No account, credentials, machine identifiers, or personal services here.
   environment.systemPackages = with pkgs; [
-    terminal quickshell mako swaybg swaylock nautilus
+    terminal desktop quickshell mako swaybg swaylock nautilus
+    playerctl wireplumber
     xwayland-satellite adwaita-icon-theme wl-clipboard
     git vim curl jq python3
   ];
   environment.sessionVariables.NIRI_CONFIG = lib.mkDefault "/etc/ohmansy/niri.kdl";
+  environment.etc."xdg/mako/config".text = ''
+    max-history=100
+  '';
+  systemd.user.services.ohmansy-lock = {
+    description = "Ohmansy screen lock";
+    after = [ "niri.service" ];
+    partOf = [ "niri.service" ];
+    serviceConfig = {
+      Type = "forking";
+      ExecStart = "${pkgs.swaylock}/bin/swaylock --daemonize --ignore-empty-password --color 171a21";
+    };
+  };
+  systemd.user.services.ohmansy-clipboard = {
+    description = "Ohmansy clipboard history";
+    wantedBy = [ "niri.service" ];
+    after = [ "niri.service" ];
+    partOf = [ "niri.service" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --watch ${pkgs.cliphist}/bin/cliphist store";
+      Restart = "on-failure";
+      UMask = "0077";
+    };
+  };
   environment.etc."xdg/xdg-terminals.list".text = lib.mkDefault "foot.desktop\n";
   environment.etc."ohmansy/niri.kdl".source = ./desktop/niri.kdl;
   environment.etc."ohmansy/wallpaper.png".source = lib.mkDefault ./desktop/wallpapers/twilight-cat.png;

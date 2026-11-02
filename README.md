@@ -103,6 +103,8 @@ a local guest overlay and is excluded from product images.
   session workflow and project knowledge. Start with `means list --path memory`.
 - [Ohmansy development](docs/ohmansy-development.md): flake outputs, SSH builds,
   image packaging, and release work.
+- [Keyboard shortcuts](docs/keyboard-shortcuts.md): navigation, layout, desktop
+  menus, screenshots, and media controls.
 - [Graphics integration](docs/graphics.md): the accelerated runtime and input.
 - [Original Virtualization backend](docs/legacy-virtualization.md): the retained
   `--original-vm` backend, including its clipboard integration.

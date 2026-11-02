@@ -1,16 +1,60 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Ohmansy.Ui as Ui
+import "DesktopMenus.js" as Menus
 
 PanelWindow {
     id: launcher
     Theme { id: theme }
     required property var barWindow
     required property bool opened
+    required property var niriState
+    property string requestedMode: "apps"
+    property string mode: requestedMode
+    property string pendingAction: ""
+    property var historyEntries: []
+    property string notificationBody: ""
+    readonly property string prompt: ({ apps: "Search applications…", windows: "Find an open window…",
+        clipboard: "Search clipboard history…", notifications: "Notification history…",
+        power: "Power", controls: "Desktop controls", confirm: "Confirm action" })[mode] || "Search…"
+    function resetMode() {
+        mode = requestedMode;
+        pendingAction = "";
+        notificationBody = "";
+        launchError = "";
+        search.clear();
+        historyEntries = [];
+        if (mode === "clipboard" || mode === "notifications") {
+            historyQuery.running = false;
+            historyQuery.queryMode = mode;
+            historyQuery.command = [Quickshell.env("OHMANSY_DESKTOP"), mode === "clipboard" ? "clipboard-list" : "notifications"];
+            historyQuery.running = true;
+        }
+        Qt.callLater(() => search.forceActiveFocus());
+    }
+    onRequestedModeChanged: if (opened) resetMode()
+    Process {
+        id: historyQuery
+        property string queryMode: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!launcher.opened || launcher.mode !== historyQuery.queryMode) return;
+                try {
+                    launcher.historyEntries = historyQuery.queryMode === "clipboard"
+                        ? Menus.clipboardEntries(text) : Menus.notificationEntries(text);
+                } catch (error) { launcher.launchError = "Could not read history."; }
+            }
+        }
+        onExited: (code, status) => {
+            if (launcher.opened && launcher.mode === queryMode && (code !== 0 || status !== 0))
+                launcher.launchError = "Could not read history.";
+        }
+    }
     signal dismissed()
     property string launchError: ""
     property string launchingName: ""
@@ -24,10 +68,18 @@ PanelWindow {
     property real reveal: opened ? 1 : 0
     readonly property var matches: {
         const words = search.text.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        return DesktopEntries.applications.values.filter(app => {
-            const text = [app.name, app.genericName, app.comment, ...app.keywords].join(" ").toLowerCase();
+        const entries = mode === "apps" ? DesktopEntries.applications.values
+            : mode === "windows" ? niriState.state.windows.map(w => ({ kind: "action", id: w.id,
+                name: w.title || w.app_id || "Untitled window", comment: w.app_id || "",
+                icon: DesktopEntries.heuristicLookup(w.app_id || "")?.icon || "application-x-executable",
+                args: ["focus-window", String(w.id)] }))
+            : mode === "clipboard" || mode === "notifications" ? historyEntries : Menus.entries(mode, pendingAction);
+        const filtered = entries.filter(app => {
+            const text = [app.name, app.genericName, app.comment, app.body, ...(app.keywords || [])].join(" ").toLowerCase();
             return words.every(word => text.includes(word));
-        }).sort((a, b) => {
+        });
+        if (mode !== "apps" && mode !== "windows") return filtered;
+        return filtered.sort((a, b) => {
             const query = search.text.trim().toLowerCase();
             const aFirst = query && a.name.toLowerCase().startsWith(query) ? 0 : 1;
             const bFirst = query && b.name.toLowerCase().startsWith(query) ? 0 : 1;
@@ -37,11 +89,19 @@ PanelWindow {
     onMatchesChanged: results.currentIndex = matches.length ? 0 : -1
     function launch(app) {
         if (!app || !opened || appLaunch.running) return;
+        if (app.kind === "back") { mode = "power"; search.clear(); return; }
+        if (app.confirm) { pendingAction = app.id; mode = "confirm"; search.clear(); return; }
+        if (app.kind === "notification") {
+            notificationBody = app.name + "\n\n" + app.body;
+            return;
+        }
         launchError = "";
         launchingName = app.name;
         // GIO resolves the desktop ID and handles activation, Exec codes,
         // working directories, and terminal selection.
-        appLaunch.command = [Quickshell.env("OHMANSY_APP_LAUNCHER"), "--", app.id + ".desktop"];
+        appLaunch.command = app.kind === "action"
+            ? [Quickshell.env("OHMANSY_DESKTOP"), ...app.args]
+            : [Quickshell.env("OHMANSY_APP_LAUNCHER"), "--", app.id + ".desktop"];
         appLaunch.running = true;
     }
     function moveSelection(step) {
@@ -49,11 +109,13 @@ PanelWindow {
         results.currentIndex = (results.currentIndex + step + matches.length) % matches.length;
         results.positionViewAtIndex(results.currentIndex, ListView.Contain);
     }
-    onOpenedChanged: if (opened) {
-        launchError = "";
-        search.clear();
-        results.currentIndex = matches.length ? 0 : -1;
-        Qt.callLater(() => search.forceActiveFocus());
+    onOpenedChanged: {
+        if (opened) resetMode();
+        else {
+            historyQuery.running = false;
+            historyEntries = [];
+            notificationBody = "";
+        }
     }
     Behavior on reveal { NumberAnimation { duration: launcher.opened ? 260 : 140; easing.type: Easing.OutQuint } }
     visible: opened || reveal > 0.001
@@ -92,8 +154,8 @@ PanelWindow {
                 leftPadding: 16
                 rightPadding: 16
                 font.pixelSize: 17
-                placeholderText: "Search applications…"
-                Accessible.name: "Search applications"
+                placeholderText: launcher.prompt
+                Accessible.name: launcher.prompt
                 onAccepted: launcher.launch(launcher.matches[results.currentIndex])
                 Keys.onDownPressed: launcher.moveSelection(1)
                 Keys.onUpPressed: launcher.moveSelection(-1)
@@ -136,6 +198,8 @@ PanelWindow {
                             Layout.preferredHeight: 28
                             source: Quickshell.iconPath(row.modelData.icon, "application-x-executable")
                             sourceSize: Qt.size(64, 64)
+                            layer.enabled: (row.modelData.icon || "").endsWith("-symbolic")
+                            layer.effect: MultiEffect { colorization: 1; colorizationColor: theme.text }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
@@ -150,7 +214,7 @@ PanelWindow {
                             }
                             Text {
                                 Layout.fillWidth: true
-                                text: row.modelData.genericName || row.modelData.comment
+                                text: row.modelData.genericName || row.modelData.comment || ""
                                 textFormat: Text.PlainText
                                 visible: text !== ""
                                 color: theme.secondary
@@ -163,9 +227,23 @@ PanelWindow {
                 Text {
                     anchors.centerIn: parent
                     visible: launcher.matches.length === 0
-                    text: "No applications found"
+                    text: historyQuery.running ? "Loading…" : "No entries found"
                     color: theme.secondary
                     font { family: Ui.Theme.fontFamily; pixelSize: 15 }
+                }
+            }
+            ScrollView {
+                visible: launcher.notificationBody !== ""
+                Layout.fillWidth: true
+                Layout.preferredHeight: 120
+                TextArea {
+                    text: launcher.notificationBody
+                    textFormat: TextEdit.PlainText
+                    readOnly: true
+                    wrapMode: TextEdit.Wrap
+                    color: theme.text
+                    font { family: Ui.Theme.fontFamily; pixelSize: 13 }
+                    background: Item {}
                 }
             }
             Text {

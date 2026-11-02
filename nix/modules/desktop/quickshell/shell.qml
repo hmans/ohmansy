@@ -1,5 +1,6 @@
 //@ pragma Env QS_NO_RELOAD_POPUP=1
 //@ pragma UseQApplication
+//@ pragma IconTheme Adwaita
 //@ pragma DefaultEnv QT_QPA_PLATFORMTHEME=xdgdesktopportal
 import Quickshell
 import Quickshell.Io
@@ -19,8 +20,11 @@ ShellRoot {
         ])
     }
     property string launcherScreen: ""
-    function toggleLauncher(screenName) {
-        launcherScreen = launcherScreen === screenName ? "" : screenName;
+    property string launcherMode: "apps"
+    function toggleLauncher(screenName, mode = "apps") {
+        const closing = launcherScreen === screenName && launcherMode === mode;
+        launcherMode = mode;
+        launcherScreen = closing ? "" : screenName;
     }
     IpcHandler {
         target: "launcher"
@@ -28,6 +32,11 @@ ShellRoot {
             root.toggleLauncher(niri.focusedOutput || Quickshell.screens[0].name);
         }
         function close(): void { root.launcherScreen = ""; }
+        function ping(): string { return "ready"; }
+        function openMenu(mode: string): void {
+            if (!["apps", "windows", "clipboard", "power", "controls", "notifications"].includes(mode)) return;
+            root.toggleLauncher(niri.focusedOutput || Quickshell.screens[0].name, mode);
+        }
     }
     NiriState { id: niri }
     AudioState { id: audioState }
@@ -42,6 +51,7 @@ ShellRoot {
             audio: audioState
             appearance: appearanceState
             launcherActive: root.launcherScreen === modelData.name
+            launcherMode: root.launcherMode
             onLauncherRequested: root.toggleLauncher(modelData.name)
             onLauncherDismissed: if (root.launcherScreen === modelData.name) root.launcherScreen = ""
         }

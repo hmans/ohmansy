@@ -19,6 +19,7 @@ ShellRoot {
             mask: Region {}
             color: "#171a21"
             property bool ribbonFailure: false
+            readonly property string imageOverride: Quickshell.env("OHMANSY_WALLPAPER_IMAGE") || ""
             readonly property var workspace: niri.state.workspaces.find(
                 w => w.output === modelData.name && w.is_active) || null
             readonly property var activeWindow: workspace ? niri.state.windows.find(
@@ -35,7 +36,7 @@ ShellRoot {
 
             Image {
                 anchors.fill: parent
-                source: "file:///etc/ohmansy/wallpaper.png"
+                source: wallpaper.imageOverride ? "file://" + wallpaper.imageOverride.split("/").map(encodeURIComponent).join("/") : "file:///etc/ohmansy/wallpaper.png"
                 fillMode: Image.PreserveAspectCrop
                 visible: animation.status !== Loader.Ready
             }
@@ -46,7 +47,7 @@ ShellRoot {
                 height: parent.height + 224
                 x: -112 + wallpaper.driftX
                 y: -112 + wallpaper.driftY
-                active: GraphicsInfo.api === GraphicsInfo.OpenGL && !ribbonFailure
+                active: GraphicsInfo.api === GraphicsInfo.OpenGL && !ribbonFailure && !wallpaper.imageOverride
                 source: active ? "Ribbons.qml" : ""
             }
             Connections {
