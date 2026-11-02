@@ -33,9 +33,16 @@ layout {
     background-color "#10131a"
     default-column-width { proportion 0.5; }
     focus-ring {
+        off
+    }
+    // A flat translucent rim on every window; focus changes its strength.
+    border {
+        // Included configs must enable borders explicitly.
+        on
         width 2
-        active-color "#7ca7ed"
-        inactive-color "#303642"
+        active-color "#d8dce560"
+        inactive-color "#b8bec92b"
+        urgent-color "#c4a7e780"
     }
 }
 cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
@@ -44,6 +51,7 @@ spawn-at-startup "mako"
 window-rule {
     geometry-corner-radius 12
     clip-to-geometry true
+    draw-border-with-background false
 }
 // Wallpaper blur remains stable in the VM and keeps terminal text opaque.
 window-rule {
