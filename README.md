@@ -15,7 +15,7 @@ in a separate Niri greeter session, then starts the selected user's desktop.
 The greeter source is in `nix/modules/greeter/`.
 Both shells share the `Ohmansy.Ui` components in `nix/modules/ui/`, including
 glass surfaces, controls, icons, and transitions. Niri supplies background
-blur behind the desktop menu bar.
+blur behind the desktop popups. The menu bar has a transparent background.
 The desktop wallpaper currently reuses the login screen's animated ribbons,
 displayed by a separate Quickshell user service tied to the Niri session.
 The ribbons ease sideways when the active window column changes and vertically

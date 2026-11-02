@@ -6,7 +6,6 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import Quickshell.Networking
-import Ohmansy.Ui as Ui
 import "Niri.js" as Niri
 
 PanelWindow {
@@ -43,7 +42,6 @@ PanelWindow {
     WlrLayershell.namespace: "ohmansy-bar"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    BackgroundEffect.blurRegion: Region { item: bar.contentItem }
     PersistentProperties {
         id: saved
         reloadableId: "bar-state-" + (bar.screen ? bar.screen.name : "")
@@ -78,15 +76,6 @@ PanelWindow {
     }
     Item {
         anchors.fill: parent
-        Ui.GlassSurface {
-            id: surface
-            anchors.fill: parent
-            radius: 0
-            // Niri supplies the blur behind this layer surface.
-            tint: theme.shellGlassTint
-            colors: theme.colors
-            sheen: false
-        }
         RowLayout {
             anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 12 }
             width: Math.max(0, bar.width / 2 - dateButton.width / 2 - 36)
