@@ -211,3 +211,10 @@ passed. The customization check exercises disabled Firefox/Fish, Bash fallback,
 Zsh, an empty utility bundle plus an added package, and actual Kitty terminal
 command resolution. The default guest was live-activated and resolves Foot;
 no new image was built or booted.
+
+Session handoff logging (2026-11-02): the guest VT contained the Niri startup
+warning about import-environment without variable names. greeter.nix now wraps
+niri-session with systemd-cat, identifier ohmansy-session, for both authenticated
+login and autologin. This retains diagnostics in the journal without printing
+them on the VT between compositors. Installed-host build and journal routing
+smoke check passed; selected for next boot, visual handoff not yet verified.

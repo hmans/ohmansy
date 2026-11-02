@@ -2,6 +2,10 @@
 let
   niri = config.programs.niri.package;
   quickshell = import ./greeter-package.nix { inherit pkgs; };
+  session = pkgs.writeShellScript "ohmansy-desktop-session" ''
+    # Keep session diagnostics out of the VT exposed between compositors.
+    exec ${pkgs.systemd}/bin/systemd-cat --identifier=ohmansy-session ${niri}/bin/niri-session
+  '';
   shell = pkgs.writeShellScript "ohmansy-greeter-shell" ''
     if ! ${quickshell}/bin/quickshell --no-duplicate --path /etc/ohmansy/greeter/shell.qml; then
       # A graphics failure must not prevent access to the login form.
@@ -27,7 +31,7 @@ in {
       default_session.command = "${compositor}";
     } // lib.optionalAttrs config.services.displayManager.autoLogin.enable {
       initial_session = {
-        command = "${niri}/bin/niri-session";
+        command = "${session}";
         user = config.services.displayManager.autoLogin.user;
       };
     };
@@ -51,7 +55,7 @@ in {
     animations { off; }
     spawn-at-startup "${shell}"
   '';
-  environment.etc."ohmansy/greeter-session".text = "${niri}/bin/niri-session";
+  environment.etc."ohmansy/greeter-session".text = "${session}";
   environment.etc."ohmansy/greeter-users".source = pkgs.writeScript "ohmansy-greeter-users" ''
     #!${pkgs.python3}/bin/python3
     import json, pwd
