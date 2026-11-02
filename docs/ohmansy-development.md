@@ -100,6 +100,13 @@ IPC target. Its overlay takes keyboard focus only while open; Escape and an
 outside click dismiss it. A layer surface is required here: a grabbing popup
 cannot reliably open from IPC without a recent input event on its parent.
 
+Foot uses dark gray and white background palettes at 85% opacity, opaque text,
+and 16×14 padding. Ctrl+Shift+T switches palettes; new terminals start dark.
+The terminal palette does not yet follow the desktop appearance preference.
+Foot requests native blur, and its Niri window rule selects cached wallpaper
+blur (`xray true`), including when floating above another window. Configure the
+palettes in `desktop.nix` and the compositor rule in `desktop/niri.kdl`.
+
 ## Login screen
 
 `nix/modules/greeter.nix` configures greetd and a separate Niri compositor for

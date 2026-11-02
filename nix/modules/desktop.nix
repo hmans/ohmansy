@@ -69,9 +69,51 @@ in {
   environment.etc."xdg/foot/foot.ini".text = ''
     [main]
     font=JetBrains Mono:size=11
-    [colors]
-    background=171a21
-    foreground=e6e9ef
+    pad=16x14
+    [colors-dark]
+    alpha=0.85
+    blur=yes
+    background=202020
+    foreground=f5f5f5
+    regular0=202020
+    regular1=e78284
+    regular2=a6d189
+    regular3=e5c890
+    regular4=8caaee
+    regular5=c4a7e7
+    regular6=81c8be
+    regular7=c6c6cc
+    bright0=777780
+    bright1=efa0a2
+    bright2=b9df9e
+    bright3=f2d8a5
+    bright4=a6bdf5
+    bright5=d6bff0
+    bright6=9bdad2
+    bright7=ffffff
+    [colors-light]
+    alpha=0.85
+    blur=yes
+    background=ffffff
+    foreground=202024
+    regular0=202024
+    regular1=a33340
+    regular2=356b32
+    regular3=805d14
+    regular4=315ba5
+    regular5=68478d
+    regular6=246b70
+    regular7=50505a
+    bright0=62626e
+    bright1=b53645
+    bright2=397332
+    bright3=89600e
+    bright4=3567b7
+    bright5=79519e
+    bright6=21777d
+    bright7=202024
+    [key-bindings]
+    color-theme-toggle=Control+Shift+t
   '';
   systemd.user.services.ohmansy-polkit = {
     description = "Ohmansy desktop authentication agent";

@@ -45,6 +45,14 @@ window-rule {
     geometry-corner-radius 12
     clip-to-geometry true
 }
+// Wallpaper blur remains stable in the VM and keeps terminal text opaque.
+window-rule {
+    match app-id="^foot$"
+    background-effect {
+        blur true
+        xray true
+    }
+}
 binds {
     Mod+Return { spawn "foot"; }
     Mod+Space { spawn "quickshell" "ipc" "--path" "/etc/xdg/quickshell/ohmansy/shell.qml" "call" "launcher" "toggle"; }
