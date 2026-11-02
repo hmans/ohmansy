@@ -1,5 +1,6 @@
 { pkgs, lib, ... }:
-{
+let shell = import ./desktop-package.nix { inherit pkgs; };
+in {
   imports = [ ./greeter.nix ];
   networking.hostName = lib.mkDefault "ohmansy";
   networking.networkmanager.enable = true;
@@ -29,6 +30,18 @@
   ];
   environment.sessionVariables.NIRI_CONFIG = lib.mkDefault "/etc/ohmansy/niri.kdl";
   environment.etc."ohmansy/niri.kdl".source = ./desktop/niri.kdl;
+  environment.etc."ohmansy/wallpaper.png".source = lib.mkDefault ./desktop/wallpapers/twilight-cat.png;
+  systemd.user.services.ohmansy-wallpaper = {
+    description = "Ohmansy desktop wallpaper";
+    wantedBy = [ "niri.service" ];
+    after = [ "niri.service" ];
+    partOf = [ "niri.service" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.swaybg}/bin/swaybg --image /etc/ohmansy/wallpaper.png --mode fill --color '#171c29'";
+      Restart = "on-failure";
+      RestartSec = 2;
+    };
+  };
   environment.etc."xdg/quickshell/ohmansy".source = ./desktop/quickshell;
   systemd.user.services.quickshell = {
     description = "Ohmansy desktop panel";
@@ -37,7 +50,7 @@
     partOf = [ "niri.service" ];
     path = with pkgs; [ niri fuzzel foot networkmanager ];
     serviceConfig = {
-      ExecStart = "${pkgs.quickshell}/bin/quickshell --path /etc/xdg/quickshell/ohmansy/shell.qml";
+      ExecStart = "${shell}/bin/ohmansy-quickshell --path /etc/xdg/quickshell/ohmansy/shell.qml";
       Restart = "on-failure";
       RestartSec = 2;
     };

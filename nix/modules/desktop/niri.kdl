@@ -4,6 +4,15 @@ input {
     focus-follows-mouse max-scroll-amount="0%"
     disable-power-key-handling
 }
+// The panel supplies translucent glass; Niri blurs the scene behind it.
+layer-rule {
+    match namespace="^ohmansy-bar$"
+    background-effect {
+        blur true
+        xray false
+    }
+}
+
 layout {
     gaps 12
     background-color "#10131a"
@@ -17,7 +26,6 @@ layout {
 cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
 prefer-no-csd
 spawn-at-startup "mako"
-spawn-at-startup "swaybg" "-c" "#171c29"
 window-rule {
     geometry-corner-radius 12
     clip-to-geometry true

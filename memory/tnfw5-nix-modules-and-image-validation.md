@@ -94,7 +94,7 @@ Wayland PanelWindow entry point: merely declaring PanelWindow prevents
 headless loading. See docs/graphics.md and the greeter-preview flake package.
 
 Glass controls sample a shared half-resolution blurred background in
-GreeterView.qml. GlassSurface.qml crops and rounds that texture, then adds
+GreeterView.qml. The shared ui/GlassSurface.qml crops and rounds that texture, then adds
 tint and a sharp half-point rim. Never include the form itself in that blur
 source: labels and password input must remain separate. Form geometry and
 scroll position invalidate sample coordinates. Keyboard focus brightens the glass rim, with no underline. Inter text and
@@ -105,3 +105,14 @@ software rendering passed on 2026-11-02; a short visible glass preview reported
 112–115 fps at its test window size, not a same-size benchmark against the
 earlier scene. The harmless full-screen preview accepts PREVIEW_KEYBOARD=1
 for interaction checks; pair it with an automatic capture/exit deadline.
+
+The shared Ohmansy.Ui module in nix/modules/ui supplies glass surfaces, controls,
+icons, theme values, and transitions. quickshell-ui.nix packages it; both shell
+wrappers set QML_IMPORT_PATH. Greeter wrappers preserve local control names.
+The desktop menu bar uses the same glass with no QML backdrop; Niri 26.04
+provides real background blur through its ohmansy-bar layer rule. The rectangle
+fills its layer surface, so the blur needs no custom rounded mask.
+On 2026-11-02 both wrapper builds, flake checks (including authentication),
+Niri validation, and the installed-system build passed. Shared greeter QML was
+previewed; the normal desktop panel service was hot-updated and visually checked
+without ending the user session. The new system generation was not boot-tested.

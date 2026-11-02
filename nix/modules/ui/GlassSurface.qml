@@ -8,7 +8,9 @@ Item {
     property bool pressed: false
     property bool focused: false
     property bool primary: false
-    property real radius: 14
+    property color tint: primary ? Theme.primaryGlass : Theme.glass
+    property bool sheen: true
+    property real radius: Theme.radius
     readonly property bool accelerated: GraphicsInfo.api !== GraphicsInfo.Software
     ShaderEffectSource {
         id: sample
@@ -17,7 +19,7 @@ Item {
         sourceRect: {
             if (!glass.backdrop) return Qt.rect(0, 0, glass.width, glass.height);
             // Recalculate when the form scrolls or changes layout.
-            const revision = glass.backdrop.layoutRevision;
+            const revision = glass.backdrop.layoutRevision || "";
             const origin = glass.mapToItem(glass.backdrop, 0, 0);
             return Qt.rect(origin.x, origin.y, glass.width, glass.height);
         }
@@ -43,11 +45,12 @@ Item {
         anchors.fill: parent
         radius: glass.radius
         color: glass.accelerated
-            ? (glass.primary ? "#725f467f" : "#483e4354") : "#ed30333f"
+            ? glass.tint : Theme.solidSurface
     }
     Rectangle {
         anchors.fill: parent
         radius: glass.radius
+        visible: glass.sheen
         gradient: Gradient {
             GradientStop { position: 0; color: glass.primary ? "#18e6d7ff" : "#0affffff" }
             GradientStop { position: 1; color: "#01ffffff" }

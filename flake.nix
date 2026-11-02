@@ -36,6 +36,7 @@
       nixosConfigurations.appliance = appliance;
       nixosConfigurations.installer = installer;
       packages.${system} = {
+        desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
         greeter-preview = pkgs.writeShellScriptBin "ohmansy-greeter-preview" ''
           preview=preview.qml
           if [ "''${PREVIEW_FULLSCREEN:-0}" = 1 ]; then

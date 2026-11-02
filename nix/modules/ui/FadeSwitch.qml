@@ -1,6 +1,6 @@
 import QtQuick
 
-// Retain the outgoing page until it is transparent, then show the latest request.
+// Shared page transition: retain the outgoing page until it is transparent.
 Item {
     id: transition
     property string requestedPage: ""

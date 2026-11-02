@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import Quickshell.Networking
+import Ohmansy.Ui as Ui
 import "Niri.js" as Niri
 
 PanelWindow {
@@ -22,7 +23,7 @@ PanelWindow {
     Theme { id: theme }
     component BarButton: QuietButton {
         font.weight: theme.barFontWeight
-        hoverHighlight: false
+        hoverHighlight: true
         tooltipsEnabled: false
     }
     SystemClock { id: clock; precision: SystemClock.Minutes }
@@ -53,7 +54,14 @@ PanelWindow {
     }
     Item {
         anchors.fill: parent
-        Rectangle { id: surface; anchors.fill: parent; color: theme.barBackground }
+        Ui.GlassSurface {
+            id: surface
+            anchors.fill: parent
+            radius: 0
+            // Niri supplies the blur behind this layer surface.
+            tint: "#60484848"
+            sheen: false
+        }
         RowLayout {
             anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 12 }
             width: Math.max(0, bar.width / 2 - dateButton.width / 2 - 36)

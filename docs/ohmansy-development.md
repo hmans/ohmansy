@@ -40,6 +40,35 @@ passwordless sudo. Never activate `.#live` on an installed system. The experimen
 installer asks for explicit whole-disk erase confirmation and needs networking.
 It is not yet an end-to-end verified installation product.
 
+## Shared Quickshell components
+
+The default desktop wallpaper is bundled at
+`nix/modules/desktop/wallpapers/twilight-cat.png`. The desktop module installs
+it as `/etc/ohmansy/wallpaper.png`, so factory and ISO builds include it without
+a download. `ohmansy-wallpaper.service` runs swaybg with aspect-preserving fill
+and follows the Niri session. Override the file's NixOS `source` option to use
+another image. Fill may crop the edges to fit the display.
+
+`nix/modules/ui/` is the `Ohmansy.Ui` QML module. It supplies shared theme
+values, GlassSurface, GlassButton, GlassField, IconButton, FadeSwitch, and
+StaggeredEntrance. Keep authentication, power commands, and desktop service
+state in their consumers. The small greeter wrappers preserve local control
+names while using the shared implementations.
+
+`quickshell-ui.nix` packages the module. Both `greeter-package.nix` and
+`desktop-package.nix` add it to `QML_IMPORT_PATH`; use their wrappers when
+running a shell or preview. `nix build .#desktop-shell` builds the desktop
+wrapper without an OS image build. Import components with `import Ohmansy.Ui`
+or use an alias when the consumer has its own Theme type.
+
+The menu bar uses GlassSurface with a flat neutral gray tint, no sheen, and a
+half-point rim. The shared surface exposes tint and sheen independently of its
+default button styling. Niri 26.04 supplies background blur through the
+`ohmansy-bar` layer rule in `desktop/niri.kdl`. Only the surface is translucent;
+text and icons stay opaque. The greeter instead supplies a shared blurred
+texture to GlassSurface because it owns its ribbon background. Do not capture
+desktop windows into the QML surface to simulate compositor blur.
+
 ## Login screen
 
 `nix/modules/greeter.nix` configures greetd and a separate Niri compositor for

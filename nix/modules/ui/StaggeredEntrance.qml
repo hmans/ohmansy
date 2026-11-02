@@ -1,6 +1,6 @@
 import QtQuick
 
-// Share one timeline across any number of items via opacityAt(delay).
+// Shared entrance timeline for any number of items via opacityAt(delay).
 Item {
     id: entrance
     property bool animated: true

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
+import Ohmansy.Ui
 
 Item {
     id: view
@@ -176,7 +177,7 @@ Item {
                 y: (accounts.height - height) / 2
                 width: 24
                 height: 24
-                source: "icons/chevron.svg"
+                source: Theme.chevron
                 sourceSize: Qt.size(48, 48)
                 opacity: accounts.hovered || accounts.popup.visible ? 0.95 : 0.65
                 rotation: accounts.popup.visible ? 180 : 0

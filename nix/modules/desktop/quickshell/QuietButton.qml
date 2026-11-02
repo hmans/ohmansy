@@ -25,11 +25,13 @@ Button {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
+        renderType: Text.QtRendering
     }
     background: Rectangle {
         radius: root.prominent ? 8 : 6
         color: root.down || root.selected || root.visualFocus ? theme.selection
             : root.hovered && root.hoverHighlight ? theme.hover : "transparent"
+        Behavior on color { ColorAnimation { duration: 120 } }
     }
     HoverHandler { cursorShape: Qt.PointingHandCursor }
     ToolTip.visible: root.tooltipsEnabled && hovered && hint !== ""

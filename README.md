@@ -11,6 +11,11 @@ notifications. The panel runs as a user service tied to the Niri session.
 Quickshell also supplies the login screen, backed by greetd and PAM. It runs
 in a separate Niri greeter session, then starts the selected user's desktop.
 The greeter source is in `nix/modules/greeter/`.
+Both shells share the `Ohmansy.Ui` components in `nix/modules/ui/`, including
+glass surfaces, controls, icons, and transitions. Niri supplies background
+blur behind the desktop menu bar.
+The default wallpaper is bundled in `nix/modules/desktop/wallpapers/` and
+displayed by a user service tied to the Niri session.
 
 The app is independently implemented and inspired by
 [Try Omarchy](https://github.com/omacom/try-omarchy). Development builds package a

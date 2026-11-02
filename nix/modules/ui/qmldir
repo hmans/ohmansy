@@ -1,0 +1,8 @@
+module Ohmansy.Ui
+singleton Theme 1.0 Theme.qml
+GlassSurface 1.0 GlassSurface.qml
+GlassButton 1.0 GlassButton.qml
+GlassField 1.0 GlassField.qml
+IconButton 1.0 IconButton.qml
+FadeSwitch 1.0 FadeSwitch.qml
+StaggeredEntrance 1.0 StaggeredEntrance.qml

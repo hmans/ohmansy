@@ -6,8 +6,9 @@ let
     patches = (old.patches or []) ++ [ ./greeter/quickshell-greetd-cancel.patch ];
   });
   ribbons = import ./greeter-ribbons.nix { inherit pkgs; };
+  ui = import ./quickshell-ui.nix { inherit pkgs; };
 in pkgs.writeShellScriptBin "quickshell" ''
   # Changing a shader must not require recompiling Quickshell itself.
-  export QML_IMPORT_PATH="${ribbons}/lib/qt-6/qml''${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+  export QML_IMPORT_PATH="${ui}/lib/qt-6/qml:${ribbons}/lib/qt-6/qml''${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
   exec ${quickshell}/bin/quickshell "$@"
 ''
