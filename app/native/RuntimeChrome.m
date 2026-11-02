@@ -15,6 +15,8 @@
 @interface OhmansyFrame : NSView
 @property(nonatomic, strong) NSView *well;
 @property(nonatomic, strong) NSView *guest;
+@property(nonatomic) NSSize guestPixelSize;
+@property(nonatomic) BOOL fitGuest;
 @property(nonatomic, strong) CAGradientLayer *welcomeGradient;
 @property(nonatomic, strong) NSArray<CAGradientLayer *> *welcomeGlows;
 @property(nonatomic, strong) NSArray<GKNoise *> *welcomeNoise;
@@ -127,7 +129,15 @@
     NSRect wellFrame = fullScreen ? self.bounds : NSInsetRect(NSIntersectionRect(self.bounds, usable), 10, 10);
     self.well.layer.cornerRadius = fullScreen ? 0 : 12;
     if (!NSEqualRects(self.well.frame, wellFrame)) self.well.frame = wellFrame;
-    if (!NSEqualRects(self.guest.frame, self.well.bounds)) self.guest.frame = self.well.bounds;
+    NSRect guestFrame = self.well.bounds;
+    if (self.fitGuest && self.guestPixelSize.width > 0 && self.guestPixelSize.height > 0) {
+        CGFloat scale = MIN(guestFrame.size.width / self.guestPixelSize.width,
+                            guestFrame.size.height / self.guestPixelSize.height);
+        NSSize size = NSMakeSize(self.guestPixelSize.width * scale, self.guestPixelSize.height * scale);
+        guestFrame = NSMakeRect(NSMidX(guestFrame) - size.width / 2,
+                               NSMidY(guestFrame) - size.height / 2, size.width, size.height);
+    }
+    if (!NSEqualRects(self.guest.frame, guestFrame)) self.guest.frame = guestFrame;
     if (!NSEqualRects(self.welcomeCanvas.frame, self.well.bounds)) self.welcomeCanvas.frame = self.well.bounds;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
@@ -160,6 +170,48 @@
 static IMP OriginalResizeWindow;
 static IMP OriginalLayerNeedsDisplay;
 static bool (*EngineLockHeld)(void);
+static void (*EngineLock)(const char *, int);
+static void (*EngineUnlock)(void);
+static void *(*EngineConsole)(unsigned int);
+static int (*EngineWidth)(void *, int);
+static int (*EngineHeight)(void *, int);
+static __weak OhmansyFrame *GuestFrame;
+static IMP OriginalGuestFrame;
+static IMP OriginalUpdateUIInfoLocked;
+static _Thread_local BOOL ReportingGuestSize;
+static NSRect GuestFrameForDisplayInfo(NSView *guest, SEL selector) {
+    if (ReportingGuestSize && GuestFrame.guest == guest) return GuestFrame.well.bounds;
+    return ((NSRect (*)(id, SEL))OriginalGuestFrame)(guest, selector);
+}
+static void ReportAvailableGuestSize(NSView *guest, SEL selector) {
+    BOOL previous = ReportingGuestSize;
+    ReportingGuestSize = YES;
+    @try {
+        ((void (*)(id, SEL))OriginalUpdateUIInfoLocked)(guest, selector);
+    } @finally {
+        ReportingGuestSize = previous;
+    }
+}
+static void RefreshGuestGeometry(void) {
+    if (!NSThread.isMainThread || !GuestFrame || !EngineLockHeld || EngineLockHeld() ||
+        !EngineLock || !EngineUnlock || !EngineConsole || !EngineWidth || !EngineHeight) return;
+    EngineLock(__FILE__, __LINE__);
+    void *console = EngineConsole(0);
+    NSSize pixels = NSZeroSize;
+    if (console) {
+        pixels = NSMakeSize(EngineWidth(console, 0), EngineHeight(console, 0));
+    }
+    EngineUnlock();
+    // Never change AppKit geometry while holding QEMU's lock: resizing reports
+    // updated display information back to the engine and acquires it again.
+    BOOL fit = pixels.width > 0 && pixels.height > 0;
+    if (GuestFrame.fitGuest != fit || !NSEqualSizes(GuestFrame.guestPixelSize, pixels)) {
+        GuestFrame.fitGuest = fit;
+        GuestFrame.guestPixelSize = pixels;
+        GuestFrame.needsLayout = YES;
+        [GuestFrame layoutSubtreeIfNeeded];
+    }
+}
 static BOOL ImmediatePresentationEnabled = YES;
 static BOOL PresentingGuestFrame;
 static void PresentReadyGuestFrame(CALayer *layer, SEL selector) {
@@ -170,6 +222,7 @@ static void PresentReadyGuestFrame(CALayer *layer, SEL selector) {
     if (ImmediatePresentationEnabled && NSThread.isMainThread &&
         EngineLockHeld && !EngineLockHeld() && !PresentingGuestFrame) {
         PresentingGuestFrame = YES;
+        RefreshGuestGeometry();
         [layer displayIfNeeded];
         PresentingGuestFrame = NO;
     }
@@ -369,6 +422,11 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
         self.previousDelegate = window.delegate;
         Class renderLayer = NSClassFromString(@"QemuCGLLayer");
         EngineLockHeld = (bool (*)(void))dlsym(RTLD_DEFAULT, "bql_locked");
+        EngineLock = (void (*)(const char *, int))dlsym(RTLD_DEFAULT, "bql_lock_impl");
+        EngineUnlock = (void (*)(void))dlsym(RTLD_DEFAULT, "bql_unlock");
+        EngineConsole = (void *(*)(unsigned int))dlsym(RTLD_DEFAULT, "qemu_console_lookup_by_index");
+        EngineWidth = (int (*)(void *, int))dlsym(RTLD_DEFAULT, "qemu_console_get_width");
+        EngineHeight = (int (*)(void *, int))dlsym(RTLD_DEFAULT, "qemu_console_get_height");
         Method invalidate = class_getInstanceMethod(renderLayer, @selector(setNeedsDisplay));
         if (invalidate && EngineLockHeld && !OriginalLayerNeedsDisplay) {
             OriginalLayerNeedsDisplay = method_getImplementation(invalidate);
@@ -390,6 +448,16 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
         frame.well.layer.cornerRadius = 12;
         frame.well.layer.masksToBounds = YES;
         frame.guest = guest;
+        GuestFrame = frame;
+        // Fit the current framebuffer, but advertise the entire available
+        // area to Linux. Otherwise letterboxing would prevent the desktop
+        // from requesting a wider resolution after a window resize.
+        OriginalGuestFrame = class_getMethodImplementation(guest.class, @selector(frame));
+        class_addMethod(guest.class, @selector(frame), (IMP)GuestFrameForDisplayInfo,
+                        method_getTypeEncoding(class_getInstanceMethod(guest.class, @selector(frame))));
+        OriginalUpdateUIInfoLocked = method_setImplementation(
+            class_getInstanceMethod(guest.class, NSSelectorFromString(@"updateUIInfoLocked")),
+            (IMP)ReportAvailableGuestSize);
         [guest removeFromSuperview];
         [frame addSubview:frame.well];
         [frame.well addSubview:guest];
@@ -499,6 +567,7 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
     [self.window makeFirstResponder:stopped ? self.startButton : self.guest];
 }
 - (void)pollStatus:(NSTimer *)timer {
+    RefreshGuestGeometry();
     [self updateKeyboardAccess];
     [(OhmansyFrame *)self.window.contentView updateWelcomeAnimation];
     if (self.polling) return;

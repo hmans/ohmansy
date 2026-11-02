@@ -46,7 +46,11 @@ in {
       "10-esp" = {
         contents = {
           "/EFI/BOOT/BOOTAA64.EFI".source = "${pkgs.systemd}/lib/systemd/boot/efi/systemd-bootaa64.efi";
-          "/loader/loader.conf".source = pkgs.writeText "loader.conf" "default ohmansy.conf\ntimeout 0\n";
+          "/loader/loader.conf".source = pkgs.writeText "loader.conf" ''
+            default ohmansy.conf
+            timeout 0
+            console-mode ${config.boot.loader.systemd-boot.consoleMode}
+          '';
           "/loader/entries/ohmansy.conf".source = entry;
           "/ohmansy/kernel".source = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
           "/ohmansy/initrd".source = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";

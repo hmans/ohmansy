@@ -2,7 +2,7 @@
 data:
   area: nix
   kind: workflow
-  reviewed: "2026-11-01"
+  reviewed: "2026-11-02"
   status: current
 id: tnfw5
 title: Nix modules and image validation
@@ -48,3 +48,12 @@ For installed-system login-manager or hardware changes, use `nixos-rebuild boot`
 and a planned reboot. Preserve the previous boot generation for recovery.
 Use `apply_patch`, stage new referenced files for Git-backed flakes, and keep
 build output and VM disks outside the tracked source tree.
+
+Boot-menu readability: `console-mode auto` passed build checks but the user
+confirmed on 2026-11-02 that it did not solve the small text. EDK II renders a
+fixed-size font in its graphics mode. `tools/dev/firmware-display.py` can set
+its separate PlatformConfig resolution from inside the guest, with format
+validation, backup, and readback. A 1024×768 preference was written to the
+private development VM; the user confirmed improved readability on 2026-11-02.
+Their screenshot also showed the host stretching the boot framebuffer. This per-VM
+setting is not a default in the shipped firmware. See docs/graphics.md.

@@ -3,6 +3,8 @@
   imports = [ ./desktop.nix ./vm.nix ];
   system.stateVersion = "26.05";
   boot.loader.systemd-boot.enable = true;
+  # Let the bootloader select a readable console mode on HiDPI host displays.
+  boot.loader.systemd-boot.consoleMode = "auto";
   boot.loader.efi.canTouchEfiVariables = false;
   boot.growPartition = true;
   boot.kernelParams = [ "console=ttyAMA0,115200" "console=tty0" ];

@@ -2,7 +2,7 @@
 data:
   area: app
   kind: workflow
-  reviewed: "2026-11-01"
+  reviewed: "2026-11-02"
   status: current
 id: bta99
 title: Mac app implementation and validation
@@ -85,3 +85,20 @@ macOS Accessibility permission. Verify packaging with
 `codesign --verify --deep --strict dist/Ohmansy.app`.
 Do not overwrite a running helper with a full build. Arrange a clean shutdown
 before rebuilding or restarting the app. A build does not update loaded code.
+
+## Boot framebuffer aspect ratio
+
+The adapter fits every framebuffer inside the black guest well. Both firmware
+and desktop use texture scanouts in the pinned engine, so scanout kind cannot
+distinguish boot from desktop. Use exported console dimension functions under
+BQL; release BQL before changing AppKit geometry.
+
+During updateUIInfoLocked, the guest frame getter reports the full well size
+using a thread-local guard. Outside that call, it reports the real fitted frame.
+This lets Linux adopt the full window resolution without stretching fixed boot
+pixels or changing input coordinates. No private struct offsets are required.
+
+On 2026-11-02, make test passed (6 Swift, 25 Python, native checks), including
+wide/tall fitting and full-area display negotiation. The signed app was installed
+after clean shutdown. Its boot menu retained proportions when changed to wide
+and tall windows through the native Window menu.

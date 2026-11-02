@@ -63,8 +63,39 @@ the clipped guest area with a 10-point gutter.
 QEMU's forced host cursor is disabled so it does not duplicate the guest cursor.
 The adapter is specific to the pinned runtime and must be reviewed on upgrades.
 
+Guest frames are centered with their original aspect ratio inside the black
+guest area. The adapter reports the full available area to Linux during display
+negotiation, so the desktop can adopt that resolution and fill the window.
+The window itself remains freely resizable. The adapter reads framebuffer
+dimensions under QEMU's lock, then updates AppKit geometry after releasing
+that lock. Both firmware and desktop frames use GPU textures in the pinned
+engine; the texture type cannot distinguish them.
+
 The standalone GPU harness below remains a development diagnostic, not the
 normal entry point. `make run` starts the main app.
+
+## Boot menu size
+
+The firmware boot menu uses a fixed-size bitmap font. Niri's scale setting
+does not affect it. `console-mode auto` alone did not make the menu readable
+in the development VM; EDK II's graphics resolution is a separate setting.
+
+The development helper can set that preference from inside an EDK II guest:
+
+```sh
+sudo python3 tools/dev/firmware-display.py 1024x768 --backup firmware-display-before.json
+```
+
+Transfer the helper over SSH if the checkout is only on the Mac. It saves the
+previous variable before writing, refuses an unknown format, and checks the
+value after writing. Restart the guest to apply it. The setting persists in
+the VM's private firmware variables; it does not change Niri's resolution or
+scale. This is a per-VM adjustment, not a default in the shipped firmware.
+The user confirmed that 1024×768 made the boot menu readable on 2026-11-02.
+
+The variable format is documented in EDK II's
+[PlatformConfig.h](https://github.com/tianocore/edk2/blob/master/OvmfPkg/PlatformDxe/PlatformConfig.h)
+and [PlatformConfig.c](https://github.com/tianocore/edk2/blob/master/OvmfPkg/PlatformDxe/PlatformConfig.c).
 
 ## Run the experiment
 

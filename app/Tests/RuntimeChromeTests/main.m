@@ -30,6 +30,10 @@ static int resizeRequests;
 static int captureAttempts;
 static int cursorHides, cursorShows;
 static int keyReleases;
+static NSRect ReportedGuestFrame;
+static void ReadDisplayInfoFrame(NSView *guest, SEL selector) {
+    ReportedGuestFrame = GuestFrameForDisplayInfo(guest, @selector(frame));
+}
 static void HideCursor(id guest, SEL selector) { cursorHides++; }
 static void ShowCursor(id guest, SEL selector) { cursorShows++; }
 @interface TestKeyboardGuest : NSView
@@ -185,6 +189,31 @@ int main(void) {
         [frame layout];
         NSCAssert(NSEqualRects(frame.well.frame, NSMakeRect(10, 10, 1180, 730)), @"Leaving full screen must restore the original inset.");
         NSCAssert(frame.well.layer.cornerRadius == 12, @"Leaving full screen must restore rounded corners.");
+        frame.fitGuest = YES;
+        frame.guestPixelSize = NSMakeSize(1024, 768);
+        [frame layout];
+        NSRect fitted = frame.guest.frame;
+        NSCAssert(fabs(fitted.size.width / fitted.size.height - 4.0 / 3.0) < 0.0001,
+                  @"Boot pixels must keep their 4:3 aspect ratio in a wide window.");
+        NSCAssert(fabs(NSMidX(fitted) - NSMidX(frame.well.bounds)) < 0.0001 &&
+                  fabs(NSMidY(fitted) - NSMidY(frame.well.bounds)) < 0.0001,
+                  @"Boot framebuffer must be centered within the black well.");
+        frame.testWindow.contentLayoutRect = NSMakeRect(0, 0, 500, 750);
+        [frame layout];
+        NSCAssert(fabs(frame.guest.frame.size.width / frame.guest.frame.size.height - 4.0 / 3.0) < 0.0001,
+                  @"Tall windows must letterbox without distorting boot pixels.");
+        GuestFrame = frame;
+        OriginalGuestFrame = class_getMethodImplementation(NSView.class, @selector(frame));
+        OriginalUpdateUIInfoLocked = (IMP)ReadDisplayInfoFrame;
+        ReportAvailableGuestSize(frame.guest, NSSelectorFromString(@"updateUIInfoLocked"));
+        NSCAssert(NSEqualRects(ReportedGuestFrame, frame.well.bounds),
+                  @"Linux must receive the available window size, not the letterboxed frame.");
+        NSCAssert(NSEqualRects(GuestFrameForDisplayInfo(frame.guest, @selector(frame)), frame.guest.frame),
+                  @"Outside display negotiation, input and rendering must use the real frame.");
+        frame.guestPixelSize = frame.well.bounds.size;
+        [frame layout];
+        NSCAssert(NSEqualRects(frame.guest.frame, frame.well.bounds),
+                  @"A desktop that adopts the advertised resolution must fill the view.");
         frame.testWindow = nil;
         for (NSValue *value in @[[NSValue valueWithSize:NSMakeSize(1200, 500)],
                                  [NSValue valueWithSize:NSMakeSize(600, 1000)]]) {
