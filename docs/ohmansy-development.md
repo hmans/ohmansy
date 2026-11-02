@@ -70,6 +70,12 @@ appearance preference and live changes reach Qt. The bar, launcher, and audio
 popup use these tokens. Pass `colors` to shared GlassSurface and GlassField;
 their existing login-screen defaults remain available when no palette is passed.
 
+The menu bar's Appearance popup selects Light, Dark, or System default. It saves
+the current user's `org.gnome.desktop.interface color-scheme` preference through
+a packaged GSettings helper. System default currently resolves to light. One
+shared AppearanceState monitors external changes and supplies the selected option
+to every bar. Supporting applications, shell surfaces, and Foot update live.
+
 The menu bar uses GlassSurface with no sheen and a half-point rim. The shared
 surface exposes tint and sheen independently of its default button styling.
 Niri 26.04 supplies background blur through the

@@ -13,6 +13,7 @@ PanelWindow {
     id: bar
     required property var niriState
     required property var audio
+    required property var appearance
     property bool launcherActive: false
     signal launcherRequested()
     signal launcherDismissed()
@@ -47,6 +48,20 @@ PanelWindow {
         id: saved
         reloadableId: "bar-state-" + (bar.screen ? bar.screen.name : "")
         property bool audioOpen: false
+        property bool appearanceOpen: false
+    }
+    LazyLoader {
+        active: saved.appearanceOpen
+        component: AppearancePopup {
+            appearance: bar.appearance
+            popupState: saved
+            anchor.window: bar
+            anchor.rect.y: bar.height + theme.edgeGap
+            anchor.gravity: Edges.Bottom | Edges.Left
+            anchor.onAnchoring: {
+                anchor.rect.x = appearanceButton.mapToItem(bar.contentItem, appearanceButton.width, 0).x;
+            }
+        }
     }
     LazyLoader {
         active: bar.audioOpen
@@ -130,9 +145,19 @@ PanelWindow {
                 onClicked: Quickshell.execDetached(["foot", "-e", "nmtui"])
             }
             BarButton {
+                id: appearanceButton
+                text: "Appearance"
+                selected: saved.appearanceOpen
+                onClicked: {
+                    bar.audioOpen = false;
+                    saved.appearanceOpen = !saved.appearanceOpen;
+                }
+            }
+            BarButton {
                 id: volume
                 text: !bar.audio.available ? "Audio" : bar.audio.muted ? "Muted" : "Vol " + Math.round(bar.audio.volume * 100) + "%"
                 onClicked: {
+                    saved.appearanceOpen = false;
                     bar.audioOpen = !bar.audioOpen;
                 }
                 MouseArea {

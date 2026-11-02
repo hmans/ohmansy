@@ -1,6 +1,16 @@
 { pkgs }:
 let
   ui = import ./quickshell-ui.nix { inherit pkgs; };
+  appearance = pkgs.writeShellScript "ohmansy-appearance" ''
+    export GSETTINGS_SCHEMA_DIR=${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}/glib-2.0/schemas
+    case "$1" in
+      read) exec ${pkgs.glib}/bin/gsettings get org.gnome.desktop.interface color-scheme ;;
+      monitor) exec ${pkgs.glib}/bin/gsettings monitor org.gnome.desktop.interface color-scheme ;;
+      default|prefer-light|prefer-dark)
+        exec ${pkgs.glib}/bin/gsettings set org.gnome.desktop.interface color-scheme "$1" ;;
+      *) exit 2 ;;
+    esac
+  '';
   syncTerminalTheme = pkgs.writeShellScript "ohmansy-terminal-theme" ''
     case "$1" in
       dark) signal=USR1 ;;
@@ -26,6 +36,7 @@ in pkgs.writeShellScriptBin "ohmansy-quickshell" ''
   export QML_IMPORT_PATH="${ui}/lib/qt-6/qml''${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
   export OHMANSY_APP_LAUNCHER="${launchApp}"
   export OHMANSY_TERMINAL_THEME="${syncTerminalTheme}"
+  export OHMANSY_APPEARANCE="${appearance}"
   export PATH="${pkgs.xdg-terminal-exec}/bin:$PATH"
   exec ${pkgs.quickshell}/bin/quickshell "$@"
 ''

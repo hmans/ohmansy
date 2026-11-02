@@ -31,6 +31,7 @@ ShellRoot {
     }
     NiriState { id: niri }
     AudioState { id: audioState }
+    AppearanceState { id: appearanceState }
     Variants {
         model: Quickshell.screens
         Bar {
@@ -39,6 +40,7 @@ ShellRoot {
             screen: modelData
             niriState: niri
             audio: audioState
+            appearance: appearanceState
             launcherActive: root.launcherScreen === modelData.name
             onLauncherRequested: root.toggleLauncher(modelData.name)
             onLauncherDismissed: if (root.launcherScreen === modelData.name) root.launcherScreen = ""
