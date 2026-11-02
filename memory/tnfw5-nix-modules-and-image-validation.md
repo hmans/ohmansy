@@ -71,17 +71,37 @@ The first greeter version booted and its normal and compact layouts were
 visually checked. Real password login, logout, and keyring unlock still need
 user verification. No new factory or ISO image was built for this change.
 
-The greeter now includes Qt Quick 3D in its scoped package. The scene is
-loaded through a QML Loader so missing 3D imports retain the original ribbons;
-the software scene-graph backend and OHMANSY_GREETER_STATIC=1 also select the
-static background. A failed Quickshell process gets one static retry. This
-does not recover a broken compositor or driver. Pause motion stops continuous
-rendering, and the login controls stay at native DPI over a bounded 3D texture.
-The installed guest booted the scene on 2026-11-02. A visible preview reported
-virgl (Apple M4 Max), OpenGL 4.1, and 108–111 fps over 15 seconds; hidden
-windows were throttled to 1 fps. Both software and missing-module fallbacks
-were visually verified. See docs/graphics.md and the greeter-preview flake
-package. Keep the offscreen preview separate from the Wayland PanelWindow
-entry point: merely declaring PanelWindow prevents headless configuration
-loading. Animate vector subproperties separately from the other axes to
-avoid replacing their whole-vector binding.
+The login background ports app/native/Welcome.metal to GLSL in
+`nix/modules/greeter/ribbons/`, replacing the earlier Qt Quick 3D loop
+prototype. The native Ohmansy.Welcome QML plugin uses QQuickFramebufferObject
+and desktop OpenGL 3.3 or later. Keep ribbon paths, noise, lights, particles,
+and per-ribbon depth prepasses aligned with the Metal source. Ribbons.qml
+starts at 12 seconds and renders at 30 fps; motion advances at 60% of the
+launcher speed. Standard password labels are hidden, while other PAM prompts
+and the accessible field name remain available. The
+framebuffer is capped at 2400 pixels wide. Pause preserves the animation phase.
+The greeter wrapper supplies the plugin import path separately, so shader
+changes do not rebuild Quickshell. Non-OpenGL backends, missing plugins, or
+initialization failures use the static background.
+
+On 2026-11-02 the GPU preview reported virgl (Apple M4 Max) and settled at
+30 fps. The starting pose was visually compared to an offscreen render of
+the original Metal shader at the same aspect ratio and time; this is not
+a bit-identical cross-API claim. Earlier Qt Quick 3D previews measured
+108–111 fps, but that renderer is superseded. Hidden windows can be throttled,
+so measure visible previews. Keep the offscreen preview separate from the
+Wayland PanelWindow entry point: merely declaring PanelWindow prevents
+headless loading. See docs/graphics.md and the greeter-preview flake package.
+
+Glass controls sample a shared half-resolution blurred background in
+GreeterView.qml. GlassSurface.qml crops and rounds that texture, then adds
+tint and a sharp half-point rim. Never include the form itself in that blur
+source: labels and password input must remain separate. Form geometry and
+scroll position invalidate sample coordinates. Keyboard focus brightens the glass rim, with no underline. Inter text and
+64-point main controls provide a larger form. The account dropdown replaces
+the separate alternate-account button. Power icons sit at the lower right
+and retain tooltips and confirmation screens; there is no motion toggle. The software backend uses an opaque fill. GPU preview and compact
+software rendering passed on 2026-11-02; a short visible glass preview reported
+112–115 fps at its test window size, not a same-size benchmark against the
+earlier scene. The harmless full-screen preview accepts PREVIEW_KEYBOARD=1
+for interaction checks; pair it with an automatic capture/exit deadline.

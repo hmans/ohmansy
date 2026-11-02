@@ -15,6 +15,7 @@ let
     export XCURSOR_SIZE=24
     export XCURSOR_PATH=${pkgs.adwaita-icon-theme}/share/icons
     export QT_QUICK_CONTROLS_STYLE=Basic
+    export QSG_RHI_BACKEND=opengl
     # The greeter has no writable home. Keep Qt's shader cache session-local.
     export XDG_CACHE_HOME="$XDG_RUNTIME_DIR/ohmansy-cache"
     exec ${pkgs.dbus}/bin/dbus-run-session -- ${niri}/bin/niri --config /etc/ohmansy/greeter.kdl

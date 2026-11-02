@@ -67,15 +67,29 @@ The preview cannot authenticate or perform power actions. Set `PREVIEW_WIDTH`
 and `PREVIEW_HEIGHT` to test small windows. With `QT_QPA_PLATFORM=offscreen`
 and `PREVIEW_IMAGE=/absolute/path.png`, it saves a screenshot and exits.
 
-The background uses Qt Quick 3D through the guest's OpenGL/VirGL path. The
-greeter package includes the Qt Quick 3D QML modules; the ordinary desktop
-Quickshell package does not. `scene/Sculpture.qml` contains the geometry,
-lights, materials, and two-minute rotation. Its render texture is bounded to
-1600×1000 while preserving aspect ratio; the login controls retain native DPI.
-**Pause motion** stops continuous animation. Authentication also pauses it.
+The background ports the macOS launcher's `app/native/Welcome.metal` animation
+to OpenGL/VirGL. `greeter/ribbons/` contains the native `Ohmansy.Welcome` QML
+plugin and GLSL shaders. Keep its ribbon paths, noise, lighting, particles,
+and depth prepasses aligned with the Metal source. `scene/Ribbons.qml` starts
+at the same 12-second pose and renders at 30 fps, with motion at 60% of the
+launcher's speed. Its render texture is limited
+to 2400 pixels wide while preserving aspect ratio; controls retain native DPI.
+Authentication stops animation without resetting its phase. The login screen
+has no motion toggle; the preview can still freeze motion for visual checks.
+The greeter wrapper adds the plugin's QML import path, so shader changes build
+the small plugin without recompiling Quickshell. The desktop package is unchanged.
 
-Set `OHMANSY_GREETER_STATIC=1` to use the original ribbons. The software
-scene-graph backend and a failed scene import also retain that fallback.
+`GlassSurface.qml` supplies the fields, buttons, and account menu. One shared
+half-resolution blur samples only the background scene; each control crops and
+masks that texture to its rounded shape. Labels and password input are never
+part of the blur source. Translucent tint and a half-point rim that brightens on focus
+keep the glass subtle and the controls readable. The software backend uses a
+more opaque fill. Sample coordinates update with form layout and scrolling.
+
+Set `OHMANSY_GREETER_STATIC=1` to use the static ribbon drawing. Non-OpenGL
+scene-graph backends, a failed plugin import, and renderer initialization errors
+also retain that fallback. The native renderer requires desktop OpenGL 3.3;
+the greeter explicitly selects Qt's OpenGL backend.
 If Quickshell exits with an error, the greeter launcher retries once with the
 static background. This does not recover from a broken compositor or driver.
 Qt's shader cache lives in the greeter's runtime directory.
@@ -86,6 +100,8 @@ no authentication or power actions. Set `PREVIEW_IMAGE` and `PREVIEW_DELAY`
 (milliseconds) to capture and exit automatically; set `PREVIEW_MOTION=0` to
 check the paused state. Hidden windows can be throttled by the compositor,
 so their frame-rate readings do not represent visible rendering performance.
+Set `PREVIEW_KEYBOARD=1` for keyboard checks in the full-screen preview; use
+an automatic capture deadline so it releases keyboard focus when the test ends.
 
 `nix flake check --all-systems` includes real Quickshell-to-greetd protocol
 tests against an isolated test socket. These cover account switching, failed

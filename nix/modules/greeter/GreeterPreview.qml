@@ -4,7 +4,7 @@ import Quickshell
 // Standalone visual preview. No authentication service or power operations.
 Item {
     id: preview
-    property var users: [{ name: "alex", label: "Alex" }]
+    property var users: [{ name: "alex", label: "Alex" }, { name: "sam", label: "Sam" }]
     property string powerAction: ""
     function confirmPower() { powerAction = ""; }
     QtObject {

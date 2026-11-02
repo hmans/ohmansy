@@ -166,7 +166,23 @@ The main app's existing integrations still belong to its Virtualization backend.
 runtime status in `boot-console.log` and `runtime-status.json`. It does not enter
 a username or password.
 
-## Login-screen 3D verified on 2026-11-02
+## Login-screen ribbons verified on 2026-11-02
+
+The login background now ports `app/native/Welcome.metal` to GLSL and renders
+through a `QQuickFramebufferObject` plugin. It retains the three meshes, depth
+prepasses, transparency order, lighting, particles, starting phase, and 30 fps
+pacing. A guest preview reported `virgl (Apple M4 Max)` and settled at 30 fps.
+The initial pose was visually compared with an offscreen render of the original
+Metal shader at the same aspect ratio and animation time. This is a visual
+match, not a claim of bit-identical results across the two graphics APIs.
+
+The plugin requires desktop OpenGL 3.3 or later; non-OpenGL backends and plugin
+initialization failures use the static background. The render texture is capped
+at 2400 pixels wide. Glass controls sample the background independently and stay
+at native resolution. See the [login-screen development
+guide](ohmansy-development.md#login-screen) for preview and diagnostic controls.
+
+### Earlier Qt Quick 3D prototype
 
 The installed guest rendered a Qt Quick 3D login preview through OpenGL 4.1,
 with Qt reporting `virgl (Apple M4 Max)` and Mesa 26.1.8. A visible full-screen
@@ -175,10 +191,9 @@ statistics, not a long-running performance guarantee. Pausing the scene stopped
 continuous rendering. A hidden preview was throttled to about 1 fps, so measure
 visible windows. This does not establish Vulkan or direct Metal access in Linux.
 
-The greeter uses a bounded 3D render texture with native-resolution 2D controls.
-The static fallback was tested with the software scene-graph backend and with
-the Qt Quick 3D modules absent. See the [login-screen development
-guide](ohmansy-development.md#login-screen) for preview and diagnostic controls.
+That prototype used a bounded 3D render texture with native-resolution 2D controls.
+Its static fallback was tested with the software scene-graph backend and with
+the Qt Quick 3D modules absent. The custom ribbon renderer supersedes it.
 
 ## Verified on 2026-10-31
 
