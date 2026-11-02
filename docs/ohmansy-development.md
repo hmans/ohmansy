@@ -101,8 +101,12 @@ outside click dismiss it. A layer surface is required here: a grabbing popup
 cannot reliably open from IPC without a recent input event on its parent.
 
 Foot uses dark gray and white background palettes at 85% opacity, opaque text,
-and 16×14 padding. Ctrl+Shift+T switches palettes; new terminals start dark.
-The terminal palette does not yet follow the desktop appearance preference.
+and 16×14 padding. New terminals read the appearance portal before starting;
+dark selects the dark palette, while light or no preference selects light.
+Quickshell sends Foot's theme-switch signals to the current user's terminals
+when the desktop preference changes and when the shell starts. Foot servers
+also update their clients. Ctrl+Shift+T provides a manual override until the
+next desktop preference change or shell restart.
 Foot requests native blur, and its Niri window rule selects cached wallpaper
 blur (`xray true`), including when floating above another window. Configure the
 palettes in `desktop.nix` and the compositor rule in `desktop/niri.kdl`.

@@ -1,5 +1,7 @@
 { pkgs, lib, ... }:
-let shell = import ./desktop-package.nix { inherit pkgs; };
+let
+  shell = import ./desktop-package.nix { inherit pkgs; };
+  terminal = import ./terminal-package.nix { inherit pkgs; };
 in {
   imports = [ ./greeter.nix ];
   networking.hostName = lib.mkDefault "ohmansy";
@@ -24,7 +26,7 @@ in {
 
   # No account, credentials, machine identifiers, or personal services here.
   environment.systemPackages = with pkgs; [
-    foot quickshell mako swaybg swaylock nautilus
+    terminal quickshell mako swaybg swaylock nautilus
     xwayland-satellite adwaita-icon-theme wl-clipboard
     git vim curl jq python3
   ];
@@ -59,7 +61,7 @@ in {
       "/etc/profiles/per-user/%u"
       "/nix/var/nix/profiles/default"
       "/run/current-system/sw"
-    ] ++ (with pkgs; [ niri foot networkmanager ]);
+    ] ++ [ terminal ] ++ (with pkgs; [ niri networkmanager ]);
     serviceConfig = {
       ExecStart = "${shell}/bin/ohmansy-quickshell --path /etc/xdg/quickshell/ohmansy/shell.qml";
       Restart = "on-failure";

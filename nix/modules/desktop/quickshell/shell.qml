@@ -3,9 +3,21 @@
 //@ pragma DefaultEnv QT_QPA_PLATFORMTHEME=xdgdesktopportal
 import Quickshell
 import Quickshell.Io
+import QtQuick
 
 ShellRoot {
     id: root
+    // Use the same portal-backed Qt preference as the desktop palette.
+    readonly property bool darkTheme: Qt.styleHints.colorScheme === Qt.ColorScheme.Dark
+    onDarkThemeChanged: terminalTheme.restart()
+    Component.onCompleted: terminalTheme.restart()
+    Timer {
+        id: terminalTheme
+        interval: 50
+        onTriggered: Quickshell.execDetached([
+            Quickshell.env("OHMANSY_TERMINAL_THEME"), root.darkTheme ? "dark" : "light"
+        ])
+    }
     property string launcherScreen: ""
     function toggleLauncher(screenName) {
         launcherScreen = launcherScreen === screenName ? "" : screenName;
