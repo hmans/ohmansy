@@ -15,6 +15,29 @@ Item {
     property bool ribbonFailure: false
     readonly property bool passwordPrompt: /^password\s*:?\s*$/i.test(auth.prompt.trim())
     readonly property var sceneStats: sculpture.item ? sculpture.item.renderStats : null
+    function entranceOpacity(delay) {
+        return entrance.opacityAt(delay);
+    }
+    StaggeredEntrance {
+        id: entrance
+        animated: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
+    }
+    FadeSwitch {
+        id: pageFade
+        requestedPage: controller.powerAction
+        animated: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
+        onSettled: {
+            if (!view.primary) return;
+            if (displayedPage !== "") cancelPower.forceActiveFocus();
+            else if (auth.waiting) response.forceActiveFocus();
+            else if (form.otherUser) username.forceActiveFocus();
+            else accounts.forceActiveFocus();
+        }
+    }
+    Connections {
+        target: controller
+        function onPowerActionChanged() { accounts.popup.close(); }
+    }
     function reveal(item) {
         const bottom = form.y + item.y + item.height;
         if (bottom > viewport.contentY + viewport.height)
@@ -86,12 +109,14 @@ Item {
     Text {
         anchors { left: parent.left; top: parent.top; margins: view.compact ? 20 : 32 }
         text: "ohmansy"
+        opacity: view.entranceOpacity(280)
         font { family: "IBM Plex Sans"; pixelSize: 24; weight: Font.DemiBold }
         color: "#e0def4"
     }
     Text {
         anchors { right: parent.right; top: parent.top; margins: 32 }
         text: Qt.formatDateTime(view.now, "ddd, d MMM   hh:mm")
+        opacity: view.entranceOpacity(280)
         font { family: "IBM Plex Sans"; pixelSize: 14 }
         color: "#b9b5ce"
         visible: parent.width > 500
@@ -108,10 +133,12 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         interactive: contentHeight > height
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-        visible: view.primary && !controller.powerAction
+        visible: view.primary && pageFade.displayedPage === ""
+        opacity: pageFade.contentOpacity
+        enabled: pageFade.interactive
     ColumnLayout {
         id: form
-        visible: view.primary && !controller.powerAction
+        visible: view.primary
         x: (viewport.width - width) / 2
         y: Math.max(0, (viewport.height - implicitHeight) / 2)
         width: Math.min(380, viewport.width - 48)
@@ -120,6 +147,7 @@ Item {
         Text {
             visible: !view.compact
             text: "Rise and/or shine."
+            opacity: view.entranceOpacity(0)
             Layout.fillWidth: true
             font { family: "Inter"; pixelSize: 32; weight: Font.Medium }
             color: "#f5f3fa"
@@ -128,6 +156,7 @@ Item {
         }
         ComboBox {
             id: accounts
+            opacity: view.entranceOpacity(90)
             HoverHandler {
                 enabled: accounts.enabled
                 cursorShape: Qt.PointingHandCursor
@@ -212,6 +241,7 @@ Item {
         }
         GreeterField {
             id: username
+            opacity: view.entranceOpacity(90)
             backdrop: blurredBackdrop
             visible: form.otherUser
             Layout.fillWidth: true
@@ -223,12 +253,14 @@ Item {
         Text {
             visible: auth.waiting && !view.compact && !view.passwordPrompt
             text: auth.prompt
+            opacity: view.entranceOpacity(180)
             color: "#c8c4d6"
             font { family: "Inter"; pixelSize: 14 }
             Layout.leftMargin: 4
         }
         GreeterField {
             id: response
+            opacity: view.entranceOpacity(180)
             backdrop: blurredBackdrop
             Layout.fillWidth: true
             visible: auth.waiting || auth.busy
@@ -245,7 +277,7 @@ Item {
                 target: auth
                 function onClearResponse() { response.clear(); }
                 function onWaitingChanged() {
-                    if (auth.waiting && view.primary) {
+                    if (auth.waiting && view.primary && pageFade.interactive && pageFade.displayedPage === "") {
                         response.forceActiveFocus();
                         viewport.contentY = Math.max(0, response.y + response.height - viewport.height);
                     }
@@ -264,6 +296,7 @@ Item {
         }
         GreeterButton {
             id: signIn
+            opacity: view.entranceOpacity(270)
             backdrop: blurredBackdrop
             Layout.fillWidth: true
             implicitHeight: view.compact ? 56 : 64
@@ -271,6 +304,7 @@ Item {
             primary: true
             text: auth.busy ? "Signing in…" : "Sign in"
             enabled: !auth.busy && (auth.waiting || (form.otherUser && username.text.trim() !== ""))
+            dimmed: auth.busy || !(auth.waiting || (form.otherUser && username.text.trim() !== ""))
             onClicked: {
                 if (auth.waiting) auth.submit(response.text);
                 else auth.selectUser(username.text);
@@ -279,12 +313,14 @@ Item {
     }
     }
     ColumnLayout {
-        visible: view.primary && controller.powerAction !== ""
+        visible: view.primary && pageFade.displayedPage !== ""
+        opacity: pageFade.contentOpacity
+        enabled: pageFade.interactive
         anchors.centerIn: parent
         width: Math.min(320, parent.width - 48)
         spacing: 16
         Text {
-            text: controller.powerAction === "reboot" ? "Restart this computer?" : "Shut down this computer?"
+            text: pageFade.displayedPage === "reboot" ? "Restart this computer?" : "Shut down this computer?"
             color: "#e0def4"
             font { family: "IBM Plex Sans"; pixelSize: 22 }
             Layout.fillWidth: true
@@ -295,18 +331,24 @@ Item {
             backdrop: blurredBackdrop
             Layout.fillWidth: true
             primary: true
-            text: controller.powerAction === "reboot" ? "Restart" : "Shut down"
+            text: pageFade.displayedPage === "reboot" ? "Restart" : "Shut down"
+            dimmed: false
             onClicked: controller.confirmPower()
         }
         GreeterButton {
+            id: cancelPower
             backdrop: blurredBackdrop
             Layout.fillWidth: true
             text: "Cancel"
+            dimmed: false
             onClicked: controller.powerAction = ""
+            Keys.onEscapePressed: controller.powerAction = ""
         }
     }
     RowLayout {
-        visible: view.primary && !controller.powerAction
+        opacity: view.entranceOpacity(360) * pageFade.contentOpacity
+        visible: view.primary && pageFade.displayedPage === ""
+        enabled: pageFade.interactive
         anchors { bottom: parent.bottom; right: parent.right; margins: view.compact ? 16 : 24 }
         spacing: 8
         PowerButton { text: "Restart"; symbol: "restart"; onClicked: { response.clear(); controller.powerAction = "reboot"; } }

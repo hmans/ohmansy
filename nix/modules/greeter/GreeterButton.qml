@@ -4,6 +4,8 @@ import QtQuick.Controls
 Button {
     id: control
     property bool primary: false
+    // A transition may block input without changing the button's appearance.
+    property bool dimmed: !enabled
     property Item backdrop: null
     implicitHeight: 60
     padding: 18
@@ -22,7 +24,7 @@ Button {
         renderType: Text.QtRendering
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        opacity: control.enabled ? 1 : 0.45
+        opacity: control.dimmed ? 0.45 : 1
     }
     background: GlassSurface {
         backdrop: control.backdrop
@@ -30,6 +32,6 @@ Button {
         highlighted: control.hovered
         pressed: control.down
         focused: control.visualFocus
-        opacity: control.enabled ? 1 : 0.55
+        opacity: control.dimmed ? 0.55 : 1
     }
 }

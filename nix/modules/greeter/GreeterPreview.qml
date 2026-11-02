@@ -7,6 +7,17 @@ Item {
     property var users: [{ name: "alex", label: "Alex" }, { name: "sam", label: "Sam" }]
     property string powerAction: ""
     function confirmPower() { powerAction = ""; }
+    // Exercise both transition directions without invoking real power actions.
+    Timer {
+        interval: 1200
+        running: Quickshell.env("PREVIEW_TRANSITIONS") === "1"
+        onTriggered: preview.powerAction = "reboot"
+    }
+    Timer {
+        interval: 2400
+        running: Quickshell.env("PREVIEW_TRANSITIONS") === "1"
+        onTriggered: preview.powerAction = ""
+    }
     QtObject {
         id: demo
         property bool waiting: true

@@ -86,6 +86,16 @@ part of the blur source. Translucent tint and a half-point rim that brightens on
 keep the glass subtle and the controls readable. The software backend uses a
 more opaque fill. Sample coordinates update with form layout and scrolling.
 
+`StaggeredEntrance.qml` shares one startup timeline across the form elements.
+`FadeSwitch.qml` fades out the current page before switching to the requested
+page and fading it in (180 ms sine exit, 360 ms quintic entrance). Controls are
+disabled during the transition, but their visual dimming is independent of
+that input lock: inherited disabled styling would cause a brightness jump at
+the end of the fade. The power
+dialog focuses Cancel; returning to login restores field focus. Static mode
+skips both animations. Use `PREVIEW_TRANSITIONS=1` with the preview package to
+exercise the dialog and return path without real power actions.
+
 Set `OHMANSY_GREETER_STATIC=1` to use the static ribbon drawing. Non-OpenGL
 scene-graph backends, a failed plugin import, and renderer initialization errors
 also retain that fallback. The native renderer requires desktop OpenGL 3.3;
