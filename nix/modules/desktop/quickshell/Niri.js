@@ -29,6 +29,10 @@ function update(state, event) {
         }).concat([window]);
     }
     if (event.WindowClosed) windows = windows.filter(function(w) { return w.id !== event.WindowClosed.id; });
+    if (event.WindowLayoutsChanged) windows = windows.map(function(w) {
+        var change = event.WindowLayoutsChanged.changes.find(function(c) { return c[0] === w.id; });
+        return change ? Object.assign({}, w, { layout: change[1] }) : w;
+    });
     if (event.WindowFocusChanged) windows = windows.map(function(w) {
         return Object.assign({}, w, { is_focused: w.id === event.WindowFocusChanged.id });
     });

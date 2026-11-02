@@ -16,8 +16,13 @@ The greeter source is in `nix/modules/greeter/`.
 Both shells share the `Ohmansy.Ui` components in `nix/modules/ui/`, including
 glass surfaces, controls, icons, and transitions. Niri supplies background
 blur behind the desktop menu bar.
-The default wallpaper is bundled in `nix/modules/desktop/wallpapers/` and
-displayed by a user service tied to the Niri session.
+The desktop wallpaper currently reuses the login screen's animated ribbons,
+displayed by a separate Quickshell user service tied to the Niri session.
+The ribbons ease sideways when the active window column changes and vertically
+when the active workspace changes. This parallax follows focus destinations,
+not continuous touchpad gesture positions.
+The image in `nix/modules/desktop/wallpapers/` is the fallback when the ribbon
+renderer cannot run.
 
 The app is independently implemented and inspired by
 [Try Omarchy](https://github.com/omacom/try-omarchy). Development builds package a

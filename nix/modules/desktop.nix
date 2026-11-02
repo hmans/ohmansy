@@ -2,6 +2,7 @@
 let
   shell = import ./desktop-package.nix { inherit pkgs; };
   terminal = import ./terminal-package.nix { inherit pkgs; };
+  wallpaper = import ./wallpaper-package.nix { inherit pkgs; };
 in {
   imports = [ ./greeter.nix ];
   networking.hostName = lib.mkDefault "ohmansy";
@@ -40,7 +41,7 @@ in {
     after = [ "niri.service" ];
     partOf = [ "niri.service" ];
     serviceConfig = {
-      ExecStart = "${pkgs.swaybg}/bin/swaybg --image /etc/ohmansy/wallpaper.png --mode fill --color '#171c29'";
+      ExecStart = "${wallpaper}/bin/ohmansy-wallpaper";
       Restart = "on-failure";
       RestartSec = 2;
     };
