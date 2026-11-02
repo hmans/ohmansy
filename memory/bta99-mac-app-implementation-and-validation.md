@@ -29,8 +29,11 @@ Use the root Makefile; the Swift package is app/Package.swift.
 ## Interaction invariants
 
 - Keep one window, free resizing, the small inset, rounded guest card, and shadow.
-- The welcome screen must leave Mac shortcuts alone. Clicking the running guest
-  locks input. Leaving the guest or Control–Option–G releases it.
+- The welcome screen must leave Mac shortcuts alone. Entering the visible running
+  guest in the active window locks input. Leaving it or Control–Option–G releases
+  it. Hover must not prompt for permission or capture behind a sheet/popover.
+- Input capture has no toolbar lock icon and keeps the title `try ohmansy`.
+  Permission setup remains under VM Controls → Keyboard Shortcuts….
 - Balance cursor hide/unhide calls and release held keys when unlocking.
   Permission polling must never capture input. Do not automate terminal input.
 - Keep HiDPI scaling separate from guest pixel resolution. Check resizing and

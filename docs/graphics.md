@@ -29,9 +29,13 @@ toolbar controls, and names the window **try ohmansy**. **VM Controls** offers
 the VM files and force-stop action. Frames stay on the
 accelerated renderer; there is no screenshot or VNC transport.
 
-Input starts unlocked. Mac Command shortcuts stay with macOS until the user
-clicks inside the running guest or clicks **Lock input** in the toolbar. **Control–Option–G**, the unlock
-button, switching away from the window, or stopping the guest releases input.
+Input starts unlocked. Moving into the visible, running guest display in the
+active window locks input automatically. Clicking inside the guest also locks
+it. Leaving the guest, **Control–Option–G**, switching away from the window,
+or stopping the guest releases input.
+Manual unlock stays in effect until the next entry or explicit lock; ordinary
+mouse movement and permission polling do not relock it. Background windows,
+host dialogs, and the keyboard setup popover block automatic capture.
 The stopped launcher never captures shortcuts. Permission checks do not lock input.
 **Keyboard Shortcuts…** in VM Controls or the app menu opens the
 setup panel; the stopped-VM launcher also offers a setup button. **Open Settings**
@@ -41,9 +45,12 @@ The user must grant access. If the toggle is already on but the app still lacks
 access, remove the stale entry and re-add the outer app revealed by **Show App**.
 The launcher is the responsible process for the helper's permission requests.
 The app checks permission and enables the event tap only while input is locked.
-After granting access, use the lock button to connect capture without restarting
+After granting access, enter or click the guest to connect capture without restarting
 the guest. **Retry** refreshes permission status. Automatic checks never display
-permission prompts.
+permission prompts. Mouse entry also stays silent if permission or capture is
+unavailable; use **VM Controls → Keyboard Shortcuts…** to open setup.
+The toolbar has no input-lock button, and the window title stays **try ohmansy**
+when capture changes.
 
 Builds use the sole available Apple Development signing identity, or the identity
 specified in `OHMANSY_SIGN_IDENTITY`. This preserves a certificate-based identity

@@ -8,6 +8,9 @@
 @property(nonatomic) NSRect contentLayoutRect;
 @property(nonatomic) BOOL titlebarAppearsTransparent;
 @property(nonatomic) NSTitlebarSeparatorStyle titlebarSeparatorStyle;
+@property(nonatomic, getter=isKeyWindow) BOOL keyWindow;
+@property(nonatomic, strong) NSWindow *attachedSheet;
+@property(nonatomic, copy) NSString *title;
 @end
 @implementation TestWindow
 @end
@@ -37,19 +40,51 @@ static void ReadDisplayInfoFrame(NSView *guest, SEL selector) {
 static void HideCursor(id guest, SEL selector) { cursorHides++; }
 static void ShowCursor(id guest, SEL selector) { cursorShows++; }
 @interface TestKeyboardGuest : NSView
+@property(nonatomic, strong) TestWindow *testWindow;
+@property(nonatomic) BOOL testHidden;
 - (void)setFullGrab:(id)sender;
 @end
 @implementation TestKeyboardGuest
+- (NSWindow *)window { return (NSWindow *)self.testWindow; }
+- (BOOL)isHiddenOrHasHiddenAncestor { return self.testHidden; }
+- (void)grabMouse { GrabGuestMouse(self, _cmd); }
 - (void)setFullGrab:(id)sender { captureAttempts++; }
 - (void)raiseAllKeys { keyReleases++; }
 @end
 @interface TestKeyboardChrome : OhmansyChrome
 @property(nonatomic) BOOL permissionGranted;
+@property(nonatomic) BOOL captureReady;
+@property(nonatomic) NSInteger setupPrompts;
 @end
 @implementation TestKeyboardChrome
 - (BOOL)keyboardPermissionGranted { return self.permissionGranted; }
 - (CFMachPortRef)keyboardEventTap { return NULL; }
+- (BOOL)keyboardCaptureReady { return self.captureReady; }
+- (void)focus:(id)sender {}
+- (void)showKeyboardSetup:(id)sender { self.setupPrompts++; }
 @end
+@interface TestPopover : NSObject
+@end
+@implementation TestPopover
+- (BOOL)isShown { return YES; }
+@end
+static BOOL testMouseGrabbed;
+static int mouseGrabs;
+static void EngineGrabMouse(NSView *guest, SEL selector) {
+    testMouseGrabbed = YES;
+    mouseGrabs++;
+    HideGuestHostCursor(guest, @selector(hideCursor));
+}
+static void EngineUngrabMouse(NSView *guest, SEL selector) {
+    testMouseGrabbed = NO;
+    UnhideGuestHostCursor(guest, @selector(unhideCursor));
+}
+static void EngineMouseEntered(NSView *guest, SEL selector, NSEvent *event) {
+    if (!testMouseGrabbed) GrabGuestMouse(guest, @selector(grabMouse));
+}
+static void EngineMouseExited(NSView *guest, SEL selector, NSEvent *event) {
+    if (testMouseGrabbed) UngrabGuestMouse(guest, @selector(ungrabMouse));
+}
 static void EngineResize(id view, SEL selector) { resizeRequests++; }
 @interface TestScrollEvent : NSObject
 @property(nonatomic) CGFloat scrollingDeltaX;
@@ -221,7 +256,72 @@ int main(void) {
             NSCAssert(NSEqualSizes([chrome windowWillResize:(NSWindow *)[TestWindow new] toSize:requested], requested),
                       @"Wide and tall host windows must retain the requested aspect ratio.");
         }
-        fprintf(stdout, "Runtime chrome regression passed: repeated mode changes cannot shrink the framed window.\n");
+        TestKeyboardChrome *hoverChrome = [TestKeyboardChrome new];
+        TestKeyboardGuest *hoverGuest = [TestKeyboardGuest new];
+        TestWindow *hoverWindow = [TestWindow new];
+        hoverWindow.keyWindow = YES;
+        hoverGuest.testWindow = hoverWindow;
+        hoverChrome.guest = hoverGuest;
+        hoverChrome.window = (NSWindow *)hoverWindow;
+        ActiveChrome = hoverChrome;
+        OriginalGrabMouse = (IMP)EngineGrabMouse;
+        OriginalUngrabMouse = (IMP)EngineUngrabMouse;
+        OriginalMouseEntered = (IMP)EngineMouseEntered;
+        OriginalMouseExited = (IMP)EngineMouseExited;
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(!hoverChrome.inputLocked && hoverChrome.setupPrompts == 0,
+                  @"Hover without permission must neither lock nor prompt.");
+        hoverChrome.permissionGranted = YES;
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(!hoverChrome.inputLocked && hoverChrome.setupPrompts == 0,
+                  @"Failed capture must unlock silently on hover.");
+        hoverChrome.captureReady = YES;
+        hoverChrome.stopped = YES;
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(!hoverChrome.inputLocked, @"Stopped screen must ignore hover.");
+        hoverChrome.stopped = NO;
+        hoverWindow.keyWindow = NO;
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(!hoverChrome.inputLocked, @"Background window must not steal shortcuts.");
+        hoverWindow.keyWindow = YES;
+        hoverGuest.testHidden = YES;
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(!hoverChrome.inputLocked, @"Hidden guest must ignore hover.");
+        hoverGuest.testHidden = NO;
+        hoverWindow.attachedSheet = (NSWindow *)[TestWindow new];
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(!hoverChrome.inputLocked, @"A sheet must block hover capture.");
+        hoverWindow.attachedSheet = nil;
+        hoverChrome.keyboardPopover = (NSPopover *)[TestPopover new];
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(!hoverChrome.inputLocked, @"Permission popover must block hover capture.");
+        hoverChrome.keyboardPopover = nil;
+        int hidesBeforeHover = cursorHides, showsBeforeHover = cursorShows;
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(hoverChrome.inputLocked && testMouseGrabbed && mouseGrabs == 1,
+                  @"Entering the active guest must lock without a click.");
+        NSCAssert([hoverWindow.title isEqualToString:@"try ohmansy"],
+                  @"Input capture must keep the window title stable.");
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(mouseGrabs == 1 && cursorHides == hidesBeforeHover + 1,
+                  @"Repeated entry must not toggle the lock or hide twice.");
+        GuestMouseExited(hoverGuest, @selector(mouseExited:), nil);
+        NSCAssert(!hoverChrome.inputLocked && !testMouseGrabbed && cursorShows == showsBeforeHover + 1,
+                  @"Mouse exit must unlock and restore exactly one cursor hide.");
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        HandleGuestEvent(hoverGuest, @selector(handleEvent:), escape);
+        [hoverChrome updateKeyboardAccess];
+        NSCAssert(!hoverChrome.inputLocked && !testMouseGrabbed,
+                  @"Manual escape must remain unlocked until re-entry.");
+        GuestMouseExited(hoverGuest, @selector(mouseExited:), nil);
+        GuestMouseEntered(hoverGuest, @selector(mouseEntered:), nil);
+        NSCAssert(hoverChrome.inputLocked, @"Re-entry must restore automatic lock.");
+        [hoverChrome windowDidResignKey:[NSNotification notificationWithName:NSWindowDidResignKeyNotification object:nil]];
+        NSCAssert(!hoverChrome.inputLocked && !testMouseGrabbed && !hoverChrome.hostCursorHidden,
+                  @"Focus loss must release a hover-acquired lock.");
+        ActiveChrome = nil;
+        hoverGuest.testWindow = nil;
+        fprintf(stdout, "Runtime chrome regression passed: frame sizing, hover capture, release, and cursor balance.\n");
     }
     return 0;
 }

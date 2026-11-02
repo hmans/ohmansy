@@ -7,7 +7,7 @@ data:
 id: jbzm6
 title: Cursor fixes span the host and guest
 ---
-Diagnose host cursor visibility separately from guest cursor rendering. Input unlock must release held keys and balance host cursor hiding. The stopped launcher must not capture Mac shortcuts. Clicking the running guest locks input; leaving it or Control–Option–G releases it.
+Diagnose host cursor visibility separately from guest cursor rendering. Input unlock must release held keys and balance host cursor hiding. The stopped launcher must not capture Mac shortcuts. Entering the visible running guest in the active window locks input; leaving it or Control–Option–G releases it. Manual release remains effective until a new entry or click. Hover capture fails silently if permission or the event tap is unavailable.
 
 The Quickshell login screen now runs in its own Niri compositor. Its launch script explicitly selects Adwaita and sets XCURSOR_PATH to the theme store path. The VM module disables the separate cursor plane for both the greeter and desktop. Software cursor rendering does not mean software rendering for the whole desktop.
 

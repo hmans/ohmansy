@@ -247,7 +247,6 @@ static void ResizeGuestWithoutShrinkingFrame(NSView *guest, SEL selector) {
 @property(nonatomic) BOOL stopped;
 @property(nonatomic) BOOL quitAfterShutdown;
 @property(nonatomic) BOOL toolbarWasVisible;
-@property(nonatomic, strong) NSToolbarItem *keyboardItem;
 @property(nonatomic, strong) NSButton *keyboardSetupButton;
 @property(nonatomic, strong) NSPopover *keyboardPopover;
 @property(nonatomic, strong) NSTextField *keyboardDetail;
@@ -257,10 +256,12 @@ static void ResizeGuestWithoutShrinkingFrame(NSView *guest, SEL selector) {
 - (void)install;
 - (void)releaseInput;
 - (void)keyboard:(id)sender;
+- (void)lockInputShowingSetup:(BOOL)showSetup sender:(id)sender;
 @end
 
 static __weak OhmansyChrome *ActiveChrome;
 static IMP OriginalHandleEvent, OriginalGrabMouse, OriginalUngrabMouse;
+static IMP OriginalMouseEntered, OriginalMouseExited;
 static IMP OriginalHideCursor, OriginalUnhideCursor;
 static void HideGuestHostCursor(NSView *guest, SEL selector) {
     if (!ActiveChrome.inputLocked || ActiveChrome.stopped || ActiveChrome.hostCursorHidden) return;
@@ -340,12 +341,31 @@ static bool HandleGuestEvent(NSView *guest, SEL selector, NSEvent *event) {
 static void GrabGuestMouse(NSView *guest, SEL selector) {
     if (ActiveChrome.stopped || !ActiveChrome.inputLocked) return;
     ((void (*)(id, SEL))OriginalGrabMouse)(guest, selector);
-    guest.window.title = ActiveChrome.inputLocked ? @"try ohmansy — Input locked · ⌃⌥G to release" : @"try ohmansy";
+    guest.window.title = @"try ohmansy";
 }
 static void UngrabGuestMouse(NSView *guest, SEL selector) {
     ((void (*)(id, SEL))OriginalUngrabMouse)(guest, selector);
     ActiveChrome.inputLocked = NO;
     [ActiveChrome releaseInput];
+}
+static void GuestMouseEntered(NSView *guest, SEL selector, NSEvent *event) {
+    OhmansyChrome *chrome = ActiveChrome;
+    // The engine's tracking area is active only in the key window. Keep these
+    // guards explicit: entering a background view must not steal Mac shortcuts.
+    if (chrome.guest == guest && chrome.window.isKeyWindow && !chrome.stopped &&
+        !chrome.inputLocked && !guest.hiddenOrHasHiddenAncestor &&
+        !chrome.window.attachedSheet && !chrome.keyboardPopover.shown) {
+        [chrome lockInputShowingSetup:NO sender:nil];
+    }
+    ((void (*)(id, SEL, id))OriginalMouseEntered)(guest, selector, event);
+}
+static void GuestMouseExited(NSView *guest, SEL selector, NSEvent *event) {
+    ((void (*)(id, SEL, id))OriginalMouseExited)(guest, selector, event);
+    OhmansyChrome *chrome = ActiveChrome;
+    // The absolute-pointer engine path normally unlocks first. Also cover an
+    // exit where the engine no longer considers its mouse grabbed.
+    if (chrome.guest == guest && (chrome.inputLocked || chrome.hostCursorHidden))
+        [chrome releaseInput];
 }
 
 static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
@@ -417,6 +437,8 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
         OriginalHandleEvent = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"handleEvent:")), (IMP)HandleGuestEvent);
         OriginalGrabMouse = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"grabMouse")), (IMP)GrabGuestMouse);
         OriginalUngrabMouse = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"ungrabMouse")), (IMP)UngrabGuestMouse);
+        OriginalMouseEntered = method_setImplementation(class_getInstanceMethod(guest.class, @selector(mouseEntered:)), (IMP)GuestMouseEntered);
+        OriginalMouseExited = method_setImplementation(class_getInstanceMethod(guest.class, @selector(mouseExited:)), (IMP)GuestMouseExited);
         OriginalHideCursor = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"hideCursor")), (IMP)HideGuestHostCursor);
         OriginalUnhideCursor = method_setImplementation(class_getInstanceMethod(guest.class, NSSelectorFromString(@"unhideCursor")), (IMP)UnhideGuestHostCursor);
         self.previousDelegate = window.delegate;
@@ -597,7 +619,7 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
     [self shutdown:sender];
 }
 - (NSArray *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar {
-    return @[NSToolbarFlexibleSpaceItemIdentifier, @"keyboard", @"settings", @"power"];
+    return @[NSToolbarFlexibleSpaceItemIdentifier, @"settings", @"power"];
 }
 - (NSArray *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar {
     return [self toolbarDefaultItemIdentifiers:toolbar];
@@ -605,12 +627,7 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
 - (NSToolbarItem *)toolbar:(NSToolbar *)toolbar itemForItemIdentifier:(NSString *)identifier willBeInsertedIntoToolbar:(BOOL)inserted {
     NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:identifier];
     item.target = self;
-    if ([identifier isEqualToString:@"keyboard"]) {
-        self.keyboardItem = item;
-        item.label = @"Focus Keyboard";
-        item.image = [NSImage imageWithSystemSymbolName:@"keyboard" accessibilityDescription:item.label];
-        item.action = @selector(keyboard:);
-    } else if ([identifier isEqualToString:@"settings"]) {
+    if ([identifier isEqualToString:@"settings"]) {
         NSMenuToolbarItem *controls = [[NSMenuToolbarItem alloc] initWithItemIdentifier:identifier];
         controls.label = @"VM Controls";
         controls.image = [NSImage imageWithSystemSymbolName:@"slider.horizontal.3" accessibilityDescription:controls.label];
@@ -691,15 +708,9 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
     tap = [self keyboardEventTap];
     if (tap && CFMachPortIsValid(tap)) CGEventTapEnable(tap, self.inputLocked && !self.stopped && trusted);
     BOOL ready = [self keyboardCaptureReady];
-    NSString *title = self.inputLocked && ready ? @"Unlock input" : @"Lock input";
-    self.keyboardItem.label = title;
-    self.keyboardItem.enabled = !self.stopped;
-    self.keyboardItem.toolTip = self.inputLocked ? @"Unlock input (Control–Option–G)" : @"Lock input to send Mac shortcuts to Linux";
-    self.keyboardItem.image = [NSImage imageWithSystemSymbolName:self.inputLocked ? @"lock.fill" : @"lock.open"
-                                      accessibilityDescription:title];
     self.keyboardSetupButton.hidden = trusted;
     self.keyboardDetail.stringValue = trusted && !self.inputLocked
-        ? @"Click inside the running guest to lock input and send shortcuts to Linux. You can also use the lock button. Control–Option–G unlocks input. Switching apps also releases input."
+        ? @"Move into the running guest to lock input and send shortcuts to Linux. You can also click. Leaving the guest, Control–Option–G, or switching apps releases input."
         : ready ? @"Input is locked to Linux. Press Control–Option–G to return shortcuts to your Mac. Switching apps also releases input."
         : trusted
             ? @"Permission is granted, but keyboard capture is not connected. Click Retry. If it still fails, save your guest work and restart try ohmansy."
@@ -708,7 +719,14 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
 - (void)keyboard:(id)sender {
     if (self.stopped) return;
     if (self.inputLocked) { [self releaseInput]; return; }
-    if (![self keyboardPermissionGranted]) { [self showKeyboardSetup:sender]; return; }
+    [self lockInputShowingSetup:YES sender:sender];
+}
+- (void)lockInputShowingSetup:(BOOL)showSetup sender:(id)sender {
+    if (self.stopped || self.inputLocked) return;
+    if (![self keyboardPermissionGranted]) {
+        if (showSetup) [self showKeyboardSetup:sender];
+        return;
+    }
     self.inputLocked = YES;
     self.lastCaptureAttempt = 0;
     [self updateKeyboardAccess];
@@ -718,7 +736,7 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
         ((void (*)(id, SEL))[self.guest methodForSelector:grab])(self.guest, grab);
     } else {
         [self releaseInput];
-        [self showKeyboardSetup:sender];
+        if (showSetup) [self showKeyboardSetup:sender];
     }
 }
 - (void)showKeyboardSetup:(id)sender {
