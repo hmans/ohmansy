@@ -9,6 +9,7 @@ let
   desktopOnly = evaluate [ ../modules/desktop.nix ];
   softwareOnly = evaluate [ ../modules/software.nix ];
   noFish = evaluate [ ../modules/default.nix { programs.fish.enable = false; } ];
+  noBrowserStyle = evaluate [ ../modules/software.nix { ohmansy.firefoxStyle.enable = false; } ];
   custom = evaluate [
     ../modules/default.nix
     {
@@ -25,6 +26,8 @@ let
     (throw "No terminal launcher installed") custom.environment.systemPackages;
 in
 assert defaults.programs.firefox.enable && defaults.programs.fish.enable;
+assert noBrowserStyle.programs.firefox.enable && noBrowserStyle.programs.firefox.autoConfig == "";
+assert custom.programs.firefox.autoConfig == "";
 assert defaults.users.defaultUserShell == pkgs.fish;
 assert defaults.environment.etc."xdg/xdg-terminals.list".text == "foot.desktop\n";
 assert defaults.environment.etc ? "xdg/foot/foot.ini";

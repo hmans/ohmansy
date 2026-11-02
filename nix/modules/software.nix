@@ -1,5 +1,6 @@
 { config, lib, pkgs, ... }:
 {
+  imports = [ ./firefox-style.nix ];
   options.ohmansy.software.packages = lib.mkOption {
     type = lib.types.listOf lib.types.package;
     default = with pkgs; [ git vim curl jq python3 ];

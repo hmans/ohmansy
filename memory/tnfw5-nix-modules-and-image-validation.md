@@ -228,3 +228,33 @@ build and live QML loading passed; no QML component errors were logged.
 The transparent bar uses Theme.onWallpaper and forwards it into QuietButton;
 this fixes text, icons, slider, and hover colors independently of light/dark
 mode. Tray images are rendered white. Other surfaces retain the system palette.
+
+Firefox styling (2026-11-02): software.nix imports firefox-style.nix. Packaged
+AutoConfig registers a USER_SHEET scoped to browser.xhtml, without writing user
+profiles or replacing userChrome.css. Compact density and hidden bookmarks are
+user-overridable defaults; ohmansy.firefoxStyle.enable disables the integration,
+use ohmansy.browserStyle.enabled=false in
+about:config to disable only the stylesheet after restart. The css option replaces
+the stylesheet. The selected Firefox wrapper retains existing extraAutoConfig.
+Only the AutoConfig sandbox is disabled for the privileged stylesheet service;
+the web-content sandbox is unchanged. Firefox 158 uses .urlbar-background rather
+than the older ID, so both selectors are covered. Internal chrome CSS is version
+sensitive. Installed-host build, customization check, and isolated Marionette
+light/dark computed-style checks passed; a blank-profile screenshot was inspected.
+The guest was test-activated, with a separate visible preview profile; existing
+Firefox processes need restart. No new ISO or boot validation was performed.
+
+Firefox refinement: 28px tabs with 4px corners, quieter selected fill, compact
+16px toolbar glyphs, no toolbox separator, and a single address-field focus
+border. The Firefox 158 searchmode-switcher uses moz-button shadow DOM: override
+its --button-background-color-muted family to remove the inner pill; generic
+button colors and ::part did not change its rendered fill. Native control focus
+remains. Final packaged browser checks confirmed transparent picker fill, no
+extra field outline, and both theme colors; a blank-profile screenshot was
+visually checked. Installed configuration test-activated, not boot-tested.
+
+Firefox suggestions-open focus: the urlbar-input-container adds an inner blue
+outline independently of the outer background. Remove that container outline
+only while focused; retain the outer 1px focus border and child control cues.
+An isolated Firefox 158 query reproduced the duplicate; packaged fix verified
+with suggestions open and a screenshot. Tab corners are now 6px by request.

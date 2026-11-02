@@ -1,0 +1,85 @@
+/* Browser chrome only. Page content, permission panels and security indicators
+   keep Firefox's own styling and behavior. */
+@-moz-document url("chrome://browser/content/browser.xhtml") {
+  :root {
+    --ohmansy-toolbar: #f3f3f5;
+    --ohmansy-field: #e8e8ec;
+    --ohmansy-selected: #e6e6eb;
+    --ohmansy-focus: #857394;
+    --tab-min-height: 28px !important;
+    --tab-border-radius: 9px !important;
+    --tab-block-margin: 3px !important;
+    --toolbarbutton-border-radius: 6px !important;
+    --toolbarbutton-inner-padding: 5px !important;
+    --toolbar-bgcolor: var(--ohmansy-toolbar) !important;
+    --toolbar-field-background-color: var(--ohmansy-field) !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ohmansy-toolbar: #242428;
+      --ohmansy-field: #303036;
+      --ohmansy-selected: #2e2e33;
+      --ohmansy-focus: #a596b7;
+    }
+  }
+  #navigator-toolbox,
+  #TabsToolbar,
+  #nav-bar,
+  #PersonalToolbar {
+    background-color: var(--ohmansy-toolbar) !important;
+    background-image: none !important;
+  }
+  #navigator-toolbox { border-bottom: none !important; }
+  /* Let the compositor's rounded window frame breathe around the tab strip. */
+  #TabsToolbar {
+    padding-inline: 8px !important;
+    padding-top: 5px !important;
+  }
+  .tab-background {
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  .tab-background[selected] { background: var(--ohmansy-selected) !important; }
+  #nav-bar {
+    box-shadow: none !important;
+    border-top: none !important;
+    padding-block: 1px !important;
+  }
+  #nav-bar .toolbarbutton-icon {
+    width: 26px !important;
+    height: 26px !important;
+    padding: 5px !important;
+  }
+  #urlbar-background,
+  #urlbar > .urlbar-background,
+  #searchbar {
+    border-radius: 5px !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+  }
+  #urlbar[focused] > #urlbar-background,
+  #urlbar[focused] > .urlbar-background,
+  #searchbar:focus-within {
+    border-color: var(--ohmansy-focus) !important;
+    outline: none !important;
+  }
+  /* Suggestions add a second ring around the input row. The outer background
+     already carries our focus border; keep child button focus cues intact. */
+  #urlbar[focused] > .urlbar-input-container,
+  #urlbar[focused] > #urlbar-input-container {
+    outline: none !important;
+  }
+  /* Keep the search-engine picker functional without a second pill inside
+     the address field. These variables cross the moz-button shadow boundary. */
+  #urlbar .searchmode-switcher {
+    --button-background-color-muted: transparent !important;
+    --button-background-color-muted-hover: color-mix(in srgb, currentColor 8%, transparent) !important;
+    --button-background-color-muted-active: color-mix(in srgb, currentColor 12%, transparent) !important;
+    --button-background-color-muted-selected: color-mix(in srgb, currentColor 12%, transparent) !important;
+    --button-border-color-muted: transparent !important;
+    --button-border-radius: 3px !important;
+  }
+  /* Preserve Firefox's stronger keyboard focus cue on the actual controls. */
+  #urlbar:not([open]) > #urlbar-background,
+  #urlbar:not([open]) > .urlbar-background { background: var(--ohmansy-field) !important; }
+}

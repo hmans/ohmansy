@@ -69,6 +69,24 @@ retain store paths; removing a default does not immediately erase its files.
 Nautilus and the sound, network, Bluetooth, clipboard, and lock tools remain
 part of the desktop integration in this version.
 
+## Firefox appearance
+
+Firefox starts with compact controls, flat tabs, coordinated light/dark toolbar
+colors, and a softer address-field focus outline. The bookmarks toolbar is hidden
+by default; Firefox's toolbar menu can show it again. Density preferences remain
+editable. Browser content and security indicators retain Firefox's behavior.
+
+Disable the integration with `ohmansy.firefoxStyle.enable = false;`, or replace
+the stylesheet with `ohmansy.firefoxStyle.css = builtins.readFile ./browser.css;`.
+Individual users can set `ohmansy.browserStyle.enabled` to `false` in
+`about:config` and restart Firefox to disable the stylesheet. This leaves the
+compact and bookmarks defaults, which can be changed separately in Firefox.
+
+The package loads browser-only CSS through AutoConfig; it does not write to user
+profiles or replace `userChrome.css`. Firefox UI selectors can change between
+releases, so check the appearance after browser upgrades. Restart Firefox after
+rebuilding to load a changed stylesheet.
+
 ## Choose a terminal
 
 One setting changes the system terminal selection:
