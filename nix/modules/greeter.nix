@@ -3,7 +3,10 @@ let
   niri = config.programs.niri.package;
   quickshell = import ./greeter-package.nix { inherit pkgs; };
   shell = pkgs.writeShellScript "ohmansy-greeter-shell" ''
-    ${quickshell}/bin/quickshell --no-duplicate --path /etc/ohmansy/greeter/shell.qml
+    if ! ${quickshell}/bin/quickshell --no-duplicate --path /etc/ohmansy/greeter/shell.qml; then
+      # A graphics failure must not prevent access to the login form.
+      OHMANSY_GREETER_STATIC=1 ${quickshell}/bin/quickshell --no-duplicate --path /etc/ohmansy/greeter/shell.qml
+    fi
     # greetd waits for the whole greeter session to exit before starting Niri.
     ${niri}/bin/niri msg action quit --skip-confirmation
   '';
@@ -12,6 +15,8 @@ let
     export XCURSOR_SIZE=24
     export XCURSOR_PATH=${pkgs.adwaita-icon-theme}/share/icons
     export QT_QUICK_CONTROLS_STYLE=Basic
+    # The greeter has no writable home. Keep Qt's shader cache session-local.
+    export XDG_CACHE_HOME="$XDG_RUNTIME_DIR/ohmansy-cache"
     exec ${pkgs.dbus}/bin/dbus-run-session -- ${niri}/bin/niri --config /etc/ohmansy/greeter.kdl
   '';
 in {

@@ -60,12 +60,32 @@ the desktop. Physical systems retain their own output scaling.
 For appearance changes, run this preview inside a graphical guest session:
 
 ```sh
-quickshell --path nix/modules/greeter/preview.qml
+nix run .#greeter-preview
 ```
 
 The preview cannot authenticate or perform power actions. Set `PREVIEW_WIDTH`
 and `PREVIEW_HEIGHT` to test small windows. With `QT_QPA_PLATFORM=offscreen`
 and `PREVIEW_IMAGE=/absolute/path.png`, it saves a screenshot and exits.
+
+The background uses Qt Quick 3D through the guest's OpenGL/VirGL path. The
+greeter package includes the Qt Quick 3D QML modules; the ordinary desktop
+Quickshell package does not. `scene/Sculpture.qml` contains the geometry,
+lights, materials, and two-minute rotation. Its render texture is bounded to
+1600×1000 while preserving aspect ratio; the login controls retain native DPI.
+**Pause motion** stops continuous animation. Authentication also pauses it.
+
+Set `OHMANSY_GREETER_STATIC=1` to use the original ribbons. The software
+scene-graph backend and a failed scene import also retain that fallback.
+If Quickshell exits with an error, the greeter launcher retries once with the
+static background. This does not recover from a broken compositor or driver.
+Qt's shader cache lives in the greeter's runtime directory.
+
+For visible GPU measurements, use `PREVIEW_FULLSCREEN=1 PREVIEW_STATS=1
+nix run .#greeter-preview` in a Wayland session. The full-screen preview has
+no authentication or power actions. Set `PREVIEW_IMAGE` and `PREVIEW_DELAY`
+(milliseconds) to capture and exit automatically; set `PREVIEW_MOTION=0` to
+check the paused state. Hidden windows can be throttled by the compositor,
+so their frame-rate readings do not represent visible rendering performance.
 
 `nix flake check --all-systems` includes real Quickshell-to-greetd protocol
 tests against an isolated test socket. These cover account switching, failed

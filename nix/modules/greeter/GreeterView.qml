@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 
 Item {
     id: view
@@ -9,6 +10,8 @@ Item {
     required property date now
     required property bool primary
     readonly property bool compact: height < 560
+    property bool motionEnabled: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
+    readonly property var sceneStats: sculpture.item ? sculpture.item.renderStats : null
     function reveal(item) {
         const bottom = form.y + item.y + item.height;
         if (bottom > viewport.contentY + viewport.height)
@@ -18,6 +21,7 @@ Item {
     }
     Rectangle { anchors.fill: parent; color: "#171a21" }
     Canvas {
+        visible: sculpture.status !== Loader.Ready
         anchors.fill: parent
         onWidthChanged: requestPaint()
         onHeightChanged: requestPaint()
@@ -37,6 +41,25 @@ Item {
             }
         }
     }
+    Loader {
+        id: sculpture
+        anchors.fill: parent
+        active: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
+            && GraphicsInfo.api !== GraphicsInfo.Software
+        source: active ? "scene/Sculpture.qml" : ""
+        onLoaded: item.moving = Qt.binding(() => view.motionEnabled && view.visible && !auth.busy)
+    }
+    // Keep the form readable at every point in the sculpture's rotation.
+    Rectangle {
+        anchors.fill: parent
+        visible: sculpture.status === Loader.Ready
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: "#e6171a21" }
+            GradientStop { position: 0.5; color: "#aa171a21" }
+            GradientStop { position: 1; color: "#18171a21" }
+        }
+    }
     Text {
         anchors { left: parent.left; top: parent.top; margins: view.compact ? 20 : 32 }
         text: "ohmansy"
@@ -52,7 +75,12 @@ Item {
     }
     Flickable {
         id: viewport
-        anchors { fill: parent; topMargin: view.compact ? 64 : 86; bottomMargin: view.compact ? 68 : 90 }
+        anchors {
+            fill: parent
+            topMargin: view.compact ? 64 : 86
+            bottomMargin: view.width <= 700 && sculpture.status === Loader.Ready
+                ? (view.compact ? 96 : 132) : (view.compact ? 68 : 90)
+        }
         contentHeight: form.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
@@ -200,5 +228,13 @@ Item {
         spacing: 12
         GreeterButton { text: "Restart"; implicitHeight: view.compact ? 36 : 44; onClicked: { response.clear(); controller.powerAction = "reboot"; } }
         GreeterButton { text: "Shut down"; implicitHeight: view.compact ? 36 : 44; onClicked: { response.clear(); controller.powerAction = "poweroff"; } }
+    }
+    GreeterButton {
+        anchors { left: parent.left; bottom: parent.bottom; margins: view.compact ? 16 : 24 }
+        visible: sculpture.status === Loader.Ready
+        implicitHeight: view.compact ? 28 : 44
+        anchors.bottomMargin: view.width > 700 ? 24 : (view.compact ? 54 : 76)
+        text: view.motionEnabled ? "Pause motion" : "Resume motion"
+        onClicked: view.motionEnabled = !view.motionEnabled
     }
 }

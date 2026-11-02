@@ -166,6 +166,20 @@ The main app's existing integrations still belong to its Virtualization backend.
 runtime status in `boot-console.log` and `runtime-status.json`. It does not enter
 a username or password.
 
+## Login-screen 3D verified on 2026-11-02
+
+The installed guest rendered a Qt Quick 3D login preview through OpenGL 4.1,
+with Qt reporting `virgl (Apple M4 Max)` and Mesa 26.1.8. A visible full-screen
+preview measured 108–111 fps over 15 seconds; these are application frame
+statistics, not a long-running performance guarantee. Pausing the scene stopped
+continuous rendering. A hidden preview was throttled to about 1 fps, so measure
+visible windows. This does not establish Vulkan or direct Metal access in Linux.
+
+The greeter uses a bounded 3D render texture with native-resolution 2D controls.
+The static fallback was tested with the software scene-graph backend and with
+the Qt Quick 3D modules absent. See the [login-screen development
+guide](ohmansy-development.md#login-screen) for preview and diagnostic controls.
+
 ## Verified on 2026-10-31
 
 On an Apple M4 Max, with the NixOS 26.05 graphical ARM installer:

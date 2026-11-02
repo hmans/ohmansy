@@ -70,3 +70,18 @@ All ARM flake checks and the installed system build passed on 2026-11-02.
 The first greeter version booted and its normal and compact layouts were
 visually checked. Real password login, logout, and keyring unlock still need
 user verification. No new factory or ISO image was built for this change.
+
+The greeter now includes Qt Quick 3D in its scoped package. The scene is
+loaded through a QML Loader so missing 3D imports retain the original ribbons;
+the software scene-graph backend and OHMANSY_GREETER_STATIC=1 also select the
+static background. A failed Quickshell process gets one static retry. This
+does not recover a broken compositor or driver. Pause motion stops continuous
+rendering, and the login controls stay at native DPI over a bounded 3D texture.
+The installed guest booted the scene on 2026-11-02. A visible preview reported
+virgl (Apple M4 Max), OpenGL 4.1, and 108–111 fps over 15 seconds; hidden
+windows were throttled to 1 fps. Both software and missing-module fallbacks
+were visually verified. See docs/graphics.md and the greeter-preview flake
+package. Keep the offscreen preview separate from the Wayland PanelWindow
+entry point: merely declaring PanelWindow prevents headless configuration
+loading. Animate vector subproperties separately from the other axes to
+avoid replacing their whole-vector binding.

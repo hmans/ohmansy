@@ -36,6 +36,14 @@
       nixosConfigurations.appliance = appliance;
       nixosConfigurations.installer = installer;
       packages.${system} = {
+        greeter-preview = pkgs.writeShellScriptBin "ohmansy-greeter-preview" ''
+          preview=preview.qml
+          if [ "''${PREVIEW_FULLSCREEN:-0}" = 1 ]; then
+            preview=preview-fullscreen.qml
+          fi
+          exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
+            --path ${./nix/modules/greeter}/"$preview" "$@"
+        '';
         vm-image = appliance.config.system.build.image;
         iso = live.config.system.build.isoImage;
         installer-iso = installer.config.system.build.isoImage;
