@@ -20,7 +20,7 @@ Machine-specific storage and credentials belong to host configurations, not
 The desktop panel uses Quickshell 0.3.0 from the locked Nixpkgs source. Its
 QML lives in `nix/modules/desktop/quickshell/`; the user service starts and
 stops with `niri.service`. This first migration ports flakey's panel, Niri
-state, and audio controls. Fuzzel and Mako remain separate. The installer
+state, and audio controls. Mako remains separate. The installer
 module supplies `OHMANSY_INSTALLER` only to the live installer panel.
 No runtime file or flake input points to the ignored reference checkout.
 
@@ -110,9 +110,53 @@ The shared Ohmansy.Ui module in nix/modules/ui supplies glass surfaces, controls
 icons, theme values, and transitions. quickshell-ui.nix packages it; both shell
 wrappers set QML_IMPORT_PATH. Greeter wrappers preserve local control names.
 The desktop menu bar uses the same glass with no QML backdrop; Niri 26.04
-provides real background blur through its ohmansy-bar layer rule. The rectangle
-fills its layer surface, so the blur needs no custom rounded mask.
+provides cached wallpaper blur through its layer rules (xray true). Bar, launcher,
+and audio popup declare explicit BackgroundEffect.blurRegion regions. The launcher
+region follows its rounded glass, not its full-screen transparent click catcher.
+The earlier xray false rules produced tint without visible blur in the virgl guest.
+An A/B check on 2026-11-02 showed xray true visibly blurring the wallpaper while
+text and icons stayed sharp. This mode does not sample application windows behind
+the glass. The non-xray failure is a runtime observation, not a diagnosed GPU bug.
 On 2026-11-02 both wrapper builds, flake checks (including authentication),
 Niri validation, and the installed-system build passed. Shared greeter QML was
 previewed; the normal desktop panel service was hot-updated and visually checked
 without ending the user session. The new system generation was not boot-tested.
+
+The application launcher now uses shared glass controls and DesktopEntries in
+Launcher.qml. The bar and Mod+Space toggle its launcher IPC target. Use an
+overlay layer with exclusive keyboard focus while open: native grabbing popups
+failed when opened through IPC without a recent parent input event. Forward
+unhandled Keys.onPressed events so TextField still handles Enter and editing.
+Installed build and Niri validation passed on 2026-11-02. Search, empty results,
+Enter launch, and outside-click dismissal were checked in the live desktop.
+The new generation was staged and its QML hot-loaded; no reboot or ISO build.
+
+The Quickshell user service must include standard system and per-user profile
+bin directories in its path. A helper-only service PATH silently prevented
+desktop entries with bare Exec names (nautilus and nixos-help) from starting.
+Use systemd %h and %u specifiers, not account-specific paths. On 2026-11-02
+the installed build passed, the new unit was hot-loaded, its process PATH
+resolved both commands, and menu launches created Nautilus Home and Firefox
+NixOS Manual windows. Updating QML alone cannot fix a service environment.
+
+Launcher activation delegates desktop IDs to gtk-launch/GIO through the packaged
+OHMANSY_APP_LAUNCHER helper. Do not run DesktopEntry.command manually: GIO
+handles D-Bus activation, field codes, and working directories. xdg-terminal-exec
+chooses terminals with a system Foot default and user overrides. The helper uses
+an independent systemd user scope and journal streams. This prevents shell
+restarts killing apps and avoids closed QProcess pipes breaking terminal startup.
+Build and live Files, Manual, and Vim-in-Foot checks passed on 2026-11-02; the
+menu-launched terminal survived a shell restart and an invalid desktop ID returned
+nonzero. The QML Process displays request failures; later app crashes are separate.
+
+Desktop light/dark colors live in Ui.ColorPalette: white or #202020 surfaces
+at 85% opacity, plus semantic text, secondary, border, focus, hover, and selection
+tokens. Desktop Theme delegates to this palette; GlassSurface and GlassField
+accept an optional colors palette, retaining greeter defaults when omitted.
+Qt.styleHints.colorScheme follows the guest preference, with unknown using light.
+The desktop shell must default QT_QPA_PLATFORMTHEME to xdgdesktopportal: the
+plain Niri Qt platform theme did not react to the portal preference. On 2026-11-02,
+the installed build passed; dark mode and live return to light were visually
+verified, then the original guest preference was restored. No reboot or ISO build.
+The launcher now uses xray false to show underlying windows; its blur remains
+unresolved on virgl. Bar and audio popup retain cached wallpaper blur.

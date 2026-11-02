@@ -4,9 +4,24 @@ input {
     focus-follows-mouse max-scroll-amount="0%"
     disable-power-key-handling
 }
-// The panel supplies translucent glass; Niri blurs the scene behind it.
+// Explicit QML regions constrain blur to the glass. Cached wallpaper blur is
+// reliable on the VM renderer; non-xray blur currently produces no effect there.
 layer-rule {
     match namespace="^ohmansy-bar$"
+    background-effect {
+        blur true
+        xray true
+    }
+    popups {
+        background-effect {
+            blur true
+            xray true
+        }
+    }
+}
+
+layer-rule {
+    match namespace="^ohmansy-launcher$"
     background-effect {
         blur true
         xray false
@@ -32,7 +47,7 @@ window-rule {
 }
 binds {
     Mod+Return { spawn "foot"; }
-    Mod+Space { spawn "fuzzel"; }
+    Mod+Space { spawn "quickshell" "ipc" "--path" "/etc/xdg/quickshell/ohmansy/shell.qml" "call" "launcher" "toggle"; }
     Mod+E { spawn "nautilus"; }
     Mod+B { spawn "firefox"; }
     Mod+Q { close-window; }

@@ -12,6 +12,7 @@ PopupWindow {
     visible: popupState.audioOpen
     grabFocus: true
     color: "transparent"
+    BackgroundEffect.blurRegion: Region { item: surface; radius: surface.radius }
     implicitWidth: 320
     implicitHeight: surface.implicitHeight
     onClosed: popupState.audioOpen = false

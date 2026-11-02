@@ -4,6 +4,7 @@ import QtQuick.Effects
 Item {
     id: glass
     property Item backdrop: null
+    property ColorPalette colors: null
     property bool highlighted: false
     property bool pressed: false
     property bool focused: false
@@ -45,7 +46,7 @@ Item {
         anchors.fill: parent
         radius: glass.radius
         color: glass.accelerated
-            ? glass.tint : Theme.solidSurface
+            ? glass.tint : (glass.colors ? glass.colors.surfaceBase : Theme.solidSurface)
     }
     Rectangle {
         anchors.fill: parent
@@ -65,7 +66,9 @@ Item {
         color: "transparent"
         border.width: 0.5
         border.pixelAligned: false
-        border.color: glass.focused ? "#32e8e0f3" : (glass.highlighted ? "#26e8e0f3" : "#18e8e0f3")
+        border.color: glass.colors
+            ? (glass.focused ? glass.colors.focusBorder : glass.highlighted ? glass.colors.hoverBorder : glass.colors.border)
+            : (glass.focused ? "#32e8e0f3" : glass.highlighted ? "#26e8e0f3" : "#18e8e0f3")
         Behavior on border.color { ColorAnimation { duration: 120 } }
     }
 }

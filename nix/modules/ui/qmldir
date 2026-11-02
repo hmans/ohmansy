@@ -1,5 +1,6 @@
 module Ohmansy.Ui
 singleton Theme 1.0 Theme.qml
+ColorPalette 1.0 ColorPalette.qml
 GlassSurface 1.0 GlassSurface.qml
 GlassButton 1.0 GlassButton.qml
 GlassField 1.0 GlassField.qml

@@ -5,7 +5,9 @@ macOS host, with an accelerated guest display and a persistent private VM disk.
 
 Quickshell supplies the per-monitor panel, workspace buttons, clock, audio
 controls, network status, and system tray. Its QML files are in
-`nix/modules/desktop/quickshell/`. Fuzzel still launches apps, and Mako handles
+`nix/modules/desktop/quickshell/`. Its glass application menu opens from the
+ohmansy button or Mod+Space; type to search, use arrows and Enter to launch,
+and Escape or an outside click to close. Mako handles
 notifications. The panel runs as a user service tied to the Niri session.
 
 Quickshell also supplies the login screen, backed by greetd and PAM. It runs

@@ -24,11 +24,12 @@ in {
 
   # No account, credentials, machine identifiers, or personal services here.
   environment.systemPackages = with pkgs; [
-    foot fuzzel quickshell mako swaybg swaylock nautilus
+    foot quickshell mako swaybg swaylock nautilus
     xwayland-satellite adwaita-icon-theme wl-clipboard
     git vim curl jq python3
   ];
   environment.sessionVariables.NIRI_CONFIG = lib.mkDefault "/etc/ohmansy/niri.kdl";
+  environment.etc."xdg/xdg-terminals.list".text = lib.mkDefault "foot.desktop\n";
   environment.etc."ohmansy/niri.kdl".source = ./desktop/niri.kdl;
   environment.etc."ohmansy/wallpaper.png".source = lib.mkDefault ./desktop/wallpapers/twilight-cat.png;
   systemd.user.services.ohmansy-wallpaper = {
@@ -48,7 +49,17 @@ in {
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
     partOf = [ "niri.service" ];
-    path = with pkgs; [ niri fuzzel foot networkmanager ];
+    # Desktop entries often use bare command names. Include the user's and
+    # system's installed apps, not just the panel's own helper programs.
+    path = [
+      "/run/wrappers"
+      "%h/.nix-profile"
+      "/nix/profile"
+      "%h/.local/state/nix/profile"
+      "/etc/profiles/per-user/%u"
+      "/nix/var/nix/profiles/default"
+      "/run/current-system/sw"
+    ] ++ (with pkgs; [ niri foot networkmanager ]);
     serviceConfig = {
       ExecStart = "${shell}/bin/ohmansy-quickshell --path /etc/xdg/quickshell/ohmansy/shell.qml";
       Restart = "on-failure";

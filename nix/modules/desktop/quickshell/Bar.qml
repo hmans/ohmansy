@@ -13,6 +13,14 @@ PanelWindow {
     id: bar
     required property var niriState
     required property var audio
+    property bool launcherActive: false
+    signal launcherRequested()
+    signal launcherDismissed()
+    Launcher {
+        barWindow: bar
+        opened: bar.launcherActive
+        onDismissed: bar.launcherDismissed()
+    }
     property alias audioOpen: saved.audioOpen
     readonly property string installerCommand: Quickshell.env("OHMANSY_INSTALLER") || ""
     readonly property var networkDevices: Networking.devices.values
@@ -34,6 +42,7 @@ PanelWindow {
     WlrLayershell.namespace: "ohmansy-bar"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    BackgroundEffect.blurRegion: Region { item: bar.contentItem }
     PersistentProperties {
         id: saved
         reloadableId: "bar-state-" + (bar.screen ? bar.screen.name : "")
@@ -59,7 +68,8 @@ PanelWindow {
             anchors.fill: parent
             radius: 0
             // Niri supplies the blur behind this layer surface.
-            tint: "#60484848"
+            tint: theme.shellGlassTint
+            colors: theme.colors
             sheen: false
         }
         RowLayout {
@@ -68,7 +78,7 @@ PanelWindow {
             spacing: 8
             BarButton {
                 text: "ohmansy"
-                onClicked: Quickshell.execDetached(["fuzzel"])
+                onClicked: bar.launcherRequested()
             }
             BarButton {
                 visible: bar.installerCommand !== ""

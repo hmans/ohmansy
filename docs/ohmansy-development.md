@@ -61,13 +61,44 @@ running a shell or preview. `nix build .#desktop-shell` builds the desktop
 wrapper without an OS image build. Import components with `import Ohmansy.Ui`
 or use an alias when the consumer has its own Theme type.
 
-The menu bar uses GlassSurface with a flat neutral gray tint, no sheen, and a
-half-point rim. The shared surface exposes tint and sheen independently of its
-default button styling. Niri 26.04 supplies background blur through the
-`ohmansy-bar` layer rule in `desktop/niri.kdl`. Only the surface is translucent;
+`Ui.ColorPalette` supplies semantic desktop colors: surface, text, secondary
+text, borders, focus, hover, and selection. Surfaces use white in light mode and
+`#202020` in dark mode, both at 85% opacity. It follows `Qt.styleHints.colorScheme`
+(unknown falls back to light); consumers can set `dark` explicitly for previews.
+The desktop shell defaults to Qt's `xdgdesktopportal` platform theme so the guest
+appearance preference and live changes reach Qt. The bar, launcher, and audio
+popup use these tokens. Pass `colors` to shared GlassSurface and GlassField;
+their existing login-screen defaults remain available when no palette is passed.
+
+The menu bar uses GlassSurface with no sheen and a half-point rim. The shared
+surface exposes tint and sheen independently of its default button styling.
+Niri 26.04 supplies background blur through the
+`ohmansy-bar` and `ohmansy-launcher` layer rules in `desktop/niri.kdl`.
+The bar uses cached wallpaper blur (`xray true`). The launcher uses `xray false`
+so underlying windows remain visible, but this path still produces no visible
+blur in the virgl guest. QML BackgroundEffect.blurRegion explicitly follows each
+glass surface, including rounded menu corners and the audio popup. Do not blur
+the launcher's full-screen transparent click catcher.
+Only the surface is translucent;
 text and icons stay opaque. The greeter instead supplies a shared blurred
 texture to GlassSurface because it owns its ribbon background. Do not capture
 desktop windows into the QML surface to simulate compositor blur.
+
+The application launcher lives in `desktop/quickshell/Launcher.qml` and uses
+the same GlassSurface and GlassField. It reads installed desktop entries,
+filters names, descriptions, and keywords, and passes desktop-entry IDs to
+GTK's `gtk-launch` (GIO). GIO handles D-Bus activation, Exec field codes, and
+working directories. `xdg-terminal-exec` selects terminal applications, with
+Foot as the system default; users can override `xdg-terminals.list`. Keep the
+standard profile paths in the shell service so bare Exec names resolve.
+The packaged helper starts an independent systemd user scope so shell restarts
+do not terminate launched apps. It routes app output to the journal (`ohmansy-app-launch`)
+instead of QProcess pipes that close when the launcher exits. The menu reports
+launch-request failures; a successful request cannot guarantee the app will
+not crash later. The bar button and Mod+Space toggle it through the shell's `launcher`
+IPC target. Its overlay takes keyboard focus only while open; Escape and an
+outside click dismiss it. A layer surface is required here: a grabbing popup
+cannot reliably open from IPC without a recent input event on its parent.
 
 ## Login screen
 
