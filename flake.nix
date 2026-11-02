@@ -23,11 +23,6 @@
         let candidate = base.extendModules { modules = [ extra ]; };
         in builtins.any (item: !item.assertion &&
           nixpkgs.lib.hasPrefix "Image policy:" item.message) candidate.config.assertions;
-      vmConfig = pkgs.writeText "ohmansy-vm-validation.kdl" (
-        builtins.replaceStrings [ "/etc/ohmansy/desktop.kdl" ]
-          [ "${./nix/modules/desktop/niri.kdl}" ]
-          (builtins.readFile ./nix/modules/desktop/vm.kdl)
-      );
     in {
       nixosModules.default = self.nixosModules.desktop;
       nixosModules.desktop = import ./nix/modules/desktop.nix;
@@ -85,9 +80,13 @@
           assert !(builtins.hasAttr "hmans" appliance.config.users.users);
           assert !(builtins.hasAttr "ohmansy/source/flake.nix" appliance.config.environment.etc);
           pkgs.runCommand "ohmansy-appliance-policy" { } ''touch "$out"'';
-        niri-config = pkgs.runCommand "ohmansy-niri-config" { nativeBuildInputs = [ pkgs.niri ]; } ''
-          niri validate --config ${./nix/modules/desktop/niri.kdl}
-          niri validate --config ${vmConfig}
+        niri-config = pkgs.runCommand "ohmansy-niri-config" { nativeBuildInputs = [ pkgs.niri pkgs.python3 ]; } ''
+          ${nixpkgs.lib.concatMapStringsSep "\n" (profile: ''
+            python3 ${./nix/tests/niri-shortcuts.py} \
+              ${profile.config.environment.etc."ohmansy/niri.kdl".source} \
+              ${profile.config.environment.etc."ohmansy/desktop.kdl".source} \
+              ${./nix/modules/desktop/shortcuts.json}
+          '') [ appliance live installer ]}
           niri validate --config ${pkgs.writeText "ohmansy-greeter-validation.kdl" appliance.config.environment.etc."ohmansy/greeter.kdl".text}
           touch "$out"
         '';

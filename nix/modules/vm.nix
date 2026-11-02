@@ -8,6 +8,5 @@
     output "Virtual-1" { scale 2; }
     debug { disable-cursor-plane; }
   '';
-  environment.etc."ohmansy/niri.kdl".source = lib.mkForce ./desktop/vm.kdl;
-  environment.etc."ohmansy/desktop.kdl".source = ./desktop/niri.kdl;
+  environment.etc."ohmansy/niri.kdl".text = lib.mkForce (builtins.readFile ./desktop/vm.kdl);
 }

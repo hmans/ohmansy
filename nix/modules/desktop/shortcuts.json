@@ -1,0 +1,347 @@
+[
+  {
+    "title": "Applications",
+    "bindings": [
+      {
+        "key": "Mod+Return",
+        "title": "Open terminal",
+        "action": "spawn \"foot\""
+      },
+      {
+        "key": "Mod+Space",
+        "title": "Application launcher",
+        "action": "spawn \"ohmansy-desktop\" \"menu\" \"apps\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Shift+Space",
+        "title": "Find an open window",
+        "action": "spawn \"ohmansy-desktop\" \"menu\" \"windows\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+E",
+        "title": "Open Files",
+        "action": "spawn \"nautilus\""
+      }
+    ]
+  },
+  {
+    "title": "Navigation",
+    "bindings": [
+      {
+        "key": "Mod+Tab",
+        "title": "Overview",
+        "action": "toggle-overview",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Left",
+        "title": "Focus column or monitor left",
+        "action": "focus-column-or-monitor-left"
+      },
+      {
+        "key": "Mod+Right",
+        "title": "Focus column or monitor right",
+        "action": "focus-column-or-monitor-right"
+      },
+      {
+        "key": "Mod+Up",
+        "title": "Focus window or workspace above",
+        "action": "focus-window-or-workspace-up"
+      },
+      {
+        "key": "Mod+Down",
+        "title": "Focus window or workspace below",
+        "action": "focus-window-or-workspace-down"
+      },
+      {
+        "key": "Mod+H",
+        "title": "Focus column left",
+        "action": "focus-column-left"
+      },
+      {
+        "key": "Mod+L",
+        "title": "Focus column right",
+        "action": "focus-column-right"
+      },
+      {
+        "key": "Mod+K",
+        "title": "Focus window above",
+        "action": "focus-window-up"
+      },
+      {
+        "key": "Mod+J",
+        "title": "Focus window below",
+        "action": "focus-window-down"
+      },
+      {
+        "key": "Mod+Ctrl+Left",
+        "title": "Focus monitor left",
+        "action": "focus-monitor-left"
+      },
+      {
+        "key": "Mod+Ctrl+Right",
+        "title": "Focus monitor right",
+        "action": "focus-monitor-right"
+      },
+      {
+        "key": "Mod+Page_Up",
+        "title": "Workspace above",
+        "action": "focus-workspace-up"
+      },
+      {
+        "key": "Mod+Page_Down",
+        "title": "Workspace below",
+        "action": "focus-workspace-down"
+      }
+    ]
+  },
+  {
+    "title": "Window layout",
+    "bindings": [
+      {
+        "key": "Mod+W",
+        "title": "Close window",
+        "action": "close-window",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Q",
+        "title": "Close window",
+        "action": "close-window",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+F",
+        "title": "Maximize column",
+        "action": "maximize-column"
+      },
+      {
+        "key": "Mod+Shift+F",
+        "title": "Fullscreen",
+        "action": "fullscreen-window"
+      },
+      {
+        "key": "Mod+Shift+Left",
+        "title": "Move column left",
+        "action": "move-column-left"
+      },
+      {
+        "key": "Mod+Shift+Right",
+        "title": "Move column right",
+        "action": "move-column-right"
+      },
+      {
+        "key": "Mod+Shift+Up",
+        "title": "Move window up / workspace above",
+        "action": "move-window-up-or-to-workspace-up"
+      },
+      {
+        "key": "Mod+Shift+Down",
+        "title": "Move window down / workspace below",
+        "action": "move-window-down-or-to-workspace-down"
+      },
+      {
+        "key": "Mod+Shift+Ctrl+Left",
+        "title": "Move column to monitor left",
+        "action": "move-column-to-monitor-left"
+      },
+      {
+        "key": "Mod+Shift+Ctrl+Right",
+        "title": "Move column to monitor right",
+        "action": "move-column-to-monitor-right"
+      },
+      {
+        "key": "Mod+Shift+Page_Up",
+        "title": "Move column to workspace above",
+        "action": "move-column-to-workspace-up"
+      },
+      {
+        "key": "Mod+Shift+Page_Down",
+        "title": "Move column to workspace below",
+        "action": "move-column-to-workspace-down"
+      },
+      {
+        "key": "Mod+R",
+        "title": "Next column width",
+        "action": "switch-preset-column-width"
+      },
+      {
+        "key": "Mod+Shift+R",
+        "title": "Previous column width",
+        "action": "switch-preset-column-width-back"
+      },
+      {
+        "key": "Mod+Ctrl+R",
+        "title": "Next window height",
+        "action": "switch-preset-window-height"
+      },
+      {
+        "key": "Mod+Ctrl+Shift+R",
+        "title": "Previous window height",
+        "action": "switch-preset-window-height-back"
+      },
+      {
+        "key": "Mod+Shift+C",
+        "title": "Center column",
+        "action": "center-column"
+      },
+      {
+        "key": "Mod+Ctrl+C",
+        "title": "Center visible columns",
+        "action": "center-visible-columns"
+      },
+      {
+        "key": "Mod+U",
+        "title": "Toggle column tabs",
+        "action": "toggle-column-tabbed-display",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+I",
+        "title": "Pull window from right",
+        "action": "consume-window-into-column"
+      },
+      {
+        "key": "Mod+O",
+        "title": "Split bottom window to right",
+        "action": "expel-window-from-column"
+      },
+      {
+        "key": "Mod+Shift+I",
+        "title": "Pull window from left into column",
+        "action": "spawn \"ohmansy-desktop\" \"consume-left\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Shift+O",
+        "title": "Split bottom window into column on left",
+        "action": "spawn \"ohmansy-desktop\" \"expel-left\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Shift+T",
+        "title": "Toggle floating",
+        "action": "toggle-window-floating"
+      },
+      {
+        "key": "Mod+Minus",
+        "title": "Narrower column",
+        "action": "set-column-width \"-10%\""
+      },
+      {
+        "key": "Mod+Equal",
+        "title": "Wider column",
+        "action": "set-column-width \"+10%\""
+      }
+    ]
+  },
+  {
+    "title": "Desktop",
+    "bindings": [
+      {
+        "key": "Mod+Shift+Slash",
+        "title": "Keyboard shortcuts",
+        "action": "spawn \"ohmansy-desktop\" \"menu\" \"shortcuts\""
+      },
+      {
+        "key": "Mod+Shift+V",
+        "title": "Clipboard history",
+        "action": "spawn \"ohmansy-desktop\" \"menu\" \"clipboard\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Comma",
+        "title": "Desktop controls",
+        "action": "spawn \"ohmansy-desktop\" \"menu\" \"controls\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+N",
+        "title": "Notification history",
+        "action": "spawn \"ohmansy-desktop\" \"menu\" \"notifications\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+X",
+        "title": "Power menu",
+        "action": "spawn \"ohmansy-desktop\" \"menu\" \"power\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Alt+L",
+        "title": "Lock screen",
+        "action": "spawn \"ohmansy-desktop\" \"lock\"",
+        "options": "repeat=false"
+      },
+      {
+        "key": "Mod+Shift+E",
+        "title": "Log out",
+        "action": "quit"
+      }
+    ]
+  },
+  {
+    "title": "Screenshots & media",
+    "bindings": [
+      {
+        "key": "XF86AudioRaiseVolume",
+        "title": "Volume up",
+        "action": "spawn \"wpctl\" \"set-volume\" \"-l\" \"1.0\" \"@DEFAULT_AUDIO_SINK@\" \"3%+\"",
+        "options": "allow-when-locked=true"
+      },
+      {
+        "key": "XF86AudioLowerVolume",
+        "title": "Volume down",
+        "action": "spawn \"wpctl\" \"set-volume\" \"@DEFAULT_AUDIO_SINK@\" \"3%-\"",
+        "options": "allow-when-locked=true"
+      },
+      {
+        "key": "XF86AudioMute",
+        "title": "Mute speakers",
+        "action": "spawn \"wpctl\" \"set-mute\" \"@DEFAULT_AUDIO_SINK@\" \"toggle\"",
+        "options": "allow-when-locked=true"
+      },
+      {
+        "key": "XF86AudioMicMute",
+        "title": "Mute microphone",
+        "action": "spawn \"wpctl\" \"set-mute\" \"@DEFAULT_AUDIO_SOURCE@\" \"toggle\"",
+        "options": "allow-when-locked=true"
+      },
+      {
+        "key": "XF86AudioPlay",
+        "title": "Play / pause",
+        "action": "spawn \"playerctl\" \"play-pause\"",
+        "options": "allow-when-locked=true"
+      },
+      {
+        "key": "XF86AudioNext",
+        "title": "Next track",
+        "action": "spawn \"playerctl\" \"next\"",
+        "options": "allow-when-locked=true"
+      },
+      {
+        "key": "XF86AudioPrev",
+        "title": "Previous track",
+        "action": "spawn \"playerctl\" \"previous\"",
+        "options": "allow-when-locked=true"
+      },
+      {
+        "key": "Print",
+        "title": "Capture selection",
+        "action": "screenshot show-pointer=false"
+      },
+      {
+        "key": "Ctrl+Print",
+        "title": "Capture screen",
+        "action": "screenshot-screen show-pointer=false"
+      },
+      {
+        "key": "Alt+Print",
+        "title": "Capture window",
+        "action": "screenshot-window show-pointer=false"
+      }
+    ]
+  }
+]

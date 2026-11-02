@@ -1,17 +1,17 @@
 # Keyboard shortcuts
 
 `Mod` is Niri's Super modifier. These bindings do not change the keyboard layout,
-Alt/Super mapping, or Caps Lock behavior. Press **Mod+Shift+/** for Niri's hotkey
-overlay. In the Mac host, lock guest input to send shortcuts that macOS would
+Alt/Super mapping, or Caps Lock behavior. Press **Mod+Shift+/** for the Quickshell
+shortcut panel. Search by action, category, or key; use Up/Down or Page Up/Down
+to scroll, and Escape to close. In the Mac host, lock guest input to send shortcuts that macOS would
 otherwise intercept.
 
 ## Applications and desktop menus
 
 | Shortcut | Action |
 | --- | --- |
-| Mod+Return or Mod+T | Open Foot |
+| Mod+Return | Open Foot |
 | Mod+E | Open Files |
-| Mod+B | Open Firefox |
 | Mod+Space | Application launcher |
 | Mod+Shift+Space | Search open windows |
 | Mod+Shift+V | Clipboard history; select an entry to copy it |
@@ -86,12 +86,15 @@ Screenshots exclude the pointer. Media keys also work while the screen is locked
 
 ## Implementation and checks
 
-Bindings live in `nix/modules/desktop/niri.kdl`. Fixed desktop actions are packaged
+Bindings and help labels share `nix/modules/desktop/shortcuts.json`.
+The desktop module generates Niri's bindings from these definitions; the
+Quickshell panel reads the installed copy. User-added bindings outside this
+file are not listed in the panel. Fixed desktop actions are packaged
 from `nix/modules/desktop/actions.sh`; launcher modes share the existing
 Quickshell launcher. Clipboard data is restored by numeric history ID, never
 evaluated as a command. Swaylock uses the system PAM configuration.
 
-Run `node --test tools/tests/desktop-menus.test.mjs` and
+Run `node --test tools/tests/desktop-menus.test.mjs tools/tests/shortcuts.test.mjs` and
 `python3 -m unittest tools.tests.test_desktop_actions` for menu and helper tests.
 The Python helper tests require `jq`. Niri's `validate` command checks the KDL,
 and the installed-system build runs ShellCheck on the packaged helper.

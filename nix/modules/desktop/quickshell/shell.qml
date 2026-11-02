@@ -34,7 +34,7 @@ ShellRoot {
         function close(): void { root.launcherScreen = ""; }
         function ping(): string { return "ready"; }
         function openMenu(mode: string): void {
-            if (!["apps", "windows", "clipboard", "power", "controls", "notifications"].includes(mode)) return;
+            if (!["apps", "windows", "clipboard", "power", "controls", "notifications", "shortcuts"].includes(mode)) return;
             root.toggleLauncher(niri.focusedOutput || Quickshell.screens[0].name, mode);
         }
     }

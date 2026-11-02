@@ -4,6 +4,10 @@ let
   terminal = import ./terminal-package.nix { inherit pkgs; };
   wallpaper = import ./wallpaper-package.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
+  shortcutGroups = builtins.fromJSON (builtins.readFile ./desktop/shortcuts.json);
+  shortcutBindings = lib.concatMap (group: group.bindings) shortcutGroups;
+  renderBinding = binding:
+    "  ${binding.key} ${binding.options or ""} hotkey-overlay-title=${builtins.toJSON binding.title} { ${binding.action}; }";
 in {
   imports = [ ./greeter.nix ];
   networking.hostName = lib.mkDefault "ohmansy";
@@ -60,7 +64,13 @@ in {
     };
   };
   environment.etc."xdg/xdg-terminals.list".text = lib.mkDefault "foot.desktop\n";
-  environment.etc."ohmansy/niri.kdl".source = ./desktop/niri.kdl;
+  environment.etc."ohmansy/niri.kdl".text = ''
+    include "/etc/ohmansy/desktop.kdl"
+  '';
+  environment.etc."ohmansy/desktop.kdl".text =
+    builtins.readFile ./desktop/niri.kdl
+    + "\nbinds {\n" + lib.concatMapStringsSep "\n" renderBinding shortcutBindings + "\n}\n";
+  environment.etc."ohmansy/shortcuts.json".source = ./desktop/shortcuts.json;
   environment.etc."ohmansy/wallpaper.png".source = lib.mkDefault ./desktop/wallpapers/twilight-cat.png;
   systemd.user.services.ohmansy-wallpaper = {
     description = "Ohmansy desktop wallpaper";

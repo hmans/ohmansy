@@ -173,3 +173,20 @@ Adwaita comment pragma to resolve symbolic menu icons with the portal platform
 theme. The installed build, Niri validation, seven targeted tests, live window
 picker, and power confirmation passed. Final icon loading had no warnings.
 Real unlock, physical media keys, and multiple monitors remain untested.
+
+Shortcut help uses ShortcutPanel.qml and the shared desktop glass palette.
+`desktop/shortcuts.json` is the source for both generated Niri bindings and
+the installed help data; custom bindings outside it are not displayed.
+Mod+Shift+Slash opens the searchable panel. Super+T and Super+B were removed
+at the user's request; Super+Return still opens Foot. Keep JavaScript compatible
+with Qt's engine: Array.flatMap passed Node tests but failed in Quickshell 0.3.0;
+use map/join for search text. Runtime loading must supplement pure Node tests.
+
+The first shared-shortcut migration missed vm.nix's desktop.kdl include, leaving
+the VM with zero bindings after reload/reboot. Niri validate still passed: empty
+bindings are valid. Fixed by generating desktop.kdl in desktop.nix for all
+profiles and making both entry points include it. The VM overrides only the
+entry text for output settings. The niri-config flake check now reads packaged
+entry/include sources for appliance, live, and installer, checks all actions
+against shortcuts.json, and validates the resolved KDL. It passes and rejects
+the previous raw include. Live activation reloaded all 60 intended bindings.

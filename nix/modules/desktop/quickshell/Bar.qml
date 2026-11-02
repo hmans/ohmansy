@@ -19,9 +19,14 @@ PanelWindow {
     signal launcherDismissed()
     Launcher {
         barWindow: bar
-        opened: bar.launcherActive
+        opened: bar.launcherActive && bar.launcherMode !== "shortcuts"
         requestedMode: bar.launcherMode
         niriState: bar.niriState
+        onDismissed: bar.launcherDismissed()
+    }
+    ShortcutPanel {
+        barWindow: bar
+        opened: bar.launcherActive && bar.launcherMode === "shortcuts"
         onDismissed: bar.launcherDismissed()
     }
     property alias audioOpen: saved.audioOpen
