@@ -4,6 +4,8 @@ import Quickshell.Io
 Scope {
     id: root
     property string preference: ""
+    // An unset desktop preference resolves to light, just like the shell palette.
+    readonly property string effectivePreference: preference === "prefer-dark" ? "prefer-dark" : "prefer-light"
     property string error: ""
     readonly property bool busy: writer.running
     readonly property string helper: Quickshell.env("OHMANSY_APPEARANCE")

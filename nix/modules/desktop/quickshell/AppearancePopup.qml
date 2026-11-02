@@ -34,15 +34,14 @@ PopupWindow {
             Repeater {
                 model: [
                     { label: "Light", value: "prefer-light" },
-                    { label: "Dark", value: "prefer-dark" },
-                    { label: "System default", value: "default" }
+                    { label: "Dark", value: "prefer-dark" }
                 ]
                 QuietButton {
                     required property var modelData
                     Layout.fillWidth: true
                     implicitHeight: 40
                     text: modelData.label
-                    selected: popup.appearance.preference === modelData.value
+                    selected: popup.appearance.effectivePreference === modelData.value
                     enabled: !popup.appearance.busy
                     Accessible.name: modelData.label
                     Accessible.checkable: true
@@ -53,7 +52,8 @@ PopupWindow {
             Text {
                 Layout.fillWidth: true
                 Layout.topMargin: 6
-                text: popup.appearance.error || "System default currently uses light mode."
+                visible: popup.appearance.error !== ""
+                text: popup.appearance.error
                 wrapMode: Text.Wrap
                 color: theme.secondary
                 font { family: theme.fontFamily; pixelSize: 12 }
