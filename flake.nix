@@ -42,6 +42,13 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        greeter-auth = pkgs.runCommand "ohmansy-greeter-auth" {
+          nativeBuildInputs = [ pkgs.python3 (import ./nix/modules/greeter-package.nix { inherit pkgs; }) ];
+        } ''
+          export HOME="$TMPDIR"
+          python3 ${./nix}/tests/greeter-auth.py
+          touch "$out"
+        '';
         image-development-boundary =
           assert builtins.all (base: rejectsDevelopment base {
             environment.etc."ohmansy/development-access".text = "test";
@@ -59,6 +66,11 @@
           pkgs.runCommand "ohmansy-image-development-boundary" {} ''touch "$out"'';
         appliance-policy = assert !appliance.config.services.openssh.enable;
           assert !appliance.config.services.displayManager.autoLogin.enable;
+          assert appliance.config.services.greetd.enable;
+          assert !appliance.config.services.displayManager.sddm.enable;
+          assert !(appliance.config.services.greetd.settings ? initial_session);
+          assert !appliance.config.security.pam.services.greetd.allowNullPassword;
+          assert builtins.elem "ohmansy-first-boot.service" appliance.config.systemd.services.greetd.requires;
           assert appliance.config.security.sudo.wheelNeedsPassword;
           assert !(builtins.hasAttr "ohmansy" appliance.config.users.users);
           assert !(builtins.hasAttr "hmans" appliance.config.users.users);
@@ -67,9 +79,11 @@
         niri-config = pkgs.runCommand "ohmansy-niri-config" { nativeBuildInputs = [ pkgs.niri ]; } ''
           niri validate --config ${./nix/modules/desktop/niri.kdl}
           niri validate --config ${vmConfig}
+          niri validate --config ${pkgs.writeText "ohmansy-greeter-validation.kdl" appliance.config.environment.etc."ohmansy/greeter.kdl".text}
           touch "$out"
         '';
         live-policy = assert !live.config.services.openssh.enable;
+          assert live.config.services.greetd.settings.initial_session.user == "nixos";
           assert !live.config.services.desktopManager.gnome.enable;
           assert live.config.services.displayManager.defaultSession == "niri";
           assert !(builtins.hasAttr "hmans" live.config.users.users);

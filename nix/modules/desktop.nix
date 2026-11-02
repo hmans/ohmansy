@@ -1,5 +1,6 @@
 { pkgs, lib, ... }:
 {
+  imports = [ ./greeter.nix ];
   networking.hostName = lib.mkDefault "ohmansy";
   networking.networkmanager.enable = true;
   time.timeZone = lib.mkDefault "UTC";
@@ -8,14 +9,7 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   programs.niri.enable = true;
-  services.displayManager = {
-    defaultSession = "niri";
-    sddm = {
-      enable = true;
-      wayland.enable = true;
-    };
-  };
-  security.pam.services.sddm.enableGnomeKeyring = true;
+  services.displayManager.defaultSession = "niri";
   security.polkit.enable = true;
   security.rtkit.enable = true;
   services.pipewire = {

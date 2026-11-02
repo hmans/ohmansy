@@ -1,0 +1,66 @@
+diff --git a/src/services/greetd/connection.hpp b/src/services/greetd/connection.hpp
+--- a/src/services/greetd/connection.hpp
++++ b/src/services/greetd/connection.hpp
+@@ -5,6 +5,7 @@
+ #include <qlocalsocket.h>
+ #include <qobject.h>
+ #include <qqmlintegration.h>
++#include <qqueue.h>
+ #include <qtmetamacros.h>
+ #include <qtypes.h>
+ 
+@@ -73,6 +74,8 @@ private:
+ 	bool mAvailable = false;
+ 	GreetdState::Enum mState = GreetdState::Inactive;
+ 	bool mTargetActive = false;
++	bool mCancelling = false;
++	QQueue<QString> pendingRequests;
+ 	bool mExitAfterLaunch = false;
+ 	QString mMessage;
+ 	bool mResponseRequired = false;
+diff --git a/src/services/greetd/connection.cpp b/src/services/greetd/connection.cpp
+--- a/src/services/greetd/connection.cpp
++++ b/src/services/greetd/connection.cpp
+@@ -98,5 +98,6 @@ void GreetdConnection::setActive(bool active) {
+ 	if (this->socket.state() == QLocalSocket::ConnectedState) {
+ 		this->mTargetActive = active;
++		if (this->mCancelling) return;
+ 		if (active == (this->mState != GreetdState::Inactive)) return;
+ 
+ 		if (active) {
+@@ -115,5 +116,6 @@ void GreetdConnection::setActive(bool active) {
+ 			emit this->stateChanged();
+ 		} else {
++			this->mCancelling = true;
+ 			this->sendRequest({
+ 			    {"type", "cancel_session"},
+ 			});
+@@ -174,5 +176,23 @@ void GreetdConnection::onSocketReady() {
+ 		qCDebug(logGreetd).noquote() << "Received greetd response:" << text;
+ 
++		// Replies are ordered. A cancellation acknowledgement is not an
++		// authentication success, even if another account has been selected.
++		if (this->pendingRequests.isEmpty()) {
++			qCCritical(logGreetd) << "Received unsolicited greetd response";
++			continue;
++		}
++		auto request = this->pendingRequests.dequeue();
++		if (request == "cancel_session") {
++			this->mCancelling = false;
++			if (type != "success") {
++				this->setInactive();
++				emit this->error("Could not cancel authentication");
++			} else if (this->mTargetActive) {
++				this->setActive(true);
++			}
++			continue;
++		}
++		if (this->mCancelling) continue;
+ 		if (type == "success") {
+ 			switch (this->mState) {
+ 			case GreetdState::Authenticating:
+@@ -227,2 +247,3 @@ void GreetdConnection::sendRequest(const QJsonObject& json) {
++	this->pendingRequests.enqueue(json.value("type").toString());
+ 	auto text = QJsonDocument(json).toJson(QJsonDocument::Compact);
+ 	auto length = static_cast<qint32>(text.length());
+ 

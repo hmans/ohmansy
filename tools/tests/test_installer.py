@@ -20,7 +20,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(installer.available_disks(devices), [disk])
 
     def test_rejects_reserved_and_injected_account_names(self):
-        for name in ['root', 'nixos', 'nixbld2', 'systemd-foo', 'user; reboot', 'user"', '../root', '']:
+        for name in ['root', 'nixos', 'greeter', 'nixbld2', 'systemd-foo', 'user; reboot', 'user"', '../root', '']:
             self.assertFalse(installer.valid_username(name), name)
         self.assertTrue(installer.valid_username('alex'))
 

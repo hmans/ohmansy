@@ -8,6 +8,10 @@ controls, network status, and system tray. Its QML files are in
 `nix/modules/desktop/quickshell/`. Fuzzel still launches apps, and Mako handles
 notifications. The panel runs as a user service tied to the Niri session.
 
+Quickshell also supplies the login screen, backed by greetd and PAM. It runs
+in a separate Niri greeter session, then starts the selected user's desktop.
+The greeter source is in `nix/modules/greeter/`.
+
 The app is independently implemented and inspired by
 [Try Omarchy](https://github.com/omacom/try-omarchy). Development builds package a
 pinned copy of its QEMU/VirGL engine. The official Ohmansy flake does not depend

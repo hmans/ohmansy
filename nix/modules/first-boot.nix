@@ -13,7 +13,7 @@ in {
     wantedBy = [ "multi-user.target" ];
     requires = [ "post-boot.service" ];
     after = [ "post-boot.service" ];
-    before = [ "display-manager.service" "getty@tty1.service" ];
+    before = [ "greetd.service" "getty@tty1.service" ];
     conflicts = [ "getty@tty1.service" ];
     unitConfig.ConditionPathExists = "!/var/lib/ohmansy/provisioned";
     serviceConfig = {
@@ -31,5 +31,5 @@ in {
       RestartSec = 2;
     };
   };
-  systemd.services.display-manager.requires = [ "ohmansy-first-boot.service" ];
+  systemd.services.greetd.requires = [ "ohmansy-first-boot.service" ];
 }

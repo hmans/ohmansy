@@ -57,3 +57,16 @@ validation, backup, and readback. A 1024×768 preference was written to the
 private development VM; the user confirmed improved readability on 2026-11-02.
 Their screenshot also showed the host stretching the boot framebuffer. This per-VM
 setting is not a default in the shipped firmware. See docs/graphics.md.
+
+The login screen uses Quickshell under greetd in a separate Niri compositor.
+`nix/modules/greeter.nix` configures PAM and GNOME Keyring, disables empty
+password login on installed systems, and preserves live autologin. First-boot
+setup runs before greetd; the greeter exits before the user desktop starts.
+`greeter-package.nix` applies a scoped cancellation-reply fix to Quickshell
+0.3.0; the desktop panel package is unchanged. The greetd protocol check
+uses real Quickshell with a fake socket and covers retry, account switching,
+delayed cancellation, extra prompts, session launch, and response-log redaction.
+All ARM flake checks and the installed system build passed on 2026-11-02.
+The first greeter version booted and its normal and compact layouts were
+visually checked. Real password login, logout, and keyring unlock still need
+user verification. No new factory or ISO image was built for this change.

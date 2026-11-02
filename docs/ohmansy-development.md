@@ -21,7 +21,7 @@ ship a preinstalled system and keep a private writable disk between launches.
 App updates must not replace that disk. The guest owns its OS updates.
 
 The factory has no preset owner or enabled SSH service. First boot asks for a
-username and password on the guest console, then starts SDDM. Passwords go
+username and password on the guest console, then starts the Quickshell greeter. Passwords go
 directly to `passwd`, not into Nix source. Setup can resume after interruption.
 The owner has password-protected sudo.
 
@@ -39,6 +39,46 @@ The live ISO has a separate disposable `nixos` account with autologin and local
 passwordless sudo. Never activate `.#live` on an installed system. The experimental
 installer asks for explicit whole-disk erase confirmation and needs networking.
 It is not yet an end-to-end verified installation product.
+
+## Login screen
+
+`nix/modules/greeter.nix` configures greetd and a separate Niri compositor for
+the Quickshell login screen. This compositor has no desktop shortcuts or user
+panel services. It exits after greetd accepts the authenticated session; the
+user's `niri-session` then starts the desktop and its services.
+
+PAM handles authentication and unlocks GNOME Keyring. The greeter clears its
+response field after submission, failure, or account changes. It supports
+additional PAM prompts and cancels the previous conversation when switching
+accounts. Installed systems reject empty passwords. Only disposable live
+profiles enable autologin and permit their passwordless live account.
+
+First-boot setup must complete before `greetd.service` starts on tty1. The VM
+module applies scale 2 and Niri's composited cursor to the greeter as well as
+the desktop. Physical systems retain their own output scaling.
+
+For appearance changes, run this preview inside a graphical guest session:
+
+```sh
+quickshell --path nix/modules/greeter/preview.qml
+```
+
+The preview cannot authenticate or perform power actions. Set `PREVIEW_WIDTH`
+and `PREVIEW_HEIGHT` to test small windows. With `QT_QPA_PLATFORM=offscreen`
+and `PREVIEW_IMAGE=/absolute/path.png`, it saves a screenshot and exits.
+
+`nix flake check --all-systems` includes real Quickshell-to-greetd protocol
+tests against an isolated test socket. These cover account switching, failed
+password retry, additional prompts, response-log redaction, and session launch.
+They do not replace a real password login, logout, and keyring check. Use boot
+activation for login-manager changes and retain the previous generation.
+
+The greeter uses a scoped Quickshell 0.3.0 patch in `greeter-package.nix`.
+It tracks greetd request replies so a cancellation acknowledgement cannot be
+mistaken for successful authentication. A new conversation waits for that
+acknowledgement; the protocol test deliberately delays it. The desktop panel
+continues to use the unmodified package. Recheck this patch when updating
+Quickshell, and remove it when the upstream version passes the same tests.
 
 ## Build on ARM Linux
 

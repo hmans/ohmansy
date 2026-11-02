@@ -33,7 +33,7 @@ def list_disks():
 
 def valid_username(value):
     return bool(re.fullmatch(r'[a-z][a-z0-9_-]{0,30}', value)) and value not in {
-        'root', 'nixos', 'nobody', 'sddm', 'systemd-network', 'systemd-resolve',
+        'root', 'nixos', 'nobody', 'sddm', 'greeter', 'systemd-network', 'systemd-resolve',
         'messagebus', 'polkituser', 'sshd', 'nixbld',
     } and not value.startswith(('nixbld', 'systemd-'))
 

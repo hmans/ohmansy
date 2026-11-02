@@ -11,7 +11,7 @@ CONFIG = Path('/etc/nixos')
 
 def valid_username(value):
     return bool(re.fullmatch(r'[a-z][a-z0-9_-]{0,30}', value)) and value not in {
-        'root', 'nobody', 'nixos', 'sddm', 'daemon', 'bin', 'sys', 'sync',
+        'root', 'nobody', 'nixos', 'sddm', 'greeter', 'daemon', 'bin', 'sys', 'sync',
     }
 
 
