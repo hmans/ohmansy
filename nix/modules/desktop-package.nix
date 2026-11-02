@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, syncFootTheme ? true }:
 let
   ui = import ./quickshell-ui.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
@@ -13,6 +13,7 @@ let
     esac
   '';
   syncTerminalTheme = pkgs.writeShellScript "ohmansy-terminal-theme" ''
+    ${pkgs.lib.optionalString (!syncFootTheme) "exit 0"}
     case "$1" in
       dark) signal=USR1 ;;
       light) signal=USR2 ;;

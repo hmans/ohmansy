@@ -8,7 +8,9 @@ development guest or ARM CI for builds; personal configuration is not a product 
 
 | Output | Purpose |
 | --- | --- |
-| `nixosModules.desktop` | Shared Niri desktop without accounts or disks |
+| `nixosModules.default` | Desktop plus optional software defaults |
+| `nixosModules.desktop` | Niri, Quickshell, desktop services, and terminal integration |
+| `nixosModules.software` | Optional Firefox, Fish, and command-line tools |
 | `nixosModules.vm` | Virtio, shutdown, display scale, and software cursor |
 | `nixosConfigurations.appliance` | Persistent VM with first-boot account setup |
 | `packages.aarch64-linux.vm-image` (default) | Compressed raw UEFI factory disk |
@@ -32,8 +34,9 @@ sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
 This imports `persistent-vm.nix` and `owner.nix`, not the image builder or setup
-service. For physical hardware, import the shared desktop with the machine's
+service. For physical hardware, import the default module with the machine's
 hardware configuration and accounts; do not import the VM disk layout.
+See [Customizing Ohmansy](customization.md) for package, shell, and terminal choices.
 
 The live ISO has a separate disposable `nixos` account with autologin and local
 passwordless sudo. Never activate `.#live` on an installed system. The experimental
@@ -115,7 +118,8 @@ also update their clients. Ctrl+Shift+T provides a manual override until the
 next desktop preference change or shell restart.
 Foot requests native blur, and its Niri window rule selects cached wallpaper
 blur (`xray true`), including when floating above another window. Configure the
-palettes in `desktop.nix` and the compositor rule in `desktop/niri.kdl`.
+palettes and the compositor rule in `terminal.nix`. These settings and the theme
+signals apply only when the selected terminal package is Foot.
 
 ## Login screen
 

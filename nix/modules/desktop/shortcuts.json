@@ -5,7 +5,7 @@
       {
         "key": "Mod+Return",
         "title": "Open terminal",
-        "action": "spawn \"foot\""
+        "action": "spawn \"ohmansy-terminal\""
       },
       {
         "key": "Mod+Space",

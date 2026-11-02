@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, package ? pkgs.foot }:
 let
   launcher = pkgs.writeShellScript "ohmansy-foot" ''
     # The appearance portal uses 1 for dark, 2 for light, and 0 for no preference.
@@ -10,14 +10,14 @@ let
       --method org.freedesktop.portal.Settings.Read \
       org.freedesktop.appearance color-scheme 2>/dev/null) || preference=
     case "$preference" in *"uint32 1"*) theme=dark ;; esac
-    exec ${pkgs.foot}/bin/foot --override="main.initial-color-theme=$theme" "$@"
+    exec ${package}/bin/foot --override="main.initial-color-theme=$theme" "$@"
   '';
 in pkgs.symlinkJoin {
-  name = "ohmansy-foot-${pkgs.foot.version}";
-  paths = [ pkgs.foot ];
+  name = "ohmansy-foot-${package.version}";
+  paths = [ package ];
   postBuild = ''
     rm "$out/bin/foot"
     ln -s ${launcher} "$out/bin/foot"
   '';
-  meta = pkgs.foot.meta;
+  meta = package.meta;
 }

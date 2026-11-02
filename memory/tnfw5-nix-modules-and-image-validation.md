@@ -190,3 +190,24 @@ entry text for output settings. The niri-config flake check now reads packaged
 entry/include sources for appliance, live, and installer, checks all actions
 against shortcuts.json, and validates the resolved KDL. It passes and rejects
 the previous raw include. Live activation reloaded all 60 intended bindings.
+
+Module layering (2026-11-02): default.nix composes desktop.nix and software.nix.
+The public flake exports default, desktop, software, and vm modules. Factory,
+live, and newly generated installer hosts use the combined module. Direct
+desktop imports now omit optional software; existing hosts wanting the full
+bundle must import default instead. software.nix uses standard Firefox/Fish
+enable options with mkDefault and a replaceable ohmansy.software.packages list.
+Fish's login-shell preference applies only while enabled; first-boot setup
+receives the configured shell instead of hardcoding Bash.
+
+terminal.nix coordinates ohmansy.terminal.package and desktopEntry, installs
+`ohmansy-terminal`, and supplies xdg-terminals.list.
+Shortcuts, network controls, and installer launchers use xdg-terminal-exec;
+per-user lists still override the system default. Only a selected Foot package
+receives the wrapper, palette, compositor rule, and theme signals. Standard
+Foot/Kitty/Alacritty/Ghostty IDs are inferred; other packages need an entry ID.
+See docs/customization.md. Full ARM flake checks and the installed-system build
+passed. The customization check exercises disabled Firefox/Fish, Bash fallback,
+Zsh, an empty utility bundle plus an added package, and actual Kitty terminal
+command resolution. The default guest was live-activated and resolves Foot;
+no new image was built or booted.

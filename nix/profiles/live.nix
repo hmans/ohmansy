@@ -2,7 +2,7 @@
 {
   imports = [
     (modulesPath + "/installer/cd-dvd/installation-cd-base.nix")
-    ../modules/desktop.nix
+    ../modules/default.nix
     ../modules/vm.nix
     (import ../modules/image-policy.nix { live = true; })
   ];

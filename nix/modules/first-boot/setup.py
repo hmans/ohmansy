@@ -4,6 +4,7 @@ from pathlib import Path
 import pwd
 import re
 import subprocess
+import sys
 
 STATE = Path('/var/lib/ohmansy')
 CONFIG = Path('/etc/nixos')
@@ -15,7 +16,7 @@ def valid_username(value):
     }
 
 
-def main():
+def main(shell):
     STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     pending = STATE / 'pending-owner'
     print('\nWelcome to ohmansy.\nCreate your local account to begin.\n', flush=True)
@@ -39,7 +40,7 @@ def main():
         pwd.getpwnam(username)
     except KeyError:
         subprocess.run(['useradd', '--create-home', '--groups', 'wheel,networkmanager',
-                        '--shell', '/run/current-system/sw/bin/bash', username], check=True)
+                        '--shell', shell, username], check=True)
     print(f'\nSet a password for {username}.', flush=True)
     while subprocess.run(['passwd', username]).returncode:
         print('Password was not saved. Please try again.', flush=True)
@@ -54,4 +55,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1])

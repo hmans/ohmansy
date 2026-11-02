@@ -41,7 +41,7 @@ def valid_username(value):
 def host_config(username, hostname):
     # Inputs have a restricted alphabet; JSON also produces valid Nix strings here.
     return '''{ ... }: {
-  imports = [ ./hardware-configuration.nix ./ohmansy/nix/modules/desktop.nix ];
+  imports = [ ./hardware-configuration.nix ./ohmansy/nix/modules/default.nix ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   networking.hostName = %s;

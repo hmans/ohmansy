@@ -10,7 +10,7 @@ otherwise intercept.
 
 | Shortcut | Action |
 | --- | --- |
-| Mod+Return | Open Foot |
+| Mod+Return | Open the configured terminal (Foot by default) |
 | Mod+E | Open Files |
 | Mod+Space | Application launcher |
 | Mod+Shift+Space | Search open windows |

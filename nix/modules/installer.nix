@@ -9,12 +9,13 @@ let
     name = "ohmansy-install";
     desktopName = "Install Ohmansy";
     comment = "Install Ohmansy to a blank virtual disk";
-    exec = "${pkgs.foot}/bin/foot --title=Install-Ohmansy sudo ${installer}/bin/ohmansy-install";
+    exec = "sudo ${installer}/bin/ohmansy-install";
+    terminal = true;
     icon = "system-software-install";
     categories = [ "System" ];
   };
   panelInstaller = pkgs.writeShellScript "ohmansy-panel-install" ''
-    exec ${pkgs.foot}/bin/foot --title=Install-Ohmansy sudo ${installer}/bin/ohmansy-install
+    exec ${pkgs.xdg-terminal-exec}/bin/xdg-terminal-exec sudo ${installer}/bin/ohmansy-install
   '';
 in {
   environment.systemPackages = [ installer launcher ];

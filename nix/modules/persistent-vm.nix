@@ -1,6 +1,6 @@
 { lib, ... }:
 {
-  imports = [ ./desktop.nix ./vm.nix ];
+  imports = [ ./default.nix ./vm.nix ];
   system.stateVersion = "26.05";
   boot.loader.systemd-boot.enable = true;
   # Let the bootloader select a readable console mode on HiDPI host displays.

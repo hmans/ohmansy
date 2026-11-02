@@ -38,12 +38,14 @@ class FactoryTests(unittest.TestCase):
                  patch.object(setup.pwd, 'getpwnam', side_effect=KeyError), \
                  patch('builtins.input', side_effect=['root', 'alice']), \
                  patch.object(setup.subprocess, 'run', side_effect=[Mock(returncode=0), Mock(returncode=1), Mock(returncode=0)]) as run:
-                setup.main()
+                setup.main('/run/current-system/sw/bin/fish')
             self.assertEqual((root / 'state/provisioned').read_text(), 'alice\n')
             self.assertFalse((root / 'state/pending-owner').exists())
             owner = (root / 'owner.nix').read_text()
             self.assertIn('users.users."alice"', owner)
             self.assertNotIn('Password', owner)
+            self.assertEqual(run.call_args_list[0].args[0][-3:],
+                             ['--shell', '/run/current-system/sw/bin/fish', 'alice'])
             self.assertEqual(run.call_args_list[-1].args[0], ['passwd', 'alice'])
 
     def test_interrupted_setup_resumes_without_recreating_account(self):
@@ -54,7 +56,7 @@ class FactoryTests(unittest.TestCase):
                  patch.object(setup.pwd, 'getpwnam', return_value=Mock()), \
                  patch('builtins.input', side_effect=AssertionError('Must reuse pending account')), \
                  patch.object(setup.subprocess, 'run', return_value=Mock(returncode=0)) as run:
-                setup.main()
+                setup.main('/run/current-system/sw/bin/fish')
             run.assert_called_once_with(['passwd', 'alice'])
 
 

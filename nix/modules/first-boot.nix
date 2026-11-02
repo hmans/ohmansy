@@ -1,9 +1,9 @@
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   setup = pkgs.writeShellApplication {
     name = "ohmansy-first-boot";
     runtimeInputs = [ pkgs.python3 pkgs.shadow pkgs.coreutils pkgs.systemd ];
-    text = ''exec python3 ${./first-boot/setup.py}'';
+    text = ''exec python3 ${./first-boot/setup.py} ${lib.getExe config.users.defaultUserShell}'';
   };
 in {
   users.mutableUsers = true;

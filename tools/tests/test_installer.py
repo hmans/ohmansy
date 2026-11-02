@@ -28,6 +28,7 @@ class InstallerTests(unittest.TestCase):
         configuration = installer.host_config('alex', 'workstation')
         self.assertIn('users.users."alex"', configuration)
         self.assertIn('hardware-configuration.nix', configuration)
+        self.assertIn('modules/default.nix', configuration)
         self.assertNotIn('live.nix', configuration)
         self.assertNotIn('vm.nix', configuration)
         self.assertNotIn('initialPassword', configuration)

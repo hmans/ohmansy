@@ -24,8 +24,9 @@
         in builtins.any (item: !item.assertion &&
           nixpkgs.lib.hasPrefix "Image policy:" item.message) candidate.config.assertions;
     in {
-      nixosModules.default = self.nixosModules.desktop;
+      nixosModules.default = import ./nix/modules/default.nix;
       nixosModules.desktop = import ./nix/modules/desktop.nix;
+      nixosModules.software = import ./nix/modules/software.nix;
       nixosModules.vm = import ./nix/modules/vm.nix;
       nixosConfigurations.live = live;
       nixosConfigurations.appliance = appliance;
@@ -46,6 +47,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        customization = import ./nix/tests/customization.nix { inherit nixpkgs pkgs system; };
         greeter-auth = pkgs.runCommand "ohmansy-greeter-auth" {
           nativeBuildInputs = [ pkgs.python3 (import ./nix/modules/greeter-package.nix { inherit pkgs; }) ];
         } ''

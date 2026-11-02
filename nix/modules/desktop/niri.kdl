@@ -47,6 +47,16 @@ layout {
         inactive-color "#b8bec92b"
         urgent-color "#c4a7e780"
     }
+    shadow {
+        on
+        softness 30
+        spread 1
+        offset x=0 y=6
+        // Keep transparent window content clear of the shadow's dark fill.
+        draw-behind-window false
+        color "#00000060"
+        inactive-color "#00000038"
+    }
 }
 cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
 prefer-no-csd
@@ -55,14 +65,6 @@ window-rule {
     geometry-corner-radius 12
     clip-to-geometry true
     draw-border-with-background false
-}
-// Wallpaper blur remains stable in the VM and keeps terminal text opaque.
-window-rule {
-    match app-id="^foot$"
-    background-effect {
-        blur true
-        xray true
-    }
 }
 // Bindings are generated from shortcuts.json by desktop.nix.
 hotkey-overlay { skip-at-startup; }

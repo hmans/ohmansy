@@ -139,7 +139,7 @@ PanelWindow {
             BarButton {
                 visible: bar.networkText !== ""
                 text: bar.networkText
-                onClicked: Quickshell.execDetached(["foot", "-e", "nmtui"])
+                onClicked: Quickshell.execDetached(["ohmansy-terminal", "nmtui"])
             }
             BarButton {
                 id: appearanceButton

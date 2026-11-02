@@ -10,6 +10,9 @@ ohmansy button or Mod+Space; type to search, use arrows and Enter to launch,
 and Escape or an outside click to close. Mako handles
 notifications. The panel runs as a user service tied to the Niri session.
 
+Fish is the default interactive shell. Hosts and individual accounts can
+override the shell through the standard NixOS user options.
+
 Quickshell also supplies the login screen, backed by greetd and PAM. It runs
 in a separate Niri greeter session, then starts the selected user's desktop.
 The greeter source is in `nix/modules/greeter/`.
@@ -105,6 +108,8 @@ a local guest overlay and is excluded from product images.
   image packaging, and release work.
 - [Keyboard shortcuts](docs/keyboard-shortcuts.md): navigation, layout, desktop
   menus, screenshots, and media controls.
+- [Customizing Ohmansy](docs/customization.md): module selection, optional software,
+  and terminal and shell defaults.
 - [Graphics integration](docs/graphics.md): the accelerated runtime and input.
 - [Original Virtualization backend](docs/legacy-virtualization.md): the retained
   `--original-vm` backend, including its clipboard integration.
