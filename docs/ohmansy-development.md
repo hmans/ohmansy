@@ -91,8 +91,9 @@ more opaque fill. Sample coordinates update with form layout and scrolling.
 page and fading it in (180 ms sine exit, 360 ms quintic entrance). Controls are
 disabled during the transition, but their visual dimming is independent of
 that input lock: inherited disabled styling would cause a brightness jump at
-the end of the fade. The power
-dialog focuses Cancel; returning to login restores field focus. Static mode
+the end of the fade. One lower-right power icon opens a menu with Restart,
+Shut down, and Cancel. The menu focuses Cancel; returning to login restores
+field focus. Only the two explicit power actions can start systemctl. Static mode
 skips both animations. Use `PREVIEW_TRANSITIONS=1` with the preview package to
 exercise the dialog and return path without real power actions.
 

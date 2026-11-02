@@ -5,18 +5,18 @@ import Quickshell
 Item {
     id: preview
     property var users: [{ name: "alex", label: "Alex" }, { name: "sam", label: "Sam" }]
-    property string powerAction: ""
-    function confirmPower() { powerAction = ""; }
+    property bool powerMenuOpen: false
+    function confirmPower(action) { powerMenuOpen = false; }
     // Exercise both transition directions without invoking real power actions.
     Timer {
         interval: 1200
         running: Quickshell.env("PREVIEW_TRANSITIONS") === "1"
-        onTriggered: preview.powerAction = "reboot"
+        onTriggered: preview.powerMenuOpen = true
     }
     Timer {
         interval: 2400
         running: Quickshell.env("PREVIEW_TRANSITIONS") === "1"
-        onTriggered: preview.powerAction = ""
+        onTriggered: preview.powerMenuOpen = false
     }
     QtObject {
         id: demo

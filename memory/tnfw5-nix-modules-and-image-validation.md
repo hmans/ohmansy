@@ -99,8 +99,8 @@ tint and a sharp half-point rim. Never include the form itself in that blur
 source: labels and password input must remain separate. Form geometry and
 scroll position invalidate sample coordinates. Keyboard focus brightens the glass rim, with no underline. Inter text and
 64-point main controls provide a larger form. The account dropdown replaces
-the separate alternate-account button. Power icons sit at the lower right
-and retain tooltips and confirmation screens; there is no motion toggle. The software backend uses an opaque fill. GPU preview and compact
+the separate alternate-account button. One power icon at the lower right opens a shared Restart/Shut down/Cancel
+menu with eased page transitions; there is no motion toggle. The software backend uses an opaque fill. GPU preview and compact
 software rendering passed on 2026-11-02; a short visible glass preview reported
 112–115 fps at its test window size, not a same-size benchmark against the
 earlier scene. The harmless full-screen preview accepts PREVIEW_KEYBOARD=1

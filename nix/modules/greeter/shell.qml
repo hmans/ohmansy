@@ -10,8 +10,12 @@ import Quickshell.Wayland
 ShellRoot {
     id: root
     property var users: []
-    property string powerAction: ""
-    function confirmPower() { power.running = true; }
+    property bool powerMenuOpen: false
+    function confirmPower(action) {
+        if (power.running || (action !== "reboot" && action !== "poweroff")) return;
+        power.command = ["/run/current-system/sw/bin/systemctl", action];
+        power.running = true;
+    }
     Auth { id: authentication }
     FileView {
         path: "/etc/ohmansy/greeter-session"
@@ -29,10 +33,9 @@ ShellRoot {
     }
     Process {
         id: power
-        command: ["/run/current-system/sw/bin/systemctl", root.powerAction]
         onExited: (code, status) => {
             if (code !== 0) authentication.message = "Could not complete the power request.";
-            root.powerAction = "";
+            root.powerMenuOpen = false;
         }
     }
     SystemClock { id: clock; precision: SystemClock.Minutes }

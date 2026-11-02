@@ -24,7 +24,7 @@ Item {
     }
     FadeSwitch {
         id: pageFade
-        requestedPage: controller.powerAction
+        requestedPage: controller.powerMenuOpen ? "power" : ""
         animated: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
         onSettled: {
             if (!view.primary) return;
@@ -36,7 +36,7 @@ Item {
     }
     Connections {
         target: controller
-        function onPowerActionChanged() { accounts.popup.close(); }
+        function onPowerMenuOpenChanged() { accounts.popup.close(); }
     }
     function reveal(item) {
         const bottom = form.y + item.y + item.height;
@@ -319,30 +319,31 @@ Item {
         anchors.centerIn: parent
         width: Math.min(320, parent.width - 48)
         spacing: 16
-        Text {
-            text: pageFade.displayedPage === "reboot" ? "Restart this computer?" : "Shut down this computer?"
-            color: "#e0def4"
-            font { family: "IBM Plex Sans"; pixelSize: 22 }
+        GreeterButton {
+            backdrop: blurredBackdrop
             Layout.fillWidth: true
-            wrapMode: Text.Wrap
-            horizontalAlignment: Text.AlignHCenter
+            text: "Restart"
+            primary: true
+            dimmed: false
+            onClicked: controller.confirmPower("reboot")
         }
         GreeterButton {
             backdrop: blurredBackdrop
             Layout.fillWidth: true
+            text: "Shut down"
             primary: true
-            text: pageFade.displayedPage === "reboot" ? "Restart" : "Shut down"
             dimmed: false
-            onClicked: controller.confirmPower()
+            onClicked: controller.confirmPower("poweroff")
         }
         GreeterButton {
             id: cancelPower
             backdrop: blurredBackdrop
             Layout.fillWidth: true
+            Layout.topMargin: 8
             text: "Cancel"
             dimmed: false
-            onClicked: controller.powerAction = ""
-            Keys.onEscapePressed: controller.powerAction = ""
+            onClicked: controller.powerMenuOpen = false
+            Keys.onEscapePressed: controller.powerMenuOpen = false
         }
     }
     RowLayout {
@@ -351,7 +352,6 @@ Item {
         enabled: pageFade.interactive
         anchors { bottom: parent.bottom; right: parent.right; margins: view.compact ? 16 : 24 }
         spacing: 8
-        PowerButton { text: "Restart"; symbol: "restart"; onClicked: { response.clear(); controller.powerAction = "reboot"; } }
-        PowerButton { text: "Shut down"; symbol: "power"; onClicked: { response.clear(); controller.powerAction = "poweroff"; } }
+        PowerButton { text: "Power"; symbol: "power"; onClicked: { response.clear(); controller.powerMenuOpen = true; } }
     }
 }
