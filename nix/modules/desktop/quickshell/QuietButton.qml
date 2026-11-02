@@ -8,7 +8,8 @@ Button {
     property bool hoverHighlight: true
     property bool tooltipsEnabled: true
     property bool prominent: false
-    Theme { id: theme }
+    property bool onWallpaper: false
+    Theme { id: theme; onWallpaper: root.onWallpaper }
     implicitHeight: prominent ? 32 : 28
     implicitWidth: prominent ? 32 : label.implicitWidth + 18
     padding: prominent ? 0 : 8

@@ -218,3 +218,13 @@ niri-session with systemd-cat, identifier ohmansy-session, for both authenticate
 login and autologin. This retains diagnostics in the journal without printing
 them on the VT between compositors. Installed-host build and journal routing
 smoke check passed; selected for next boot, visual handoff not yet verified.
+
+Inline bar controls (2026-11-02): Bar.qml uses symbolic sun/moon and speaker
+buttons. Appearance toggles the shared light/dark preference directly; speaker
+click toggles mute, wheel adjusts volume, and a compact inline slider sets it.
+AudioPopup.qml and AppearancePopup.qml were removed. Device selection remains
+in Desktop Controls → Sound. Date hover tooltip is disabled. Installed host
+build and live QML loading passed; no QML component errors were logged.
+The transparent bar uses Theme.onWallpaper and forwards it into QuietButton;
+this fixes text, icons, slider, and hover colors independently of light/dark
+mode. Tray images are rendered white. Other surfaces retain the system palette.

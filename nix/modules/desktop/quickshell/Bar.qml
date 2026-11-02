@@ -29,18 +29,34 @@ PanelWindow {
         opened: bar.launcherActive && bar.launcherMode === "shortcuts"
         onDismissed: bar.launcherDismissed()
     }
-    property alias audioOpen: saved.audioOpen
     readonly property string installerCommand: Quickshell.env("OHMANSY_INSTALLER") || ""
     readonly property var networkDevices: Networking.devices.values
     readonly property bool online: networkDevices.some(device => device.connected)
     readonly property var wifi: networkDevices.find(device => device.type === DeviceType.Wifi && device.connected)
     readonly property string networkText: wifi ? (wifi.networks.values.find(network => network.connected) || {}).name || "Wi-Fi" : online ? "" : "Offline"
     readonly property string windowTitle: Niri.titleFor(niriState.state, screen ? screen.name : "")
-    Theme { id: theme }
+    Theme { id: theme; onWallpaper: true }
     component BarButton: QuietButton {
+        onWallpaper: true
         font.weight: theme.barFontWeight
         hoverHighlight: true
         tooltipsEnabled: false
+    }
+    component BarIcon: Button {
+        implicitWidth: 28
+        implicitHeight: 28
+        padding: 5
+        display: AbstractButton.IconOnly
+        icon.width: 18
+        icon.height: 18
+        icon.color: enabled ? theme.text : theme.muted
+        hoverEnabled: true
+        background: Rectangle {
+            radius: 6
+            color: parent.down || parent.visualFocus ? theme.selection
+                : parent.hovered ? theme.hover : "transparent"
+        }
+        HoverHandler { cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor }
     }
     SystemClock { id: clock; precision: SystemClock.Minutes }
     anchors { top: true; left: true; right: true }
@@ -50,38 +66,6 @@ PanelWindow {
     WlrLayershell.namespace: "ohmansy-bar"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    PersistentProperties {
-        id: saved
-        reloadableId: "bar-state-" + (bar.screen ? bar.screen.name : "")
-        property bool audioOpen: false
-        property bool appearanceOpen: false
-    }
-    LazyLoader {
-        active: saved.appearanceOpen
-        component: AppearancePopup {
-            appearance: bar.appearance
-            popupState: saved
-            anchor.window: bar
-            anchor.rect.y: bar.height + theme.edgeGap
-            anchor.gravity: Edges.Bottom | Edges.Left
-            anchor.onAnchoring: {
-                anchor.rect.x = appearanceButton.mapToItem(bar.contentItem, appearanceButton.width, 0).x;
-            }
-        }
-    }
-    LazyLoader {
-        active: bar.audioOpen
-        component: AudioPopup {
-            audio: bar.audio
-            popupState: saved
-            anchor.window: bar
-            anchor.rect.y: bar.height + theme.edgeGap
-            anchor.gravity: Edges.Bottom | Edges.Left
-            anchor.onAnchoring: {
-                anchor.rect.x = volume.mapToItem(bar.contentItem, volume.width, 0).x;
-            }
-        }
-    }
     Item {
         anchors.fill: parent
         RowLayout {
@@ -130,8 +114,6 @@ PanelWindow {
             id: dateButton
             anchors.centerIn: parent
             text: Qt.formatDateTime(clock.date, "ddd dd MMM  HH:mm")
-            hint: Qt.formatDateTime(clock.date, "dddd, d MMMM yyyy")
-            tooltipsEnabled: true
         }
         RowLayout {
             anchors { right: parent.right; top: parent.top; bottom: parent.bottom; rightMargin: 12 }
@@ -141,28 +123,61 @@ PanelWindow {
                 text: bar.networkText
                 onClicked: Quickshell.execDetached(["ohmansy-terminal", "nmtui"])
             }
-            BarButton {
+            BarIcon {
                 id: appearanceButton
-                text: "Appearance"
-                selected: saved.appearanceOpen
-                onClicked: {
-                    bar.audioOpen = false;
-                    saved.appearanceOpen = !saved.appearanceOpen;
-                }
+                readonly property bool dark: bar.appearance.effectivePreference === "prefer-dark"
+                icon.name: dark ? "weather-clear-night-symbolic" : "weather-clear-symbolic"
+                text: dark ? "Switch to light mode" : "Switch to dark mode"
+                Accessible.name: text
+                Accessible.description: bar.appearance.error
+                enabled: !bar.appearance.busy
+                onClicked: bar.appearance.select(dark ? "prefer-light" : "prefer-dark")
             }
-            BarButton {
+            BarIcon {
                 id: volume
-                text: !bar.audio.available ? "Audio" : bar.audio.muted ? "Muted" : "Vol " + Math.round(bar.audio.volume * 100) + "%"
-                onClicked: {
-                    saved.appearanceOpen = false;
-                    bar.audioOpen = !bar.audioOpen;
-                }
+                icon.name: !bar.audio.available || bar.audio.muted ? "audio-volume-muted-symbolic"
+                    : bar.audio.volume > 0.66 ? "audio-volume-high-symbolic"
+                    : bar.audio.volume > 0.01 ? "audio-volume-low-symbolic" : "audio-volume-muted-symbolic"
+                text: !bar.audio.available ? "No audio output" : bar.audio.muted ? "Unmute" : "Mute"
+                Accessible.name: text
+                enabled: bar.audio.available
+                onClicked: bar.audio.toggleMute()
                 MouseArea {
                     anchors.fill: parent
                     acceptedButtons: Qt.RightButton
                     cursorShape: Qt.PointingHandCursor
                     onClicked: bar.audio.toggleMute()
-                    onWheel: wheel => bar.audio.adjust(wheel.angleDelta.y > 0 ? 0.03 : -0.03)
+                    onWheel: wheel => { if (wheel.angleDelta.y !== 0) bar.audio.adjust(wheel.angleDelta.y > 0 ? 0.03 : -0.03); }
+                }
+            }
+            Slider {
+                id: volumeSlider
+                Layout.preferredWidth: 72
+                implicitHeight: 28
+                from: 0; to: 1; stepSize: 0.01
+                value: bar.audio.volume
+                enabled: bar.audio.available
+                wheelEnabled: true
+                Accessible.name: "Output volume"
+                onMoved: bar.audio.setVolume(value)
+                HoverHandler { cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor }
+                background: Rectangle {
+                    x: volumeSlider.leftPadding
+                    y: (volumeSlider.height - height) / 2
+                    width: volumeSlider.availableWidth
+                    height: 3; radius: 1.5
+                    color: theme.border
+                    Rectangle {
+                        width: volumeSlider.visualPosition * parent.width
+                        height: parent.height; radius: 1.5
+                        color: bar.audio.muted ? theme.muted : theme.secondary
+                    }
+                }
+                handle: Rectangle {
+                    x: volumeSlider.leftPadding + volumeSlider.visualPosition * (volumeSlider.availableWidth - width)
+                    y: (volumeSlider.height - height) / 2
+                    width: 9; height: 9; radius: 4.5
+                    color: bar.audio.muted || !volumeSlider.enabled ? theme.muted : theme.text
                 }
             }
             Row {
@@ -179,7 +194,7 @@ PanelWindow {
                             source: trayItem.modelData.icon
                             sourceSize { width: 20; height: 20 }
                             layer.enabled: true
-                            layer.effect: MultiEffect { saturation: theme.traySaturation }
+                            layer.effect: MultiEffect { saturation: -1; brightness: 1 }
                         }
                         MouseArea {
                             id: trayMouse

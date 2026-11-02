@@ -3,7 +3,11 @@ import Ohmansy.Ui as Ui
 
 // Shared design tokens. Saving any QML/JS file reloads the running shell.
 QtObject {
-    readonly property Ui.ColorPalette colors: Ui.ColorPalette {}
+    id: root
+    property bool onWallpaper: false
+    readonly property Ui.ColorPalette colors: Ui.ColorPalette {
+        dark: root.onWallpaper || Qt.styleHints.colorScheme === Qt.ColorScheme.Dark
+    }
     readonly property string fontFamily: Ui.Theme.fontFamily
     readonly property int fontSize: 15
     readonly property int searchFontSize: 18
@@ -17,7 +21,7 @@ QtObject {
     readonly property color notificationBackground: colors.surface
     readonly property color notificationBorder: colors.border
     readonly property color text: colors.text
-    readonly property color secondary: colors.secondary
+    readonly property color secondary: onWallpaper ? colors.text : colors.secondary
     readonly property color muted: colors.muted
     readonly property color accent: colors.accent
     readonly property color border: colors.border

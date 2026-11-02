@@ -69,15 +69,20 @@ text, borders, focus, hover, and selection. Surfaces use white in light mode and
 `#202020` in dark mode, both at 85% opacity. It follows `Qt.styleHints.colorScheme`
 (unknown falls back to light); consumers can set `dark` explicitly for previews.
 The desktop shell defaults to Qt's `xdgdesktopportal` platform theme so the guest
-appearance preference and live changes reach Qt. The bar, launcher, and audio
-popup use these tokens. Pass `colors` to shared GlassSurface and GlassField;
+appearance preference and live changes reach Qt. The bar and launcher use
+these tokens. Pass `colors` to shared GlassSurface and GlassField;
 their existing login-screen defaults remain available when no palette is passed.
 
-The menu bar's Appearance popup selects Light or Dark. It saves
+The menu bar's sun/moon icon toggles Light and Dark directly. It saves
 the current user's `org.gnome.desktop.interface color-scheme` preference through
 a packaged GSettings helper. An unset preference is shown as Light. One
 shared AppearanceState monitors external changes and supplies the selected option
 to every bar. Supporting applications, shell surfaces, and Foot update live.
+The speaker icon toggles mute; scrolling over it or using the inline slider
+adjusts volume. Neither control opens a popup. Device selection remains under
+Desktop Controls → Sound. The date has no hover tooltip.
+The transparent bar uses the `onWallpaper` palette: white text and icons with
+light hover feedback in both desktop modes. Menus retain the system palette.
 
 The menu bar uses GlassSurface with no sheen and a half-point rim. The shared
 surface exposes tint and sheen independently of its default button styling.
@@ -86,7 +91,7 @@ Niri 26.04 supplies background blur through the
 The bar uses cached wallpaper blur (`xray true`). The launcher uses `xray false`
 so underlying windows remain visible, but this path still produces no visible
 blur in the virgl guest. QML BackgroundEffect.blurRegion explicitly follows each
-glass surface, including rounded menu corners and the audio popup. Do not blur
+glass surface, including rounded menu corners. Do not blur
 the launcher's full-screen transparent click catcher.
 Only the surface is translucent;
 text and icons stay opaque. The greeter instead supplies a shared blurred
