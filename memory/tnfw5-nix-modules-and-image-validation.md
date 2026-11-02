@@ -258,3 +258,14 @@ outline independently of the outer background. Remove that container outline
 only while focused; retain the outer 1px focus border and child control cues.
 An isolated Firefox 158 query reproduced the duplicate; packaged fix verified
 with suggestions open and a screenshot. Tab corners are now 6px by request.
+
+Wallpaper parallax investigation (2026-11-02): wallpaper.qml derives horizontal
+drift from the active window column and vertical drift from workspace index.
+It is not viewport tracking. Live Niri 26.04 reports null tile_pos_in_workspace_view
+for tiled windows and no workspace viewport field. Upstream PR #4147 remains
+open and proposes resting scrolling_view_pos destinations, not continuous
+animation frames (https://github.com/niri-wm/niri/pull/4147). True gesture-aligned
+parallax needs compositor support; focus smoothing cannot correct the input.
+Alternatives presented: animated ribbons without simulated drift (recommended),
+vertical workspace-only drift, or a deliberate compositor patch investigation.
+The user chose to leave the wallpaper unchanged.
