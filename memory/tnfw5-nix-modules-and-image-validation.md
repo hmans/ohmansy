@@ -259,7 +259,7 @@ only while focused; retain the outer 1px focus border and child control cues.
 An isolated Firefox 158 query reproduced the duplicate; packaged fix verified
 with suggestions open and a screenshot. Tab corners are now 6px by request.
 
-Wallpaper parallax investigation (2026-11-02): wallpaper.qml derives horizontal
+Wallpaper parallax investigation (2026-11-02): wallpaper.qml derived horizontal
 drift from the active window column and vertical drift from workspace index.
 It is not viewport tracking. Live Niri 26.04 reports null tile_pos_in_workspace_view
 for tiled windows and no workspace viewport field. Upstream PR #4147 remains
@@ -268,7 +268,22 @@ animation frames (https://github.com/niri-wm/niri/pull/4147). True gesture-align
 parallax needs compositor support; focus smoothing cannot correct the input.
 Alternatives presented: animated ribbons without simulated drift (recommended),
 vertical workspace-only drift, or a deliberate compositor patch investigation.
-The user chose to leave the wallpaper unchanged.
+The user initially chose to leave the wallpaper unchanged. On 2026-11-03,
+removing QML vertical drift alone did not stop scrolling: Niri also moves
+background-layer surfaces with each workspace. The wallpaper layer rule now
+sets `place-within-backdrop true`, and layout uses a transparent background.
+This keeps one wallpaper behind
+the workspace stack, including the overview. The surface must remain on the
+background layer and ignore exclusive zones. Built, live-activated, and verified
+with screenshots before, during, and after a workspace switch; the window moves
+while the ribbons remain in place. Original workspace restored.
+See https://niri-wm.github.io/niri/Overview.html#backdrop-customization.
+The user then requested vertical parallax within that stationary layer, and
+increased its range after trying the subtle version. The workspace-index offset
+is now `-64 * atan((index - 1) * 0.55)`, eased over 650 ms with OutCubic:
+about 32 logical pixels from workspace 1 to 2, bounded below 101 pixels overall
+within the 112-pixel overscan margin. Horizontal drift is unchanged. This is destination
+tracking, not continuous gesture tracking; keep the compositor backdrop rule.
 
 Graphical first boot (2026-11-02): first-boot.nix provides a greeter-owned mode-0600
 Unix socket and socket-activated root backend. greetd selects first-boot/shell.qml

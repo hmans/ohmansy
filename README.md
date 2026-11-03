@@ -21,8 +21,10 @@ glass surfaces, controls, icons, and transitions. Niri supplies background
 blur behind the desktop popups. The menu bar has a transparent background.
 The desktop wallpaper currently reuses the login screen's animated ribbons,
 displayed by a separate Quickshell user service tied to the Niri session.
-The ribbons ease sideways when the active window column changes and vertically
-when the active workspace changes. This parallax follows focus destinations,
+The ribbons ease sideways when the active window column changes and shift
+vertically when the active workspace changes. Niri keeps the wallpaper
+in a stationary backdrop, so it does not slide with the workspace itself.
+This parallax follows focus destinations,
 not continuous touchpad gesture positions.
 The image in `nix/modules/desktop/wallpapers/` is the fallback when the ribbon
 renderer cannot run.

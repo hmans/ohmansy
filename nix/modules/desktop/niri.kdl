@@ -4,6 +4,12 @@ input {
     focus-follows-mouse max-scroll-amount="0%"
     disable-power-key-handling
 }
+// Keep one wallpaper behind the workspace stack instead of sliding a copy
+// with each workspace. The Quickshell surface already ignores exclusive zones.
+layer-rule {
+    match namespace="^ohmansy-wallpaper$"
+    place-within-backdrop true
+}
 // Explicit QML regions constrain blur to the glass. Cached wallpaper blur is
 // reliable on the VM renderer; non-xray blur currently produces no effect there.
 layer-rule {
@@ -26,7 +32,7 @@ layer-rule {
 
 layout {
     gaps 12
-    background-color "#10131a"
+    background-color "transparent"
     default-column-width { proportion 0.5; }
     preset-column-widths {
         proportion 0.25

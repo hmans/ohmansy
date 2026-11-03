@@ -33,7 +33,8 @@ ShellRoot {
             // IPC supplies focus destinations, not continuous gesture positions.
             // Bound the drift so even long workspaces never reveal an edge.
             property real driftX: -64 * Math.atan((column - 1) * 0.55)
-            property real driftY: -48 * Math.atan(((workspace ? workspace.idx : 1) - 1) * 0.55)
+            // Workspace parallax stays within the 112-point overscan margin.
+            property real driftY: -64 * Math.atan(((workspace ? workspace.idx : 1) - 1) * 0.55)
             Behavior on driftX { NumberAnimation { duration: 550; easing.type: Easing.OutCubic } }
             Behavior on driftY { NumberAnimation { duration: 650; easing.type: Easing.OutCubic } }
 
