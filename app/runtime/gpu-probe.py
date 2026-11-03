@@ -123,7 +123,7 @@ def prepare_vm_copy(source, state):
     return disk
 
 
-def qmp_command(state, command):
+def qmp_command(state, command, arguments=None):
     with socket.socket(socket.AF_UNIX) as connection:
         connection.settimeout(5)
         connection.connect(str(state / 'qmp.sock'))
@@ -132,7 +132,10 @@ def qmp_command(state, command):
         if 'QMP' not in greeting:
             raise RuntimeError('The graphics probe did not send a QMP greeting.')
         for index, name in enumerate(['qmp_capabilities', command]):
-            stream.write((json.dumps({'execute': name, 'id': index}) + '\n').encode())
+            request = {'execute': name, 'id': index}
+            if index == 1 and arguments is not None:
+                request['arguments'] = arguments
+            stream.write((json.dumps(request) + '\n').encode())
             stream.flush()
             while True:
                 line = stream.readline()

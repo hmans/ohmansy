@@ -23,6 +23,22 @@ def validate_manifest(manifest):
     return name
 
 
+def development_ssh_port(state):
+    """An explicit local development opt-in; never part of a factory artifact."""
+    path = state / 'development.json'
+    if path.is_symlink():
+        raise ValueError('Development settings must be a regular local file')
+    if not path.exists():
+        return 0
+    value = json.loads(path.read_text())
+    if not isinstance(value, dict):
+        raise ValueError('Invalid development SSH settings')
+    port = value.get('sshPort')
+    if value.get('schemaVersion') != 1 or type(port) is not int or not 1024 <= port <= 65535:
+        raise ValueError('Invalid development SSH settings')
+    return port
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--factory', required=True, type=Path)
@@ -63,7 +79,7 @@ def main():
     subprocess.run([sys.executable, str(args.probe), 'start-copy',
                     '--source', str(state / 'unused-source'), '--state', str(state),
                     '--helper', str(args.helper), '--cpus', str(args.cpus),
-                    '--ssh-port', '0', '--memory-mib', str(args.memory_mib)], check=True)
+                    '--ssh-port', str(development_ssh_port(state)), '--memory-mib', str(args.memory_mib)], check=True)
 
 
 if __name__ == '__main__':

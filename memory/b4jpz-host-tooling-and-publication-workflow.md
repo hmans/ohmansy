@@ -2,7 +2,7 @@
 data:
   area: tooling
   kind: workflow
-  reviewed: "2026-11-01"
+  reviewed: "2026-11-03"
   status: current
 id: b4jpz
 title: Host tooling and publication workflow
@@ -33,9 +33,13 @@ checking to get around a mismatch or assume the old personal VM still exists.
 
 Sync into a new snapshot. Preserve installed owner, storage, and development
 overlays when building an installed host. Factory/live targets are image outputs,
-not replacements for the current guest configuration. Private development guests may
-opt in to passwordless sudo with `guest-dev.py prepare-access`. Keep the generated
-overlay under ignored `.local/` and in the installed guest only. The first activation
+not replacements for the current guest configuration. Private development guests
+opt in with the shipped `ohmansy-dev enable --public-key ...` command. The host's
+`guest-dev.py bridge --state .local/VM --port PORT --public-key KEY.pub` updates
+QMP, persists only the loopback port in local development.json, and prints the
+guest command. `unbridge` removes the forward; guest `disable` removes managed
+access. Older app bundles do not read that state setting. The manual
+prepare-access generator remains available for custom flakes. The first activation
 needs the owner's password in their own terminal. Never use terminal UI automation.
 
 Image profiles import `nix/modules/image-policy.nix` and reject development markers,

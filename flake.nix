@@ -29,6 +29,7 @@
       nixosModules.software = import ./nix/modules/software.nix;
       nixosModules.vm = import ./nix/modules/vm.nix;
       nixosModules.updates = import ./nix/modules/updates.nix;
+      nixosModules.development = import ./nix/modules/development.nix;
       nixosConfigurations.live = live;
       nixosConfigurations.appliance = appliance;
       nixosConfigurations.installer = installer;
@@ -53,6 +54,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        development-module = import ./nix/tests/development.nix { inherit nixpkgs pkgs system; };
         customization = import ./nix/tests/customization.nix { inherit nixpkgs pkgs system; };
         greeter-auth = pkgs.runCommand "ohmansy-greeter-auth" {
           nativeBuildInputs = [ pkgs.python3 (import ./nix/modules/greeter-package.nix { inherit pkgs; }) ];
@@ -62,6 +64,15 @@
           touch "$out"
         '';
         image-development-boundary =
+          assert builtins.all (base: rejectsDevelopment base {
+            imports = [ ./nix/modules/development.nix ];
+            ohmansy.development = {
+              enable = true;
+              user = "test-developer";
+              authorizedKeys = [ "ssh-ed25519 AAAA test" ];
+            };
+            users.users.test-developer.isNormalUser = true;
+          }) [ appliance live installer ];
           assert builtins.all (base: rejectsDevelopment base {
             environment.etc."ohmansy/development-access".text = "test";
           }) [ appliance live installer ];

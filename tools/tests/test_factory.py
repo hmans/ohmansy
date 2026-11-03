@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -19,6 +20,22 @@ factory = load('factory_vm', ROOT / 'app/runtime/factory-vm.py')
 
 
 class FactoryTests(unittest.TestCase):
+    def test_development_forward_is_opt_in_and_validated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            self.assertEqual(factory.development_ssh_port(state), 0)
+            path = state / 'development.json'
+            path.write_text(json.dumps({'schemaVersion': 1, 'sshPort': 2223}))
+            self.assertEqual(factory.development_ssh_port(state), 2223)
+            for value in [[], {'schemaVersion': 1, 'sshPort': 22},
+                          {'schemaVersion': 1, 'sshPort': '2223'},
+                          {'schemaVersion': 2, 'sshPort': 2223}]:
+                path.write_text(json.dumps(value))
+                with self.assertRaises(ValueError): factory.development_ssh_port(state)
+            path.unlink(); path.symlink_to(state / 'missing')
+            # A broken settings symlink must also fail closed.
+            with self.assertRaises(ValueError): factory.development_ssh_port(state)
+
     def test_manifest_rejects_paths_and_wrong_architecture(self):
         manifest = dict(schemaVersion=1, product='ohmansy', kind='factory',
                         format='raw.zst', architecture='aarch64-linux')

@@ -3,12 +3,15 @@
 import argparse
 from datetime import datetime, timezone
 import io
+import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shlex
 import subprocess
 import tarfile
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -54,9 +57,76 @@ def source_archive():
     return data.getvalue()
 
 
+def runtime_module(name):
+    spec = importlib.util.spec_from_file_location(name, ROOT / 'app/runtime' / (name + '.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def forwarded(usernet, port):
+    for line in usernet.splitlines():
+        fields = line.split()
+        if (len(fields) >= 6 and fields[0] == 'TCP[HOST_FORWARD]'
+                and fields[2] == '127.0.0.1' and fields[3] == str(port) and fields[5] == '22'):
+            return True
+    return False
+
+
+def bridge(state, port, enable=True):
+    state = state.resolve()
+    if not state.is_relative_to((ROOT / '.local').resolve()):
+        raise ValueError('Development bridge state must be under this checkout\'s .local/')
+    if not (state / 'factory.json').is_file() or not (state / 'disk.raw').is_file():
+        raise ValueError('Select an existing factory VM; this command never creates a disk')
+    if not 1024 <= port <= 65535:
+        raise ValueError('Use an unprivileged SSH port between 1024 and 65535')
+    settings = state / 'development.json'
+    previous = runtime_module('factory-vm').development_ssh_port(state)
+    if previous and enable and previous != port:
+        raise ValueError('Disable the existing bridge before changing its port')
+    if not enable:
+        if not previous:
+            print('No development bridge is configured.')
+            return
+        port = previous
+    live = False
+    if (state / 'qmp.sock').exists():
+        qmp = runtime_module('gpu-probe').qmp_command
+        try:
+            usernet = qmp(state, 'human-monitor-command', {'command-line': 'info usernet'})
+        except (ConnectionRefusedError, FileNotFoundError):
+            pass  # A stopped VM can leave a stale socket.
+        else:
+            live = True
+            present = forwarded(usernet, port)
+            if enable != present:
+                operation = (f'hostfwd_add net tcp:127.0.0.1:{port}-:22' if enable
+                             else f'hostfwd_remove net tcp:127.0.0.1:{port}')
+                reply = qmp(state, 'human-monitor-command', {'command-line': operation})
+                if enable and reply.strip():
+                    raise ValueError('Could not enable SSH forwarding: ' + reply.strip())
+                updated = qmp(state, 'human-monitor-command', {'command-line': 'info usernet'})
+                if forwarded(updated, port) != enable:
+                    raise ValueError('SSH forwarding did not reach the requested state')
+    if enable:
+        fd, temporary = tempfile.mkstemp(prefix='.development-', dir=state)
+        try:
+            with os.fdopen(fd, 'w') as output:
+                json.dump({'schemaVersion': 1, 'sshPort': port}, output)
+            os.replace(temporary, settings)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+    else:
+        settings.unlink(missing_ok=True)
+    print(f'Development SSH forward {"enabled" if enable else "disabled"}: 127.0.0.1:{port}'
+          + (' (running VM updated)' if live else ' (takes effect on next launch)'))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['prepare-access', 'sync', 'check', 'build', 'fetch'])
+    parser.add_argument('action', choices=['prepare-access', 'bridge', 'unbridge', 'sync', 'check', 'build', 'fetch'])
+    parser.add_argument('--state', type=Path, help='Existing .local/ factory VM for bridge/unbridge')
     parser.add_argument('--host', help='SSH destination, e.g. user@127.0.0.1')
     parser.add_argument('--guest-user', help='Existing guest owner for prepare-access')
     parser.add_argument('--public-key', type=Path, help='Ed25519 public key for prepare-access')
@@ -68,6 +138,21 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT / 'dist/iso')
     parser.add_argument('--target', choices=['vm-image', 'iso', 'installer-iso'], default='vm-image')
     args = parser.parse_args()
+    if args.action in ('bridge', 'unbridge'):
+        if not args.state:
+            parser.error('--state is required for bridge/unbridge')
+        try:
+            key = None
+            if args.action == 'bridge' and args.public_key:
+                fields = args.public_key.read_text().strip().split()
+                access_module('developer', ' '.join(fields))
+                key = ' '.join(fields[:2])
+            bridge(args.state, args.port, args.action == 'bridge')
+        except (OSError, ValueError, RuntimeError) as error:
+            parser.error(str(error))
+        if key:
+            print('Run once in the guest: sudo ohmansy-dev enable --public-key ' + shlex.quote(key))
+        return
     if args.action == 'prepare-access':
         if not args.guest_user or not args.public_key:
             parser.error('prepare-access requires --guest-user and --public-key')

@@ -1,23 +1,11 @@
 # Generated for one private development guest. Never import into image profiles.
-{ config, ... }:
+{ ohmansy, ... }:
 {
-  assertions = [{
-    assertion = config.users.users.@USER@.isNormalUser;
-    message = "Development access requires an existing installed owner.";
-  }];
-  environment.etc."ohmansy/development-access".text = "Private development guest\n";
-  services.openssh = {
+  imports = [ ohmansy.nixosModules.development ];
+  ohmansy.development = {
     enable = true;
-    settings = {
-      PasswordAuthentication = false;
-      KbdInteractiveAuthentication = false;
-      PermitRootLogin = "no";
-      AllowUsers = [ @USER@ ];
-    };
+    user = @USER@;
+    authorizedKeys = [ @KEY@ ];
+    passwordlessSudo = true;
   };
-  users.users.@USER@.openssh.authorizedKeys.keys = [ @KEY@ ];
-  security.sudo.extraRules = [{
-    users = [ @USER@ ];
-    commands = [{ command = "ALL"; options = [ "NOPASSWD" ]; }];
-  }];
 }
