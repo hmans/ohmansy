@@ -84,6 +84,11 @@ Use `FACTORY_DIR=/path/to/package` to select another packaged factory. App build
 consume that artifact; they do not build NixOS or replace an existing guest disk.
 Builds use local signing and are not notarized distribution builds.
 
+Use `mise run clean --dry-run` to preview local artifact cleanup, then
+`mise run clean` to remove unused build outputs. VM disks and the current app
+are preserved. See [cleanup options](docs/ohmansy-development.md#clean-local-artifacts)
+for explicitly retiring old test VMs.
+
 ## Build the OS
 
 On ARM Linux, including the development VM:

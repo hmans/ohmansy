@@ -1,0 +1,3 @@
+[tasks.clean]
+description = "Remove unused build artifacts; preserve VM state unless explicitly selected"
+run = "python3 tools/dev/clean.py"

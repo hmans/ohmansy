@@ -4,6 +4,43 @@ The root flake defines the official system. The ignored `flakey/` checkout is
 reference material only. Its old personal VM has been deleted. Use the official
 development guest or ARM CI for builds; personal configuration is not a product input.
 
+## Clean local artifacts
+
+Run these commands from the repository root:
+
+```sh
+mise run clean --dry-run
+mise run clean
+```
+
+The task removes `.build/`, old `dist/Ohmansy-before-*.app` and
+`dist/Ohmansy.before-*.app` bundles, `dist/*-check`, `dist/*-update`,
+`dist/check/`, `dist/releases/`, and `dist/images/`. These release and image
+directories are local build outputs; move any artifacts you need to retain
+elsewhere first. The current `dist/Ohmansy.app`, `dist/factory-preview/`, all
+VM state, SSH keys, source, and personal configuration remain in place.
+The next build recreates the build cache.
+
+To permanently remove a retired factory VM, select its directory name explicitly:
+
+```sh
+mise run clean --dry-run --retire-vm OLD-VM
+mise run clean --retire-vm OLD-VM
+```
+
+`OLD-VM` must be directly under `.local/`. This deletes that VM's accounts and
+files as well as its disk. Repeat `--retire-vm` to select more than one VM.
+Routine cleanup never selects VM disks automatically.
+
+The tool checks process paths, open files, and VM locks. It skips artifacts in
+use and fails if process inspection is unavailable. Do not start builds or
+launch the selected VMs during cleanup. Symlink targets are not accepted.
+Allocated totals can exceed the space recovered because APFS clones and
+snapshots can share blocks. The task reports the host free-space change too.
+It does not run guest Nix garbage collection or change system generations.
+
+Without mise, use `python3 tools/dev/clean.py` with the same arguments.
+
 ## Shared system and image targets
 
 | Output | Purpose |
