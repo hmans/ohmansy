@@ -22,10 +22,18 @@ The primary product follows Try Omarchy's [factory-disk model](https://github.co
 ship a preinstalled system and keep a private writable disk between launches.
 App updates must not replace that disk. The guest owns its OS updates.
 
-The factory has no preset owner or enabled SSH service. First boot asks for a
-username and password on the guest console, then starts the Quickshell greeter. Passwords go
-directly to `passwd`, not into Nix source. Setup can resume after interruption.
-The owner has password-protected sudo.
+The factory has no preset owner or enabled SSH service. First boot opens a
+Quickshell setup flow with the shared ribbons and glass controls. It asks for a
+display name, username, and confirmed password, then returns to the login screen.
+The UI runs as the unprivileged greeter. A socket-activated root service checks
+the peer identity, validates the request, and passes the password to `chpasswd`
+through standard input. Passwords are not stored in Nix source or command arguments.
+Setup resumes a pending account after interruption. The owner has
+password-protected sudo. Boot status messages stay out of the setup screen.
+
+Use `nix run .#first-boot-preview` on ARM Linux for a standalone visual preview
+that does not create accounts. `PREVIEW_PAGE` selects `welcome`, `identity`,
+`password`, or `done`; `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` set its size.
 
 The factory seeds editable configuration in `/etc/nixos`. After setup:
 

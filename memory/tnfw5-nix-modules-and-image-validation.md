@@ -269,3 +269,29 @@ parallax needs compositor support; focus smoothing cannot correct the input.
 Alternatives presented: animated ribbons without simulated drift (recommended),
 vertical workspace-only drift, or a deliberate compositor patch investigation.
 The user chose to leave the wallpaper unchanged.
+
+Graphical first boot (2026-11-02): first-boot.nix provides a greeter-owned mode-0600
+Unix socket and socket-activated root backend. greetd selects first-boot/shell.qml
+until the provisioned marker exists, then uses the normal login screen. The
+shared glass controls, FadeSwitch, and ribbons render under the unprivileged
+greeter. Backend checks SO_PEERCRED, bounds requests, validates account input,
+and feeds chpasswd through stdin. No passwords enter argv, Nix, or logs. Root-owned
+pending state permits retry only for the same account; owner.nix and completion
+marker use atomic replacement. The state directory must be traversable by the
+greeter (0755) so the shell can stat the marker; state files remain 0600.
+Diagnostics go to the journal and factory boot status output is quiet.
+
+Preview uses a fake controller and cannot create accounts. Defer its initial
+page selection until component completion to avoid FadeSwitch binding loops.
+Installed ribbon URLs must use /etc/ohmansy/greeter/scene/Ribbons.qml: relative
+paths from the separately stored first-boot source worked in preview but failed
+after installation. Fallback wallpaper worked; corrected accelerated preview
+reported virgl and rendered ribbons. ARM flake checks, full factory build, five
+Linux backend tests (including real socket peer rejection), and compact/software
+previews passed. First fresh boot reached graphical welcome and status replied;
+The corrected factory was also booted fresh and visually verified with ribbons,
+glass controls, and no console text over the welcome screen. User completed owner
+creation; a clean restart reached the normal login screen with the new account.
+The final setup button incorrectly called Quickshell.quit(); corrected to Qt.quit().
+This correction is source-only until the factory is rebuilt; direct button
+handoff with the correction still needs runtime verification.

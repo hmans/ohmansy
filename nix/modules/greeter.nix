@@ -7,9 +7,13 @@ let
     exec ${pkgs.systemd}/bin/systemd-cat --identifier=ohmansy-session ${niri}/bin/niri-session
   '';
   shell = pkgs.writeShellScript "ohmansy-greeter-shell" ''
-    if ! ${quickshell}/bin/quickshell --no-duplicate --path /etc/ohmansy/greeter/shell.qml; then
+    scene=/etc/ohmansy/greeter/shell.qml
+    if [ -d /etc/ohmansy/first-boot ] && [ ! -f /var/lib/ohmansy/provisioned ]; then
+      scene=/etc/ohmansy/first-boot/shell.qml
+    fi
+    if ! ${quickshell}/bin/quickshell --no-duplicate --path "$scene"; then
       # A graphics failure must not prevent access to the login form.
-      OHMANSY_GREETER_STATIC=1 ${quickshell}/bin/quickshell --no-duplicate --path /etc/ohmansy/greeter/shell.qml
+      OHMANSY_GREETER_STATIC=1 ${quickshell}/bin/quickshell --no-duplicate --path "$scene"
     fi
     # greetd waits for the whole greeter session to exit before starting Niri.
     ${niri}/bin/niri msg action quit --skip-confirmation

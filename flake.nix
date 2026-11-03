@@ -41,6 +41,10 @@
           exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
             --path ${./nix/modules/greeter}/"$preview" "$@"
         '';
+        first-boot-preview = pkgs.writeShellScriptBin "ohmansy-first-boot-preview" ''
+          exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
+            --path ${./nix/modules}/first-boot/preview.qml "$@"
+        '';
         vm-image = appliance.config.system.build.image;
         iso = live.config.system.build.isoImage;
         installer-iso = installer.config.system.build.isoImage;
@@ -76,7 +80,9 @@
           assert !appliance.config.services.displayManager.sddm.enable;
           assert !(appliance.config.services.greetd.settings ? initial_session);
           assert !appliance.config.security.pam.services.greetd.allowNullPassword;
-          assert builtins.elem "ohmansy-first-boot.service" appliance.config.systemd.services.greetd.requires;
+          assert builtins.elem "ohmansy-first-boot.socket" appliance.config.systemd.services.greetd.requires;
+          assert appliance.config.systemd.sockets.ohmansy-first-boot.socketConfig.SocketMode == "0600";
+          assert appliance.config.systemd.services.ohmansy-first-boot.serviceConfig.StandardOutput == "journal";
           assert appliance.config.security.sudo.wheelNeedsPassword;
           assert !(builtins.hasAttr "ohmansy" appliance.config.users.users);
           assert !(builtins.hasAttr "hmans" appliance.config.users.users);
