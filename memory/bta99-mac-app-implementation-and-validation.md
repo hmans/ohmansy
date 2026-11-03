@@ -2,7 +2,7 @@
 data:
   area: app
   kind: workflow
-  reviewed: "2026-11-02"
+  reviewed: "2026-11-03"
   status: current
 id: bta99
 title: Mac app implementation and validation
@@ -105,3 +105,22 @@ On 2026-11-02, make test passed (6 Swift, 25 Python, native checks), including
 wide/tall fitting and full-area display negotiation. The signed app was installed
 after clean shutdown. Its boot menu retained proportions when changed to wide
 and tall windows through the native Window menu.
+
+## Accelerated text clipboard
+
+The QEMU helper has its own text bridge: native/ClipboardBridge.m connects to
+clipboard.sock, forwarded through the dev.ohmansy.clipboard virtio-serial port.
+The VM module starts ohmansy-host-clipboard.service with Niri and grants device
+access through logind/uaccess. The greeter does not run it. The pinned engine has
+no qemu-vdagent chardev; do not assume SPICE integration is available.
+
+Both app and guest must be updated. Old factory artifacts and installed guests
+do not gain the guest service when only the Mac bundle changes. No images,
+files, rich text or clipboard-clear synchronization; text is bounded to 1 MiB.
+See docs/graphics.md for the protocol and normal guest paste shortcuts.
+
+On 2026-11-03 native framing/echo/session tests, a real Wayland bidirectional
+Unicode/multiline test, ARM checks, installed-system build and signed host build
+passed. The updated existing guest booted; Mac text pasted into its launcher.
+Automated key events into QEMU were unreliable, so live shortcut and reverse
+copy confirmation was requested from the user. Test pasteboard data was restored.

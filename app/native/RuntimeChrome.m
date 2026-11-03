@@ -4,6 +4,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import <GameplayKit/GameplayKit.h>
 #import "WelcomeCanvas.h"
+#import "ClipboardBridge.h"
 #import <ApplicationServices/ApplicationServices.h>
 #import <objc/runtime.h>
 #include <sys/socket.h>
@@ -243,6 +244,7 @@ static void ResizeGuestWithoutShrinkingFrame(NSView *guest, SEL selector) {
 @property(nonatomic, strong) NSStackView *launcher;
 @property(nonatomic, strong) NSButton *startButton;
 @property(nonatomic, strong) NSTimer *statusTimer;
+@property(nonatomic, strong) OhmansyClipboardBridge *clipboardBridge;
 @property(nonatomic) BOOL polling;
 @property(nonatomic) BOOL stopped;
 @property(nonatomic) BOOL quitAfterShutdown;
@@ -533,6 +535,8 @@ static NSDictionary *ReadReply(FILE *stream, NSInteger identifier) {
         [self showStopped:YES];
         [self updateKeyboardAccess];
         self.statusTimer = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(pollStatus:) userInfo:nil repeats:YES];
+        self.clipboardBridge = [[OhmansyClipboardBridge alloc] initWithSocket:NSProcessInfo.processInfo.environment[@"OHMANSY_CLIPBOARD_SOCKET"]];
+        [self.clipboardBridge start];
         fprintf(stderr, "ohmansy: native GPU window adapter installed\n");
         [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"dev.hmans.ohmansy.runtimeReady" object:nil userInfo:nil deliverImmediately:YES];
         break;

@@ -32,6 +32,8 @@ class GPUProbeTests(unittest.TestCase):
         self.assertFalse(any('/unused' in arg for arg in args))
         self.assertIn('-S', args)
         self.assertIn('-no-shutdown', args)
+        self.assertIn('virtserialport,chardev=clipboard,name=dev.ohmansy.clipboard', args)
+        self.assertIn('socket,id=clipboard,path=/tmp/probe/clipboard.sock,server=on,wait=off', args)
         self.assertIn('user,id=net,hostfwd=tcp:127.0.0.1:2222-:22', args)
 
     def test_running_source_is_not_cloned(self):

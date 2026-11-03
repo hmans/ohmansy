@@ -33,7 +33,8 @@ shutil.copy2(root / 'app/native/Welcome.metal', contents / 'Resources/Welcome.me
 subprocess.run(['clang', '-dynamiclib', '-fobjc-arc', '-mmacosx-version-min=15.0',
                 '-framework', 'AppKit', '-framework', 'QuartzCore', '-framework', 'ApplicationServices', '-framework', 'GameplayKit',
                 '-framework', 'Metal', '-framework', 'MetalKit',
-                str(root / 'app/native/RuntimeChrome.m'), str(root / 'app/native/WelcomeCanvas.m'), '-o',
+                str(root / 'app/native/RuntimeChrome.m'), str(root / 'app/native/WelcomeCanvas.m'),
+                str(root / 'app/native/ClipboardBridge.m'), '-o',
                 str(contents / 'Frameworks/OhmansyChrome.dylib')], check=True)
 identity = signing_identity()
 for library in [*sorted((contents / 'lib').glob('*.dylib')),

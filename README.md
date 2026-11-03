@@ -118,7 +118,13 @@ a local guest overlay and is excluded from product images.
 - [Earlier guest setup](docs/guest-development.md): historical personal-builder
   configuration; not the official product.
 
+The accelerated app shares plain text with the logged-in guest desktop. Copy
+normally on the Mac, then use **Ctrl+V** in guest apps or **Ctrl+Shift+V** in Foot.
+Command remains the desktop modifier. Images and files are not shared. Both the
+app and guest need the clipboard integration; replacing the app alone does not
+update an existing guest. See [clipboard details](docs/graphics.md#text-clipboard).
+
 GPU acceleration, Niri login, guest rebuilds, and cursor handling have been
-verified in the development VM. Accelerated clipboard/audio, remote factory
+verified in the development VM. Accelerated audio, remote factory
 updates, reproducible engine builds, and public Mac distribution remain work
 in progress. The CI workflow builds factory artifacts but does not publish them.

@@ -48,6 +48,11 @@ def launch_arguments(app, iso, state, disk=None, helper=None, cpus=4, memory_mib
     firmware = resources / 'firmware/edk2-aarch64-code.fd'
     if helper:
         arguments += ['-S', '-no-shutdown']
+        arguments += [
+            '-device', 'virtio-serial-pci',
+            '-chardev', f'socket,id=clipboard,path={qemu_value(state / "clipboard.sock")},server=on,wait=off',
+            '-device', 'virtserialport,chardev=clipboard,name=dev.ohmansy.clipboard',
+        ]
         if ssh_port:
             arguments[arguments.index('-netdev') + 1] = f'user,id=net,hostfwd=tcp:127.0.0.1:{ssh_port}-:22'
         bootstrap = state / 'bootstrap.iso'
@@ -280,6 +285,7 @@ def main():
         if helper:
             environment['DYLD_INSERT_LIBRARIES'] = str(helper / 'Contents/Frameworks/OhmansyChrome.dylib')
             environment['OHMANSY_QMP_SOCKET'] = str(state / 'qmp.sock')
+            environment['OHMANSY_CLIPBOARD_SOCKET'] = str(state / 'clipboard.sock')
         (state / 'launch.json').write_text(json.dumps(arguments, indent=2) + '\n')
         print(f'Starting GPU test. Log: {state / "qemu.log"}', flush=True)
         with (state / 'qemu.log').open('w') as log:

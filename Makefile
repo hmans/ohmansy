@@ -43,8 +43,10 @@ build:
 test:
 	swift test --package-path app --scratch-path "$(CURDIR)/.build" --disable-sandbox
 	python3 -m unittest discover -s tools/tests -p 'test_*.py'
-	clang -fobjc-arc -mmacosx-version-min=15.0 -framework AppKit -framework QuartzCore -framework ApplicationServices -framework GameplayKit -framework Metal -framework MetalKit app/Tests/RuntimeChromeTests/main.m app/native/WelcomeCanvas.m -o .build/runtime-chrome-tests
+	clang -fobjc-arc -mmacosx-version-min=15.0 -framework AppKit -framework QuartzCore -framework ApplicationServices -framework GameplayKit -framework Metal -framework MetalKit app/Tests/RuntimeChromeTests/main.m app/native/WelcomeCanvas.m app/native/ClipboardBridge.m -o .build/runtime-chrome-tests
 	.build/runtime-chrome-tests
+	clang -fobjc-arc -mmacosx-version-min=15.0 -framework AppKit app/Tests/ClipboardBridgeTests/main.m -o .build/clipboard-bridge-tests
+	.build/clipboard-bridge-tests
 
 run: build
 	open "$(APP_BUNDLE)"

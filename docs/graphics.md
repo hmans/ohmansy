@@ -166,12 +166,40 @@ python3 app/runtime/gpu-probe.py shutdown --state "$PWD/.local/gpu-vm"
 ```
 
 The live-guest diagnostic button is specific to the installer ISO's serial
-autologin. It does not attempt to log in to the installed VM. Clipboard sharing,
-audio, and dynamic display scaling are not yet implemented for this QEMU path.
-The main app's existing integrations still belong to its Virtualization backend.
+autologin. It does not attempt to log in to the installed VM. The bundled helper
+supports the text clipboard described below. Raw diagnostic launches do not
+start the native clipboard bridge. Audio remains separate work.
 **Read copy boot log** captures the installed copy's serial console and QEMU
 runtime status in `boot-console.log` and `runtime-status.json`. It does not enter
 a username or password.
+
+## Text clipboard
+
+The accelerated app shares UTF-8 text, up to 1 MiB per selection, in both
+directions. Paste with Ctrl+V in guest applications or Ctrl+Shift+V in Foot.
+Command remains Super for desktop shortcuts. Images, files, rich text, primary
+selection, and clipboard-clear events are not transferred.
+
+`app/native/ClipboardBridge.m` observes the Mac pasteboard and connects to a
+private Unix socket in the VM state directory. QEMU forwards newline-delimited
+JSON over the `dev.ohmansy.clipboard` virtio-serial port. No network service,
+shared host directory, or simulated typing is involved.
+
+The VM module installs `ohmansy-host-clipboard.service` for the Niri user session.
+It uses `wl-copy` and `wl-paste --watch`; logind grants the active local user
+access to the device through a uaccess rule. The greeter does not run the bridge.
+Clipboard contents are not logged. Host text is sent when the desktop bridge
+connects, then changes are synchronized with echo suppression and bounded queues.
+
+Both sides must be installed. A new app bundle cannot add the service to an old
+guest by itself. Rebuild/update the guest's VM module as well. Physical desktop
+installations do not import this VM-specific service.
+
+On 2026-11-03, native transport tests and a real Wayland clipboard test passed
+in both directions, including Unicode and multiline text. The signed app and
+updated existing guest booted, and Mac text pasted successfully into the live
+Quickshell launcher. These checks do not establish image/file support or prove
+that an older bundled factory artifact contains the new guest service.
 
 ## Login-screen ribbons verified on 2026-11-02
 
@@ -234,6 +262,5 @@ Not yet verified: a full Niri login session,
 the `flakey` desktop configuration, Vulkan, or long-running graphics stability.
 Try Omarchy documents Vulkan as unavailable in its current runtime.
 
-The next milestones are a full Niri login session, and porting clipboard and
-audio to the accelerated path. Dynamic guest resolution, scale preservation,
-keyboard shortcuts, and screen transitions need further runtime validation.
+Those were the initial graphics checks. Later desktop and clipboard evidence
+appears above; audio and long-running graphics stability still need validation.
