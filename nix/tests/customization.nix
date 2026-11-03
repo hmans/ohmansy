@@ -13,6 +13,13 @@ let
   desktopOnly = evaluate [ ../modules/desktop.nix ];
   softwareOnly = evaluate [ ../modules/software.nix ];
   noFish = evaluate [ ../modules/default.nix { programs.fish.enable = false; } ];
+  noFishStyle = evaluate [ ../modules/software.nix { ohmansy.fishStyle.enable = false; } ];
+  customPrompt = evaluate [ ../modules/software.nix {
+    programs.starship.settings.directory.style = "bold blue";
+  } ];
+  differentPreset = evaluate [ ../modules/software.nix {
+    programs.starship.presets = [ "plain-text-symbols" ];
+  } ];
   noBrowserStyle = evaluate [ ../modules/software.nix { ohmansy.firefoxStyle.enable = false; } ];
   custom = evaluate [
     ../modules/default.nix
@@ -39,6 +46,11 @@ assert defaults.environment.etc ? "xdg/foot/foot.ini";
 assert !desktopOnly.programs.firefox.enable && !desktopOnly.programs.fish.enable;
 assert !softwareOnly.programs.niri.enable;
 assert noFish.users.defaultUserShell == pkgs.bashInteractive;
+assert softwareOnly.programs.starship.enable;
+assert !noFish.programs.starship.enable && !noFishStyle.programs.starship.enable;
+assert customPrompt.programs.starship.settings.directory.style == "bold blue";
+assert differentPreset.programs.starship.presets == [ "plain-text-symbols" ];
+assert differentPreset.programs.starship.settings == { };
 assert !custom.programs.firefox.enable && !custom.programs.fish.enable;
 assert custom.users.defaultUserShell == pkgs.zsh;
 assert custom.ohmansy.software.packages == [];

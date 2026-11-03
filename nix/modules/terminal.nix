@@ -57,7 +57,7 @@ in {
       '';
       environment.etc."xdg/foot/foot.ini".text = ''
         [main]
-        font=JetBrains Mono:size=11
+        font=${if config.programs.fish.enable && (config.ohmansy.fishStyle.enable or false) then "JetBrainsMono Nerd Font" else "JetBrains Mono"}:size=11
         pad=16x14
         [colors-dark]
         alpha=0.85

@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 {
-  imports = [ ./firefox-style.nix ];
+  imports = [ ./firefox-style.nix ./fish-style.nix ];
   options.ohmansy.software.packages = lib.mkOption {
     type = lib.types.listOf lib.types.package;
     default = with pkgs; [

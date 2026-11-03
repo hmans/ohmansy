@@ -74,6 +74,22 @@ retain store paths; removing a default does not immediately erase its files.
 Nautilus and the sound, network, Bluetooth, clipboard, and lock tools remain
 part of the desktop integration in this version.
 
+## Fish appearance
+
+Fish uses Starship's Pastel Powerline preset, with connected colored segments
+for the user, directory, Git state, language tools, container context, and time.
+JetBrainsMono Nerd Font supplies its icons and separators in Foot. The preset
+uses fixed colors with explicit pale lettering in both modes. Fish keeps its
+standard syntax colors. These lettering defaults apply only
+to the Pastel Powerline preset and can be overridden through Starship settings.
+
+Set `ohmansy.fishStyle.enable = false;` to omit these defaults. Customize the
+prompt with `~/.config/starship.toml`, or use the standard NixOS
+`programs.starship.presets` and `programs.starship.settings` options. NixOS's
+Starship integration also applies to other enabled supported shells.
+New terminals load changes; existing Fish
+processes keep their loaded configuration.
+
 ## Firefox appearance
 
 Firefox starts with compact controls, flat tabs, coordinated light/dark toolbar

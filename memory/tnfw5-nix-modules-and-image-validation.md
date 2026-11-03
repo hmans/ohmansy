@@ -191,6 +191,23 @@ entry/include sources for appliance, live, and installer, checks all actions
 against shortcuts.json, and validates the resolved KDL. It passes and rejects
 the previous raw include. Live activation reloaded all 60 intended bindings.
 
+Fish styling (2026-11-03): software.nix imports fish-style.nix. When Fish and
+ohmansy.fishStyle.enable are enabled, use the standard NixOS Starship integration
+with its packaged pastel-powerline preset. Bundle JetBrainsMono Nerd Font and
+select it in Foot. Personal ~/.config/starship.toml takes precedence; hosts can
+override programs.starship settings/presets or disable the Fish style module.
+Fish keeps its standard syntax colors and greeting; the custom vendor config
+and rejected inverse-block prompt were removed to keep this integration simple.
+Customization checks cover enabled/disabled styling, Fish opt-out, individual
+Starship style overrides, and alternate presets without leaked colors. Installed
+build passed; actual light/dark Foot previews confirmed separators and icons.
+Existing Fish/Foot processes need restart to load prompt/font changes.
+Pastel Powerline only sets segment backgrounds upstream, so its text inherited
+black in light terminals. fish-style.nix now supplies explicit #f5f5f5 text for
+all preset segments, preserving the user's preferred dark-mode look. Defaults
+remain overridable and apply only when this preset is selected. Both actual
+light/dark terminal previews verified consistent lettering after activation.
+
 Module layering (2026-11-02): default.nix composes desktop.nix and software.nix.
 The public flake exports default, desktop, software, and vm modules. Factory,
 live, and newly generated installer hosts use the combined module. Direct
