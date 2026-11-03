@@ -56,6 +56,49 @@ Without mise, use `python3 tools/dev/clean.py` with the same arguments.
 | `packages.aarch64-linux.installer-iso` | Experimental whole-disk installer |
 | `devShells.aarch64-linux.default` | Git, Nix tools, Python, and Niri |
 
+PC live images are separate from the ARM VM and installer:
+
+| Output | Purpose |
+| --- | --- |
+| `packages.x86_64-linux.iso` | Generic Intel/AMD PC live desktop |
+| `packages.x86_64-linux.iso-nvidia` | PC live desktop with NVIDIA drivers for Turing and newer GPUs |
+
+The NVIDIA image uses the open kernel module and matching proprietary
+userspace driver from locked Nixpkgs. The RTX 3060 Ti is in this supported
+hardware generation. Physical GPU operation still requires a boot test;
+configuration checks and an ISO build do not prove that it works on a PC.
+Neither PC image imports the VM clipboard service, fixed display scale, or
+software-cursor setting. Both use the same desktop and software modules as the VM.
+
+On an x86-64 Linux builder:
+
+```sh
+nix build --no-update-lock-file .#iso-nvidia
+python3 tools/release/package-iso.py --iso result/iso/*.iso \
+  --output dist/live-pc --architecture x86_64-linux --kind live --graphics nvidia
+```
+
+The `pc-live` CI job builds this NVIDIA variant and uploads the
+`ohmansy-x86_64-nvidia-live-preview` artifact with a seven-day retention period.
+It contains the ISO, SHA256 checksums, source archive, lock file, and manifest.
+
+### Try the PC image from USB
+
+1. Download and extract the CI artifact. Verify the ISO against `SHA256SUMS`.
+2. Write the ISO as a disk image to a USB drive. This erases that USB drive;
+   copying the ISO into an ordinary filesystem is not sufficient.
+3. Boot the USB through the PC's one-time UEFI boot menu. This preview is not
+   Secure Boot signed, so Secure Boot must be disabled to boot it.
+4. The local `nixos` live account opens the desktop automatically. Try display
+   resolution, keyboard shortcuts, the launcher, Firefox, audio, networking,
+   and shutdown. `nvidia-smi` can confirm the NVIDIA driver sees the GPU.
+
+This is a disposable live session: changes are lost on restart. There is no
+Ohmansy installation action and no automatic internal-disk installation.
+Internal disks can still be accessed manually through ordinary Linux tools.
+Remove the USB after shutdown to return to the existing OS. Persistent PC
+installation is a separate milestone; the current installer remains ARM-only.
+
 The primary product follows Try Omarchy's [factory-disk model](https://github.com/omacom/try-omarchy/blob/main/docs/architecture.md):
 ship a preinstalled system and keep a private writable disk between launches.
 App updates must not replace that disk. The guest owns its OS updates.
@@ -500,8 +543,9 @@ Each new VM is decompressed separately; a shared APFS factory cache is future wo
 
 ## Pipeline and release work
 
-`.github/workflows/images.yml` checks and builds the factory on ARM Linux, then
-uploads the packaged artifacts. Actions are pinned; the workflow does not publish
+`.github/workflows/images.yml` checks and builds the factory on ARM Linux and
+the NVIDIA live ISO on x86-64 Linux, then uploads the packaged artifacts.
+Actions are pinned; the workflow does not publish
 releases. Runs are available in the repository's GitHub Actions tab. A successful
 image build still needs a separate boot test.
 

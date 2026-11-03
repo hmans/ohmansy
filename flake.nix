@@ -9,7 +9,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       live = nixpkgs.lib.nixosSystem {
         inherit system;
-        modules = [ ./nix/profiles/live.nix ];
+        modules = [ ./nix/profiles/live-vm.nix ];
       };
       appliance = nixpkgs.lib.nixosSystem {
         inherit system;
@@ -18,6 +18,16 @@
       installer = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [ ./nix/profiles/installer.nix ];
+      };
+      pcSystem = "x86_64-linux";
+      pcPkgs = nixpkgs.legacyPackages.${pcSystem};
+      pcLive = nixpkgs.lib.nixosSystem {
+        system = pcSystem;
+        modules = [ ./nix/profiles/live.nix ];
+      };
+      pcNvidia = nixpkgs.lib.nixosSystem {
+        system = pcSystem;
+        modules = [ ./nix/profiles/live-nvidia.nix ];
       };
       rejectsDevelopment = base: extra:
         let candidate = base.extendModules { modules = [ extra ]; };
@@ -33,6 +43,24 @@
       nixosConfigurations.live = live;
       nixosConfigurations.appliance = appliance;
       nixosConfigurations.installer = installer;
+      nixosConfigurations.live-x86_64 = pcLive;
+      nixosConfigurations.live-nvidia-x86_64 = pcNvidia;
+      packages.${pcSystem} = {
+        iso = pcLive.config.system.build.isoImage;
+        iso-nvidia = pcNvidia.config.system.build.isoImage;
+        default = self.packages.${pcSystem}.iso;
+      };
+      checks.${pcSystem} = {
+        live-pc-policy = import ./nix/tests/live-pc.nix {
+          inherit nixpkgs pcLive pcNvidia;
+          pkgs = pcPkgs;
+        };
+        customization = import ./nix/tests/customization.nix {
+          inherit nixpkgs;
+          pkgs = pcPkgs;
+          system = pcSystem;
+        };
+      };
       packages.${system} = {
         installation = import ./nix/modules/installation-package.nix { inherit pkgs; };
         desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };

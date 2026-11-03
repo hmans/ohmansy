@@ -103,6 +103,11 @@ The root flake also provides `.#iso` for a disposable live desktop and
 persistent factory disk, with first-boot owner setup and no preset credentials.
 The installer still needs end-to-end validation.
 
+For an Intel/AMD PC, the x86-64 outputs are `.#iso` and `.#iso-nvidia`
+(NVIDIA Turing and newer, including RTX 3060 Ti). These are disposable live
+USB desktops with no Ohmansy installation action. See
+[PC live images and USB testing](docs/ohmansy-development.md#try-the-pc-image-from-usb).
+
 Use SSH for guest commands and file transfer. Never type or paste commands into
 terminal windows through computer automation. Development SSH access belongs to
 a local guest overlay and is excluded from product images.

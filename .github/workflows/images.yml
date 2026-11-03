@@ -10,6 +10,35 @@ permissions:
   contents: read
 
 jobs:
+  pc-live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Allow the image builder's user namespace
+        run: sudo apparmor_parser -r .github/nix-userns.apparmor
+      - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            max-jobs = 2
+      - name: Check PC configuration and packaging
+        run: |
+          nix flake check --no-update-lock-file
+          python3 -m unittest discover -s tools/tests -p 'test_iso_package.py'
+      - name: Build the NVIDIA PC live USB image
+        run: nix build --no-update-lock-file .#iso-nvidia
+      - name: Package live preview artifacts
+        run: >-
+          python3 tools/release/package-iso.py --iso result/iso/*.iso
+          --output dist/live-pc --architecture x86_64-linux --kind live --graphics nvidia
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ohmansy-x86_64-nvidia-live-preview
+          path: dist/live-pc/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
   factory:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
