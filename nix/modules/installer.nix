@@ -19,9 +19,7 @@ let
   '';
 in {
   environment.systemPackages = [ installer launcher ];
-  environment.etc."ohmansy/source/flake.nix".source = ../../flake.nix;
-  environment.etc."ohmansy/source/flake.lock".source = ../../flake.lock;
-  environment.etc."ohmansy/source/nix".source = ../.;
+  environment.etc."ohmansy/installation".source = import ./installation-package.nix { inherit pkgs; };
   # Live-only launcher button; installed desktops retain the normal panel.
   systemd.user.services.quickshell.environment.OHMANSY_INSTALLER = "${panelInstaller}";
 }

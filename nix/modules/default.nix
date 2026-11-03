@@ -1,4 +1,4 @@
 { ... }:
 {
-  imports = [ ./desktop.nix ./software.nix ];
+  imports = [ ./desktop.nix ./software.nix ./updates.nix ];
 }

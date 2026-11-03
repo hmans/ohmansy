@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 
-SOURCE = Path('/etc/ohmansy/source')
+SOURCE = Path('/etc/ohmansy/installation')
 TARGET = Path('/mnt/ohmansy')
 
 
@@ -41,7 +41,7 @@ def valid_username(value):
 def host_config(username, hostname):
     # Inputs have a restricted alphabet; JSON also produces valid Nix strings here.
     return '''{ ... }: {
-  imports = [ ./hardware-configuration.nix ./ohmansy/nix/modules/default.nix ];
+  imports = [ ./hardware-configuration.nix ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   networking.hostName = %s;
@@ -58,18 +58,10 @@ def host_config(username, hostname):
 def write_configuration(username, hostname):
     config = TARGET / 'etc/nixos'
     config.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(SOURCE, config / 'ohmansy')
     (config / 'configuration.nix').write_text(host_config(username, hostname))
-    (config / 'flake.nix').write_text('''{
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-  outputs = { nixpkgs, ... }: {
-    nixosConfigurations.ohmansy = nixpkgs.lib.nixosSystem {
-      system = "aarch64-linux";
-      modules = [ ./configuration.nix ];
-    };
-  };
-}
-''')
+    (config / 'owner.nix').write_text('{ ... }: { }\n')
+    (config / 'preferences.nix').write_text('{ ... }: { }\n')
+    shutil.copyfile(SOURCE / 'flake.nix', config / 'flake.nix')
     shutil.copyfile(SOURCE / 'flake.lock', config / 'flake.lock')
 
 

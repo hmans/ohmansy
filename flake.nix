@@ -28,10 +28,12 @@
       nixosModules.desktop = import ./nix/modules/desktop.nix;
       nixosModules.software = import ./nix/modules/software.nix;
       nixosModules.vm = import ./nix/modules/vm.nix;
+      nixosModules.updates = import ./nix/modules/updates.nix;
       nixosConfigurations.live = live;
       nixosConfigurations.appliance = appliance;
       nixosConfigurations.installer = installer;
       packages.${system} = {
+        installation = import ./nix/modules/installation-package.nix { inherit pkgs; };
         desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
         greeter-preview = pkgs.writeShellScriptBin "ohmansy-greeter-preview" ''
           preview=preview.qml

@@ -110,6 +110,8 @@ a local guest overlay and is excluded from product images.
   menus, screenshots, and media controls.
 - [Customizing Ohmansy](docs/customization.md): module selection, optional software,
   and terminal and shell defaults.
+- [Updating Ohmansy](docs/updates.md): pinned releases, local configuration,
+  update preparation, and recovery.
 - [Graphics integration](docs/graphics.md): the accelerated runtime and input.
 - [Original Virtualization backend](docs/legacy-virtualization.md): the retained
   `--original-vm` backend, including its clipboard integration.

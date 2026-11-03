@@ -41,8 +41,10 @@ The factory seeds editable configuration in `/etc/nixos`. After setup:
 sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
-This imports `persistent-vm.nix` and `owner.nix`, not the image builder or setup
-service. For physical hardware, import the default module with the machine's
+New installations import a pinned Ohmansy release with local machine, owner,
+hardware, and preference modules, not the image builder or setup service.
+See [Updating Ohmansy](updates.md) for release preparation and boot selection.
+For physical hardware, import the default module with the machine's
 hardware configuration and accounts; do not import the VM disk layout.
 See [Customizing Ohmansy](customization.md) for package, shell, and terminal choices.
 

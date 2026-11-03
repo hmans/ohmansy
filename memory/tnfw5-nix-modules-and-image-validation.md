@@ -2,7 +2,7 @@
 data:
   area: nix
   kind: workflow
-  reviewed: "2026-11-02"
+  reviewed: "2026-11-03"
   status: current
 id: tnfw5
 title: Nix modules and image validation
@@ -295,3 +295,38 @@ creation; a clean restart reached the normal login screen with the new account.
 The final setup button incorrectly called Quickshell.quit(); corrected to Qt.quit().
 This correction is source-only until the factory is rebuilt; direct button
 handoff with the correction still needs runtime verification.
+
+Release updates (2026-11-03): new factory and installer configurations use a
+pinned ohmansy input, with nixpkgs following its lock. installation-package.nix
+ships a minimal exact-source flake snapshot and a precomputed lock for offline
+first boot, including dirty development sources. The installed configuration
+retains ohmansy.outPath through system.extraDependencies. Machine hardware,
+accounts, preferences, and system.stateVersion are local installation files.
+persistent-vm.nix no longer owns stateVersion; the factory and generated host do.
+
+The default module installs ohmansy-update prepare/apply. Preparation builds a
+private copy; apply verifies fingerprints, registers the exact system through
+nix-env, selects boot with switch-to-configuration, and promotes only the pin
+and lock. Errors attempt to restore the preceding profile and boot selection.
+Prepared closures remain GC-rooted; retention cleanup is not implemented.
+Symlink-managed configurations use nixos-rebuild directly. Older copied-module
+installations need the explicit one-time migration in docs/updates.md. No disk
+reset, impermanence, automatic release channel, or automatic reboot is involved.
+
+Verification: all ARM flake checks passed; generated bootstrap evaluated offline
+with --no-update-lock-file and built a full installed system. An isolated clone
+booted local release fixture A, prepared/applied B with the real updater, booted
+B, then booted A through nixos-rebuild boot --rollback. Password/account state,
+provisioning marker, a home file, local package override, hardware configuration,
+and stateVersion survived. Fixtures used local flake inputs instead of publishing
+GitHub releases; remote release delivery was not tested. Host tests: 42 total,
+41 passed and one Linux peer test skipped. No fresh factory/ISO image or current
+user guest was replaced for this task.
+
+Fresh factory verification (2026-11-03): the updater-enabled factory image was
+built, packaged, embedded into the stopped app, and its code signature verified.
+A new guest booted to the graphical first-boot welcome screen with ribbons.
+The user then confirmed account creation and successful login. No credentials
+were entered by the agent.
+The image includes the Qt.quit final-button fix and the pinned installation
+configuration. This is a dirty-source local build, not a published release.

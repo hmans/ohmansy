@@ -10,9 +10,9 @@ let
 in {
   imports = [ (modulesPath + "/image/repart.nix") ../modules/persistent-vm.nix ../modules/first-boot.nix
     (import ../modules/image-policy.nix {}) ];
+  system.stateVersion = "26.05";
   services.openssh.enable = lib.mkForce false;
-  environment.etc."ohmansy/source/flake.lock".source = ../../flake.lock;
-  environment.etc."ohmansy/source/nix".source = ../.;
+  environment.etc."ohmansy/installation".source = import ../modules/installation-package.nix { inherit pkgs; };
   # Register the shipped store on the first boot of each private writable copy.
   boot.postBootCommands = ''
     if [ -f /nix-path-registration ]; then
@@ -22,21 +22,19 @@ in {
     fi
     if [ ! -e /etc/nixos/flake.nix ]; then
       mkdir -p /etc/nixos
-      cp -rL /etc/ohmansy/source/nix /etc/nixos/nix
-      cp /etc/ohmansy/source/flake.lock /etc/nixos/flake.lock
-      chmod -R u+w /etc/nixos
+      cp /etc/ohmansy/installation/flake.lock /etc/nixos/flake.lock
+      cp /etc/ohmansy/installation/vm-hardware.nix /etc/nixos/hardware-configuration.nix
       echo '{ ... }: { }' > /etc/nixos/owner.nix
-      cat > /etc/nixos/flake.nix <<'EOF'
-    {
-      inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-      outputs = { nixpkgs, ... }: {
-        nixosConfigurations.ohmansy = nixpkgs.lib.nixosSystem {
-          system = "aarch64-linux";
-          modules = [ ./nix/modules/persistent-vm.nix ./owner.nix ];
-        };
-      };
+      echo '{ ... }: { }' > /etc/nixos/preferences.nix
+      cat > /etc/nixos/configuration.nix <<'EOF'
+    { ohmansy, ... }: {
+      imports = [ ohmansy.nixosModules.vm ./hardware-configuration.nix ];
+      system.stateVersion = "26.05";
     }
     EOF
+      # Write the entry point last; setup never observes a partial configuration.
+      cp /etc/ohmansy/installation/flake.nix /etc/nixos/flake.nix
+      chmod -R u+w /etc/nixos
     fi
   '';
   image.repart = {

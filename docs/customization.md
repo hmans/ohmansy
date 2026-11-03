@@ -1,7 +1,7 @@
 # Customizing Ohmansy
 
 Keep your preferences in a host module under `/etc/nixos`, separate from the
-copied Ohmansy modules. Import it alongside your existing host configuration.
+Ohmansy release input. Import it alongside your existing host configuration.
 This lets you change defaults without editing the desktop implementation.
 
 ## Select modules
@@ -14,18 +14,21 @@ The root flake exports these NixOS modules:
 | `nixosModules.desktop` | Niri, Quickshell, login screen, desktop services, and terminal integration |
 | `nixosModules.software` | Firefox, Fish, and optional command-line tools |
 | `nixosModules.vm` | Guest display and Virtio integration |
+| `nixosModules.updates` | Command-line release preparation and boot selection |
 
 The default module has no accounts or disk layout. A physical machine combines
 it with its hardware configuration and local accounts. The app's persistent VM
 profile combines it with VM integration and the VM disk layout. Choosing
 `desktop` alone omits the optional software bundle.
 
-Factory and installer configurations use local module copies. Their combined
-entry point is `nix/modules/default.nix`. The factory imports it through
-`persistent-vm.nix`; newly generated installer configurations import it directly.
-Older configurations importing `desktop.nix` directly must switch to
-`default.nix` if they want to retain the optional bundle after updating sources.
-This separation does not implement automatic upstream updates.
+New factory and installer configurations use a pinned `ohmansy` flake input.
+The initial pin points to the exact source shipped in the image, so first boot
+does not require a published release or network access. Updates select a GitHub
+release tag or full commit ID. See [Updating Ohmansy](updates.md).
+
+`configuration.nix`, `hardware-configuration.nix`, `owner.nix`, and
+`preferences.nix` belong to the installed machine. Its `system.stateVersion`
+stays in local configuration; it is not the Ohmansy release number.
 
 ## Add or remove optional software
 
@@ -46,8 +49,8 @@ For example, create a `preferences.nix` module:
 }
 ```
 
-Add `./preferences.nix` to the host's module imports. The factory flake's
-`nixosSystem.modules` list is one such location. Then rebuild:
+New installations already import `./preferences.nix`. On older installations,
+add it to the host's module imports. Then rebuild:
 
 ```sh
 sudo nixos-rebuild switch --flake /etc/nixos#ohmansy

@@ -6,6 +6,10 @@ let
     modules = modules ++ [ { system.stateVersion = "26.05"; } ];
   }).config;
   defaults = evaluate [ ../modules/default.nix ];
+  hostOwnedState = (lib.nixosSystem {
+    inherit system;
+    modules = [ ../modules/default.nix { system.stateVersion = "25.11"; } ];
+  }).config;
   desktopOnly = evaluate [ ../modules/desktop.nix ];
   softwareOnly = evaluate [ ../modules/software.nix ];
   noFish = evaluate [ ../modules/default.nix { programs.fish.enable = false; } ];
@@ -25,6 +29,7 @@ let
   terminalLauncher = lib.findFirst (package: lib.getName package == "ohmansy-terminal")
     (throw "No terminal launcher installed") custom.environment.systemPackages;
 in
+assert hostOwnedState.system.stateVersion == "25.11";
 assert defaults.programs.firefox.enable && defaults.programs.fish.enable;
 assert noBrowserStyle.programs.firefox.enable && noBrowserStyle.programs.firefox.autoConfig == "";
 assert custom.programs.firefox.autoConfig == "";
