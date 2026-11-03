@@ -72,7 +72,10 @@ pkgs.runCommand "ohmansy-customization" {
   mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
   cp ${custom.environment.etc."xdg/xdg-terminals.list".source} "$XDG_CONFIG_HOME/xdg-terminals.list"
   test "$(${terminalLauncher}/bin/ohmansy-terminal --print-id)" = kitty.desktop
-  ${terminalLauncher}/bin/ohmansy-terminal --print-cmd nmtui | grep -q kitty
+  # Read the whole command before matching: grep -q can close a pipe early
+  # and fail the launcher under pipefail while it is still writing arguments.
+  ${terminalLauncher}/bin/ohmansy-terminal --print-cmd nmtui > terminal-command
+  grep -Fq kitty terminal-command
   python3 ${./niri-shortcuts.py} \
     ${custom.environment.etc."ohmansy/niri.kdl".source} \
     ${custom.environment.etc."ohmansy/desktop.kdl".source} \
