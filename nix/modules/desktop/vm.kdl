@@ -1,3 +1,4 @@
 include "/etc/ohmansy/desktop.kdl"
+include optional=true "~/.local/state/ohmansy/niri-appearance.kdl"
 output "Virtual-1" { scale 2; }
 debug { disable-cursor-plane; }

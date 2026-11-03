@@ -9,6 +9,8 @@ import tempfile
 entry, desktop, definitions = map(Path, sys.argv[1:])
 entry_text = entry.read_text()
 assert 'include "/etc/ohmansy/desktop.kdl"' in entry_text, "Entry point does not load desktop bindings"
+assert 'include optional=true "~/.local/state/ohmansy/niri-appearance.kdl"' in entry_text, "Entry point does not load the desktop appearance palette"
+assert entry_text.index('include "/etc/ohmansy/desktop.kdl"') < entry_text.index('include optional=true "~/.local/state/ohmansy/niri-appearance.kdl"'), "Appearance palette must override the desktop defaults"
 expected = {
     binding["key"]: binding["action"]
     for group in json.loads(definitions.read_text())

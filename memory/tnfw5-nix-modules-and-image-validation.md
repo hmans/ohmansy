@@ -351,3 +351,10 @@ Light ribbon palette (2026-11-03): Ui.Appearance supplies a 150 ms InOutCubic li
 Plugin/desktop packages built, ARM flake checks passed, and initial dark/mid/light GLSL frames were rendered with llvmpipe and visually inspected. QML checks passed startup endpoint, intermediate blend, no-jump reversal and final endpoints. Offscreen Qt ignores a forced colorScheme in the test backend, so interpolation was tested directly. Later timing and light-background refinements were built and test-activated in the installed guest over SSH; this does not select them for the next boot. No factory image rebuilt.
 
 Niri window outlines now follow appearance through an optional home-relative include of ~/.local/state/ohmansy/niri-appearance.kdl. The shell writes the selected packaged light/dark KDL palette atomically at startup and on preference changes; identical content does not trigger a write. This uses Niri's include watcher, not compositor restarts. Both palettes and the complete config validated, and real GSettings dark/light toggles selected each palette in the live guest. Keep colors in desktop/niri-{light,dark}.kdl, and preserve the default border when the optional file is absent.
+
+The VM entry point initially omitted this include, so its palette file updated
+without changing the visible borders. Fixed desktop/vm.kdl to include the palette
+after desktop.kdl. The niri-config check now requires that include and ordering
+for every image profile. The check, installed system build, and live validation
+passed; a guest screenshot confirmed dark slate light-mode borders, with a
+stronger active rim and softer inactive rim.
