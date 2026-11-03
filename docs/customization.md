@@ -132,6 +132,16 @@ A user's `~/.config/xdg-terminals.list` can override the system selection if
 their preferred terminal is installed. Such a user override selects the
 launcher; it does not change system-wide terminal styling.
 
+## VM display scale
+
+The VM module uses 100% scale on x86-64 and retains 200% for the ARM Mac VM.
+The setup screen, login screen, and desktop share this setting. A host that
+imports `nixosModules.vm` can override it in its configuration or preferences:
+
+```nix
+ohmansy.vm.displayScale = 1.25;
+```
+
 ## Verification
 
 `nix build .#checks.aarch64-linux.customization` checks independent module

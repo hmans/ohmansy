@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive whole-disk installer for the Ohmansy ARM VM image."""
+"""Interactive whole-disk installer for the Ohmansy installer image."""
 import json
 import os
 from pathlib import Path

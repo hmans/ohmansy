@@ -96,7 +96,7 @@ For development directly on a Linux PC or inside the macOS VM, see
 `nix develop`, desktop previews, and native flake checks; no Mac host or SSH
 bridge is needed when commands already run inside Linux.
 
-On ARM Linux, including the development VM:
+On ARM or x86-64 Linux, including a development VM:
 
 ```sh
 make flake-check
@@ -112,6 +112,8 @@ For an Intel/AMD PC, the x86-64 outputs are `.#iso` and `.#iso-nvidia`
 (NVIDIA Turing and newer, including RTX 3060 Ti). These are disposable live
 USB desktops with no Ohmansy installation action. See
 [PC live images and USB testing](docs/ohmansy-development.md#try-the-pc-image-from-usb).
+For the setup wizard and a persistent account in a Linux VM, use `.#vm-image`;
+see [persistent VM setup](docs/linux-development.md#boot-the-setup-wizard-in-a-persistent-vm).
 
 Use SSH for guest commands and file transfer. Never type or paste commands into
 terminal windows through computer automation. Development SSH access belongs to

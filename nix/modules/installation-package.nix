@@ -9,7 +9,8 @@ let
     cp -r ${../.} "$out/nix"
   '';
   template = pkgs.writeText "installed-flake.nix" (builtins.replaceStrings
-    [ "@SOURCE@" ] [ (toString source) ] (builtins.readFile ./installation/flake.nix.in));
+    [ "@SOURCE@" "@SYSTEM@" ] [ (toString source) pkgs.stdenv.hostPlatform.system ]
+    (builtins.readFile ./installation/flake.nix.in));
 in pkgs.runCommand "ohmansy-installation" { nativeBuildInputs = [ pkgs.nix pkgs.python3 ]; } ''
   mkdir -p "$out"
   cp ${template} "$out/flake.nix"

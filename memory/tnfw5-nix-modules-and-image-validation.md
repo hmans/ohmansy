@@ -9,6 +9,26 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Persistent Linux VM setup (2026-11-03): both architectures now export `vm-image`
+and `installer-iso`. The factory selects the matching UEFI fallback loader and
+root partition type; serial console and the generated installed flake also follow
+the target platform. The native x86 flake checks and factory build passed; ARM
+factory platform assertions evaluated successfully. A fresh writable x86 factory
+copy booted under QEMU/KVM with VirtIO GL to the graphical first-boot welcome,
+including ribbons. Account creation and persistence across a reboot were not
+exercised in that check. See the persistent VM section in
+[Linux development](../docs/linux-development.md). The factory wizard provisions
+an already installed disk; the separate installer ISO installs onto a blank disk.
+The new x86 installer output evaluated but has not been built or booted.
+
+The first x86 factory inherited the Mac VM's hardcoded 2x display scale, making
+setup too large. `ohmansy.vm.displayScale` now defaults to 1 on x86 and retains 2
+on ARM, and generates both desktop and greeter/setup output settings. Native
+flake checks passed, including assertions for both output configurations; ARM
+platform assertions evaluated with scale 2. A corrected fresh x86 factory was
+built and visually verified at the welcome screen at scale 1. The initial disk
+was retained; the user confirmed setup had not yet created an account.
+
 Build from the root flake. `flakey/` is reference material only, not an input.
 `profiles/` composes factory, live, and installer systems. `modules/` contains
 reusable modules, with implementation assets in matching subdirectories. Keep

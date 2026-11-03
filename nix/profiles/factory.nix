@@ -1,5 +1,7 @@
 { config, lib, pkgs, modulesPath, ... }:
 let
+  arm = pkgs.stdenv.hostPlatform.isAarch64;
+  efiArch = if arm then "aa64" else "x64";
   closure = pkgs.closureInfo { rootPaths = [ config.system.build.toplevel ]; };
   entry = pkgs.writeText "ohmansy-boot.conf" ''
     title Ohmansy
@@ -38,12 +40,12 @@ in {
     fi
   '';
   image.repart = {
-    name = "ohmansy-0.1.0-aarch64-linux";
+    name = "ohmansy-0.1.0-${pkgs.stdenv.hostPlatform.system}";
     compression.enable = true;
     partitions = {
       "10-esp" = {
         contents = {
-          "/EFI/BOOT/BOOTAA64.EFI".source = "${pkgs.systemd}/lib/systemd/boot/efi/systemd-bootaa64.efi";
+          "/EFI/BOOT/BOOT${lib.toUpper efiArch}.EFI".source = "${pkgs.systemd}/lib/systemd/boot/efi/systemd-boot${efiArch}.efi";
           "/loader/loader.conf".source = pkgs.writeText "loader.conf" ''
             default ohmansy.conf
             timeout 0
@@ -58,7 +60,7 @@ in {
       "20-root" = {
         storePaths = [ config.system.build.toplevel ];
         contents."/nix-path-registration".source = "${closure}/registration";
-        repartConfig = { Type = "root-arm64"; Format = "ext4"; Label = "ohmansy"; Minimize = "guess"; };
+        repartConfig = { Type = if arm then "root-arm64" else "root-x86-64"; Format = "ext4"; Label = "ohmansy"; Minimize = "guess"; };
       };
     };
   };

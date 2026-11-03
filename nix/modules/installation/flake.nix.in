@@ -3,7 +3,7 @@
   inputs.nixpkgs.follows = "ohmansy/nixpkgs";
   outputs = { nixpkgs, ohmansy, ... }: {
     nixosConfigurations.ohmansy = nixpkgs.lib.nixosSystem {
-      system = "aarch64-linux";
+      system = "@SYSTEM@";
       specialArgs = { inherit ohmansy; };
       modules = [
         ohmansy.nixosModules.default ./configuration.nix ./owner.nix ./preferences.nix

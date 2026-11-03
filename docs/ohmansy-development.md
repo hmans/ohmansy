@@ -53,9 +53,9 @@ Without mise, use `python3 tools/dev/clean.py` with the same arguments.
 | `nixosModules.vm` | Virtio, shutdown, display scale, and software cursor |
 | `nixosModules.development` | Opt-in SSH and sudo rules for an existing owner |
 | `nixosConfigurations.appliance` | Persistent VM with first-boot account setup |
-| `packages.aarch64-linux.vm-image` (default) | Compressed raw UEFI factory disk |
+| `packages.{aarch64,x86_64}-linux.vm-image` | Compressed raw UEFI factory disk with first-boot setup |
 | `packages.aarch64-linux.iso` | Disposable live desktop without an installer |
-| `packages.aarch64-linux.installer-iso` | Experimental whole-disk installer |
+| `packages.{aarch64,x86_64}-linux.installer-iso` | Experimental whole-disk installer |
 | `devShells.{aarch64,x86_64}-linux.default` | Git, Nix tools, Python, ripgrep, and Niri |
 | `packages.{aarch64,x86_64}-linux.desktop-shell` / `wallpaper` | Desktop wrappers for local iteration |
 | `packages.{aarch64,x86_64}-linux.greeter-preview` / `first-boot-preview` | Safe graphical previews |

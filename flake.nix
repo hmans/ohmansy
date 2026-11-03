@@ -21,6 +21,14 @@
       };
       pcSystem = "x86_64-linux";
       pcPkgs = nixpkgs.legacyPackages.${pcSystem};
+      pcAppliance = nixpkgs.lib.nixosSystem {
+        system = pcSystem;
+        modules = [ ./nix/profiles/factory.nix ];
+      };
+      pcInstaller = nixpkgs.lib.nixosSystem {
+        system = pcSystem;
+        modules = [ ./nix/profiles/installer.nix ];
+      };
       pcLive = nixpkgs.lib.nixosSystem {
         system = pcSystem;
         modules = [ ./nix/profiles/live-pc.nix ];
@@ -60,13 +68,21 @@
       nixosConfigurations.appliance = appliance;
       nixosConfigurations.installer = installer;
       nixosConfigurations.live-x86_64 = pcLive;
+      nixosConfigurations.appliance-x86_64 = pcAppliance;
+      nixosConfigurations.installer-x86_64 = pcInstaller;
       nixosConfigurations.live-nvidia-x86_64 = pcNvidia;
       packages.${pcSystem} = desktopPackages pcPkgs // {
         iso = pcLive.config.system.build.isoImage;
         iso-nvidia = pcNvidia.config.system.build.isoImage;
+        vm-image = pcAppliance.config.system.build.image;
+        installer-iso = pcInstaller.config.system.build.isoImage;
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        factory-platform = import ./nix/tests/factory-platform.nix {
+          pkgs = pcPkgs;
+          appliance = pcAppliance;
+        };
         ribbons = import ./nix/tests/ribbons.nix { pkgs = pcPkgs; };
         live-pc-policy = import ./nix/tests/live-pc.nix {
           inherit nixpkgs pcLive pcNvidia;
@@ -86,6 +102,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        factory-platform = import ./nix/tests/factory-platform.nix { inherit pkgs appliance; };
         ribbons = import ./nix/tests/ribbons.nix { inherit pkgs; };
         development-module = import ./nix/tests/development.nix { inherit nixpkgs pkgs system; };
         customization = import ./nix/tests/customization.nix { inherit nixpkgs pkgs system; };

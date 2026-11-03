@@ -122,12 +122,56 @@ Build for the machine's native architecture, or use its matching CI runner:
 | --- | --- | --- |
 | x86-64 PC | `nix build .#iso-nvidia` | `result/iso/*.iso` |
 | x86-64 PC, generic graphics | `nix build .#iso` | `result/iso/*.iso` |
-| ARM Linux / macOS guest | `nix build .#vm-image` | `result/*.raw.zst` |
+| x86-64 PC or ARM Linux | `nix build .#vm-image` | `result/*.raw.zst` |
+| x86-64 PC or ARM Linux | `nix build .#installer-iso` | `result/iso/*.iso` |
 | ARM Linux / macOS guest | `nix build .#iso` | `result/iso/*.iso` |
 
 Check free disk space and RAM first. Avoid full image builds in a live session's
 RAM-backed root; use CI or a configured persistent builder. An output link on
 persistent storage alone does not move the Nix store out of RAM. Do not wipe a
 guest, delete generations, or repartition disks to make room without authorization.
+Also check the build workspace: repart image assembly temporarily needs both the
+root filesystem and the final disk image. For a single-user Nix build on a host
+with RAM-backed `/tmp`, put `TMPDIR` on persistent storage:
+
+```sh
+mkdir -p .local/nix-build
+TMPDIR="$PWD/.local/nix-build" nix build --no-update-lock-file .#vm-image
+```
+
 Building an image does not install it. Report build, runtime, and physical GPU
 test results separately. See [image packaging](ohmansy-development.md) for CI artifacts.
+
+## Boot the setup wizard in a persistent VM
+
+Use `.#vm-image` for the graphical first-boot wizard. It creates an owner on an
+already installed system; the account and files live on the writable VM disk.
+The normal live ISO uses a temporary autologin account. `.#installer-iso` instead
+boots the experimental disk installer, which installs onto a separate blank disk.
+
+On an x86-64 host with QEMU, KVM, and OVMF installed, build the factory and make
+a private writable copy. Use a new state directory for each fresh setup test:
+
+```sh
+nix build --no-update-lock-file --out-link .local/factory-image .#vm-image
+mkdir -p .local/setup-vm
+zstd --decompress --keep .local/factory-image/*.raw.zst -o .local/setup-vm/disk.raw
+chmod u+w .local/setup-vm/disk.raw
+qemu-img resize -f raw .local/setup-vm/disk.raw 64G
+cp /usr/share/edk2/x64/OVMF_VARS.4m.fd .local/setup-vm/OVMF_VARS.fd
+qemu-system-x86_64 \
+  -machine q35,accel=kvm -cpu host -smp 4 -m 8192 \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \
+  -drive if=pflash,format=raw,file=.local/setup-vm/OVMF_VARS.fd \
+  -drive if=virtio,format=raw,file=.local/setup-vm/disk.raw \
+  -vga none -device virtio-vga-gl -display gtk,gl=on \
+  -device qemu-xhci -device usb-tablet \
+  -netdev user,id=network -device virtio-net-pci,netdev=network
+```
+
+The firmware paths above are for Arch-based hosts; use the matching OVMF code
+and variables files supplied by your distribution. Run QEMU as the desktop user.
+For later boots, repeat only the QEMU command with the same disk and firmware
+variables. Shut down through the guest before closing QEMU. Never replace the
+writable disk to update an installed guest; preserve its account and host flake.
+The disk grows on first boot, and completed setup leads to the normal login screen.
