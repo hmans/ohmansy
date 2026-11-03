@@ -194,7 +194,7 @@ PanelWindow {
                             source: trayItem.modelData.icon
                             sourceSize { width: 20; height: 20 }
                             layer.enabled: true
-                            layer.effect: MultiEffect { saturation: -1; brightness: 1 }
+                            layer.effect: MultiEffect { saturation: -1; brightness: 1 - 2 * theme.lightMix }
                         }
                         MouseArea {
                             id: trayMouse

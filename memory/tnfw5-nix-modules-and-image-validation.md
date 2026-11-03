@@ -330,3 +330,7 @@ The user then confirmed account creation and successful login. No credentials
 were entered by the agent.
 The image includes the Qt.quit final-button fix and the pinned installation
 configuration. This is a dirty-source local build, not a published release.
+
+Light ribbon palette (2026-11-03): Ui.Appearance supplies an 800 ms InOutCubic lightMix blend from the portal-backed Qt preference. Desktop wallpaper imports the UI module and the xdgdesktopportal platform theme. Ribbons.qml samples targetLightMix on its existing 33 ms motion timer; the shader blends backdrop, material lighting, particles and vignette in one scene. The greeter retains a default lightMix of zero. On-wallpaper Theme text/control colors and tray icon brightness follow the same blend; the earlier always-white bar rule is superseded. Popups retain their existing immediate palette changes.
+
+Plugin/desktop packages built, ARM flake checks passed, and dark/mid/light GLSL frames were rendered with llvmpipe and visually inspected. QML checks passed startup endpoint, intermediate blend, no-jump reversal and final endpoints. Offscreen Qt ignores a forced colorScheme in the test backend, so interpolation was tested directly; actual portal-driven transitions still need live guest verification. Current user guest is unchanged; no factory image rebuilt.

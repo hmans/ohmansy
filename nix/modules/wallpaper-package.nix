@@ -1,6 +1,7 @@
 { pkgs }:
 let
   ribbons = import ./greeter-ribbons.nix { inherit pkgs; };
+  ui = import ./quickshell-ui.nix { inherit pkgs; };
   scene = pkgs.runCommand "ohmansy-wallpaper-qml" {} ''
     mkdir -p $out
     cp ${./desktop/wallpaper.qml} $out/shell.qml
@@ -14,7 +15,7 @@ in pkgs.writeShellScriptBin "ohmansy-wallpaper" ''
     IFS= read -r OHMANSY_WALLPAPER_IMAGE < "$wallpaper_state" || true
     if [ -f "$OHMANSY_WALLPAPER_IMAGE" ]; then export OHMANSY_WALLPAPER_IMAGE; fi
   fi
-  export QML_IMPORT_PATH="${ribbons}/lib/qt-6/qml''${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+  export QML_IMPORT_PATH="${ribbons}/lib/qt-6/qml:${ui}/lib/qt-6/qml''${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
   export PATH="${pkgs.niri}/bin:$PATH"
   exec ${pkgs.quickshell}/bin/quickshell --path ${scene}/shell.qml
 ''

@@ -1,6 +1,7 @@
 // GLSL translation of app/native/Welcome.metal; keep constants and motion in sync.
 uniform vec2 size;
 uniform float time;
+uniform float lightMix;
 uniform int ribbonId;
 
 float hash(vec2 p) {

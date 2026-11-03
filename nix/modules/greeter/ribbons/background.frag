@@ -5,9 +5,11 @@ void main() {
     float aspect = size.x / size.y;
     float t = time;
     vec2 p = (uv - 0.5) * vec2(aspect, 1);
-    vec3 color = mix(vec3(0.065, 0.077, 0.12), vec3(0.12, 0.15, 0.20), uv.y);
+    vec3 top = mix(vec3(0.065, 0.077, 0.12), vec3(0.93, 0.94, 0.97), lightMix);
+    vec3 bottom = mix(vec3(0.12, 0.15, 0.20), vec3(0.82, 0.86, 0.93), lightMix);
+    vec3 color = mix(top, bottom, uv.y);
     float haze = noise(vec2(uv.x * 2.3 + t * 0.018, uv.y * 1.7 - t * 0.012));
-    color += haze * vec3(0.025, 0.035, 0.06);
+    color += haze * mix(vec3(0.025, 0.035, 0.06), vec3(0.02, 0.015, 0.025), lightMix);
     float quiet = 1.0 - 0.55 * exp(-dot(p * vec2(3.2, 5), p * vec2(3.2, 5)));
     float proximity = 0.0;
     for (int ribbon = 0; ribbon < 3; ribbon++) {
@@ -38,10 +40,10 @@ void main() {
                 float halo = exp(-distance / (radius * 2.5)) * (0.08 + depth * 0.12);
                 float shimmer = 0.55 + 0.45 * pow(0.5 + 0.5 * sin(t * (0.5 + seed) + seed * 59.0), 2.0);
                 vec3 tint = mix(vec3(0.35, 0.65, 0.84), vec3(0.72, 0.57, 0.91), seed);
-                color += tint * (core + halo) * (0.16 + depth * 0.28) * shimmer * quiet * proximity;
+                color += tint * (core + halo) * (0.16 + depth * 0.28) * shimmer * quiet * proximity * mix(1.0, 0.35, lightMix);
             }
         }
     }
-    float vignette = 1.0 - 0.38 * smoothstep(0.30, 0.73, length(uv - 0.5));
+    float vignette = 1.0 - mix(0.38, 0.055, lightMix) * smoothstep(0.30, 0.73, length(uv - 0.5));
     fragColor = vec4(color * vignette + (hash(pixel) - 0.5) / 255.0, 1);
 }

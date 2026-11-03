@@ -18,6 +18,7 @@ public:
     void synchronize(QQuickFramebufferObject *item) override {
         owner = static_cast<RibbonScene *>(item);
         elapsed = owner->elapsed();
+        lightMix = owner->lightMix();
     }
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &requested) override {
         const double scale = std::min(1.0, 2400.0 / std::max(1, requested.width()));
@@ -97,6 +98,7 @@ private:
     void uniforms(QOpenGLShaderProgram &program, QSize size) {
         program.setUniformValue("size", QVector2D(size.width(), size.height()));
         program.setUniformValue("time", elapsed);
+        program.setUniformValue("lightMix", lightMix);
     }
     void initialize() {
         attempted = true;
@@ -127,6 +129,7 @@ private:
     QElapsedTimer statistics;
     GLuint vao = 0;
     float elapsed = 12;
+    float lightMix = 0;
     int frames = 0;
     bool attempted = false, ready = false;
 };

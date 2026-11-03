@@ -1,7 +1,10 @@
 //@ pragma Env QS_NO_RELOAD_POPUP=1
+//@ pragma UseQApplication
+//@ pragma DefaultEnv QT_QPA_PLATFORMTHEME=xdgdesktopportal
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Ohmansy.Ui as Ui
 
 ShellRoot {
     NiriState { id: niri }
@@ -49,6 +52,10 @@ ShellRoot {
                 y: -112 + wallpaper.driftY
                 active: GraphicsInfo.api === GraphicsInfo.OpenGL && !ribbonFailure && !wallpaper.imageOverride
                 source: active ? "Ribbons.qml" : ""
+                onLoaded: {
+                    item.targetLightMix = Qt.binding(() => Ui.Appearance.lightMix);
+                    item.lightMix = Ui.Appearance.lightMix;
+                }
             }
             Connections {
                 target: animation.item
