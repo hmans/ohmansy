@@ -3,7 +3,17 @@
   imports = [ ./firefox-style.nix ];
   options.ohmansy.software.packages = lib.mkOption {
     type = lib.types.listOf lib.types.package;
-    default = with pkgs; [ git vim curl jq python3 ];
+    default = with pkgs; [
+      git
+      vim
+      curl
+      wget
+      jq
+      python3
+      fastfetch
+      btop
+      htop
+    ];
     description = ''
       Optional command-line tools bundled with Ohmansy. Assign a list to replace
       these defaults, or an empty list to omit them. Add unrelated software with
