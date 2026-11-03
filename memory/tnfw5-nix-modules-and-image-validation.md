@@ -278,6 +278,12 @@ background layer and ignore exclusive zones. Built, live-activated, and verified
 with screenshots before, during, and after a workspace switch; the window moves
 while the ribbons remain in place. Original workspace restored.
 See https://niri-wm.github.io/niri/Overview.html#backdrop-customization.
+Overview uses `workspace-shadow { off; }`, with no workspace frames or tint.
+Individual window shadows remain enabled. The user rejected both padded tinted
+frames and a thin-line version. Do not restore that experiment: Niri cuts out
+the workspace interior, hardcodes square corners, and scales spread with output
+height. Filled, rounded overview-only cards need compositor support;
+layout.background-color also affects the normal desktop.
 The user then requested vertical parallax within that stationary layer, and
 increased its range after trying the subtle version. The workspace-index offset
 is now `-64 * atan((index - 1) * 0.55)`, eased over 650 ms with OutCubic:

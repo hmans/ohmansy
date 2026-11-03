@@ -63,6 +63,10 @@ layout {
         inactive-color "#00000038"
     }
 }
+// Keep overview workspaces clear over the shared wallpaper.
+overview {
+    workspace-shadow { off; }
+}
 cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
 prefer-no-csd
 spawn-at-startup "mako"
