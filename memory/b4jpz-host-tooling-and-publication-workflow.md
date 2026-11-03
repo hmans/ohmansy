@@ -26,7 +26,12 @@ repository root unless the tool explicitly supports another working directory.
 
 ## Guest work
 
-Use SSH with an explicit target, identity, port, and verified host key. Read
+For an agent already inside Linux, use local command tools and the native
+[Linux development workflow](../docs/linux-development.md). The Mac bridge is
+not needed. Keep live USB work on persistent storage. Mac bundle commands remain
+macOS-only; use native Nix checks and Python tests for the desktop.
+
+From another machine, use SSH with an explicit target, identity, port, and verified host key. Read
 ignored local session notes if present; confirm the endpoint and running system.
 The guest-dev defaults may describe an older builder. Never disable host-key
 checking to get around a mismatch or assume the old personal VM still exists.

@@ -1,8 +1,9 @@
 #include "RibbonScene.h"
 #include <QElapsedTimer>
 #include <QFile>
+#include <QOpenGLContext>
 #include <QOpenGLFramebufferObject>
-#include <QOpenGLFunctions_3_3_Core>
+#include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
 #include <QPointer>
 #include <QQuickOpenGLUtils>
@@ -12,7 +13,7 @@
 // OpenGL port of app/native/WelcomeCanvas.m. Keep the same draw order and
 // per-ribbon depth prepass; ordinary alpha sorting loses the fabric folds.
 class RibbonRenderer : public QQuickFramebufferObject::Renderer,
-                       protected QOpenGLFunctions_3_3_Core {
+                       protected QOpenGLExtraFunctions {
 public:
     ~RibbonRenderer() override { if (vao) glDeleteVertexArrays(1, &vao); }
     void synchronize(QQuickFramebufferObject *item) override {
@@ -37,11 +38,12 @@ public:
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_CULL_FACE);
         glDisable(GL_STENCIL_TEST);
-        glDisable(GL_FRAMEBUFFER_SRGB);
+        // ES has no core FRAMEBUFFER_SRGB switch; this target is linear RGBA8.
+        if (!openGLES) glDisable(GL_FRAMEBUFFER_SRGB);
         glDisable(GL_POLYGON_OFFSET_FILL);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glDepthMask(GL_TRUE);
-        glClearDepth(1.0);
+        glClearDepthf(1.0f);
         glClearColor(0.065f, 0.077f, 0.12f, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         glBindVertexArray(vao);
@@ -102,12 +104,31 @@ private:
     }
     void initialize() {
         attempted = true;
-        const QByteArray shared = "#version 330 core\n" + source("common.glsl");
-        const char *fullscreen = "#version 330 core\nvoid main() {"
+        const auto *context = QOpenGLContext::currentContext();
+        if (context) {
+            qInfo() << "Ohmansy ribbons context:" << context->format()
+                    << "OpenGL ES:" << context->isOpenGLES();
+        }
+        openGLES = context && context->isOpenGLES();
+        const auto minimum = openGLES ? qMakePair(3, 0) : qMakePair(3, 3);
+        if (!context || context->format().version() < minimum) {
+            qWarning() << "Ohmansy ribbons require OpenGL 3.3 or OpenGL ES 3.0.";
+            QMetaObject::invokeMethod(owner, [item = owner] {
+                if (item) item->reportFailure();
+            }, Qt::QueuedConnection);
+            return;
+        }
+        initializeOpenGLFunctions();
+        // Share shader bodies across desktop GL and ES. Explicit high precision
+        // also keeps uniforms and stage interfaces compatible when linking ES.
+        const QByteArray header = openGLES
+            ? "#version 300 es\nprecision highp float;\nprecision highp int;\n"
+            : "#version 330 core\n";
+        const QByteArray shared = header + source("common.glsl");
+        const QByteArray fullscreen = header + "void main() {"
             "vec2 p[3] = vec2[3](vec2(-1,-1),vec2(3,-1),vec2(-1,3));"
             "gl_Position = vec4(p[gl_VertexID],0,1); }";
-        ready = initializeOpenGLFunctions()
-            && background.addShaderFromSourceCode(QOpenGLShader::Vertex, fullscreen)
+        ready = background.addShaderFromSourceCode(QOpenGLShader::Vertex, fullscreen)
             && background.addShaderFromSourceCode(QOpenGLShader::Fragment, shared + source("background.frag"))
             && background.link()
             && ribbons.addShaderFromSourceCode(QOpenGLShader::Vertex, shared + source("ribbon.vert"))
@@ -131,7 +152,7 @@ private:
     float elapsed = 12;
     float lightMix = 0;
     int frames = 0;
-    bool attempted = false, ready = false;
+    bool attempted = false, ready = false, openGLES = false;
 };
 
 QQuickFramebufferObject::Renderer *RibbonScene::createRenderer() const {

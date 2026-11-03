@@ -91,6 +91,11 @@ for explicitly retiring old test VMs.
 
 ## Build the OS
 
+For development directly on a Linux PC or inside the macOS VM, see
+[Linux development](docs/linux-development.md). Both architectures provide
+`nix develop`, desktop previews, and native flake checks; no Mac host or SSH
+bridge is needed when commands already run inside Linux.
+
 On ARM Linux, including the development VM:
 
 ```sh

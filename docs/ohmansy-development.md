@@ -2,7 +2,9 @@
 
 The root flake defines the official system. The ignored `flakey/` checkout is
 reference material only. Its old personal VM has been deleted. Use the official
-development guest or ARM CI for builds; personal configuration is not a product input.
+development guest, a native Linux PC, or matching CI runner for builds; personal
+configuration is not a product input. For a coding agent or terminal running
+directly on Linux, start with [Linux development](linux-development.md).
 
 ## Clean local artifacts
 
@@ -54,7 +56,9 @@ Without mise, use `python3 tools/dev/clean.py` with the same arguments.
 | `packages.aarch64-linux.vm-image` (default) | Compressed raw UEFI factory disk |
 | `packages.aarch64-linux.iso` | Disposable live desktop without an installer |
 | `packages.aarch64-linux.installer-iso` | Experimental whole-disk installer |
-| `devShells.aarch64-linux.default` | Git, Nix tools, Python, and Niri |
+| `devShells.{aarch64,x86_64}-linux.default` | Git, Nix tools, Python, ripgrep, and Niri |
+| `packages.{aarch64,x86_64}-linux.desktop-shell` / `wallpaper` | Desktop wrappers for local iteration |
+| `packages.{aarch64,x86_64}-linux.greeter-preview` / `first-boot-preview` | Safe graphical previews |
 
 PC live images are separate from the ARM VM and installer:
 
@@ -67,8 +71,16 @@ The NVIDIA image uses the open kernel module and matching proprietary
 userspace driver from locked Nixpkgs. The RTX 3060 Ti is in this supported
 hardware generation. Physical GPU operation still requires a boot test;
 configuration checks and an ISO build do not prove that it works on a PC.
-Neither PC image imports the VM clipboard service, fixed display scale, or
+Neither PC image imports the VM clipboard service, 200% VM scale, or
 software-cursor setting. Both use the same desktop and software modules as the VM.
+The PC live profile defaults to dark mode through an unlocked dconf database.
+Its `ohmansy-live-scale` user service sets all connected displays to 125% once
+at session startup through Niri IPC, before the panel and wallpaper start.
+The bar can still switch to light mode. Display scale can be changed for the
+session with `niri msg output DP-1 scale 1.5` (use names from `niri msg outputs`).
+Displays attached later retain Niri's automatic scale; rerun
+`systemctl --user restart ohmansy-live-scale.service` to set all to 125% again.
+These defaults belong to the PC live image and do not alter installed users or VM scaling.
 
 On an x86-64 Linux builder:
 
@@ -112,7 +124,7 @@ through standard input. Passwords are not stored in Nix source or command argume
 Setup resumes a pending account after interruption. The owner has
 password-protected sudo. Boot status messages stay out of the setup screen.
 
-Use `nix run .#first-boot-preview` on ARM Linux for a standalone visual preview
+Use `nix run .#first-boot-preview` on either Linux architecture for a standalone visual preview
 that does not create accounts. `PREVIEW_PAGE` selects `welcome`, `identity`,
 `password`, or `done`; `PREVIEW_WIDTH` and `PREVIEW_HEIGHT` set its size.
 

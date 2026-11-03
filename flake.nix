@@ -23,11 +23,27 @@
       pcPkgs = nixpkgs.legacyPackages.${pcSystem};
       pcLive = nixpkgs.lib.nixosSystem {
         system = pcSystem;
-        modules = [ ./nix/profiles/live.nix ];
+        modules = [ ./nix/profiles/live-pc.nix ];
       };
       pcNvidia = nixpkgs.lib.nixosSystem {
         system = pcSystem;
         modules = [ ./nix/profiles/live-nvidia.nix ];
+      };
+      desktopPackages = pkgs: {
+        desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
+        wallpaper = import ./nix/modules/wallpaper-package.nix { inherit pkgs; };
+        greeter-preview = pkgs.writeShellScriptBin "ohmansy-greeter-preview" ''
+          preview=preview.qml
+          if [ "''${PREVIEW_FULLSCREEN:-0}" = 1 ]; then
+            preview=preview-fullscreen.qml
+          fi
+          exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
+            --path ${./nix/modules/greeter}/"$preview" "$@"
+        '';
+        first-boot-preview = pkgs.writeShellScriptBin "ohmansy-first-boot-preview" ''
+          exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
+            --path ${./nix/modules}/first-boot/preview.qml "$@"
+        '';
       };
       rejectsDevelopment = base: extra:
         let candidate = base.extendModules { modules = [ extra ]; };
@@ -45,12 +61,13 @@
       nixosConfigurations.installer = installer;
       nixosConfigurations.live-x86_64 = pcLive;
       nixosConfigurations.live-nvidia-x86_64 = pcNvidia;
-      packages.${pcSystem} = {
+      packages.${pcSystem} = desktopPackages pcPkgs // {
         iso = pcLive.config.system.build.isoImage;
         iso-nvidia = pcNvidia.config.system.build.isoImage;
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        ribbons = import ./nix/tests/ribbons.nix { pkgs = pcPkgs; };
         live-pc-policy = import ./nix/tests/live-pc.nix {
           inherit nixpkgs pcLive pcNvidia;
           pkgs = pcPkgs;
@@ -61,27 +78,15 @@
           system = pcSystem;
         };
       };
-      packages.${system} = {
+      packages.${system} = desktopPackages pkgs // {
         installation = import ./nix/modules/installation-package.nix { inherit pkgs; };
-        desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
-        greeter-preview = pkgs.writeShellScriptBin "ohmansy-greeter-preview" ''
-          preview=preview.qml
-          if [ "''${PREVIEW_FULLSCREEN:-0}" = 1 ]; then
-            preview=preview-fullscreen.qml
-          fi
-          exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
-            --path ${./nix/modules/greeter}/"$preview" "$@"
-        '';
-        first-boot-preview = pkgs.writeShellScriptBin "ohmansy-first-boot-preview" ''
-          exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
-            --path ${./nix/modules}/first-boot/preview.qml "$@"
-        '';
         vm-image = appliance.config.system.build.image;
         iso = live.config.system.build.isoImage;
         installer-iso = installer.config.system.build.isoImage;
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        ribbons = import ./nix/tests/ribbons.nix { inherit pkgs; };
         development-module = import ./nix/tests/development.nix { inherit nixpkgs pkgs system; };
         customization = import ./nix/tests/customization.nix { inherit nixpkgs pkgs system; };
         greeter-auth = pkgs.runCommand "ohmansy-greeter-auth" {
@@ -146,11 +151,10 @@
           assert !(builtins.hasAttr "hmans" live.config.users.users);
           pkgs.runCommand "ohmansy-live-policy" { } ''touch "$out"'';
       };
-      devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [ git nixfmt nil statix python3 niri ];
-        shellHook = ''
-          echo "Ohmansy: nix flake check | nix build .#vm-image"
-        '';
-      };
+      devShells = nixpkgs.lib.genAttrs [ system pcSystem ] (target:
+        let tools = nixpkgs.legacyPackages.${target};
+        in { default = tools.mkShell {
+          packages = with tools; [ git nixfmt nil statix python3 niri ripgrep ];
+        }; });
     };
 }

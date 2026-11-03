@@ -211,11 +211,19 @@ The initial pose was visually compared with an offscreen render of the original
 Metal shader at the same aspect ratio and animation time. This is a visual
 match, not a claim of bit-identical results across the two graphics APIs.
 
-The plugin requires desktop OpenGL 3.3 or later; non-OpenGL backends and plugin
+The plugin supports desktop OpenGL 3.3+ and OpenGL ES 3.0+; non-OpenGL backends and plugin
 initialization failures use the static background. The render texture is capped
 at 2400 pixels wide. Glass controls sample the background independently and stay
 at native resolution. See the [login-screen development
 guide](ohmansy-development.md#login-screen) for preview and diagnostic controls.
+
+The first NVIDIA live USB test selected OpenGL ES 3.2. The original desktop-only
+function loader failed before shader compilation, which caused the static cat
+wallpaper fallback. The renderer now uses portable Qt GL functions and selects
+GLSL 330 core or GLSL 300 ES for the actual context. The `ribbons` flake check
+renders dark, light, and animated frames through both APIs with Mesa software
+rendering and checks for GL errors. Both passed on ARM Linux on 2026-11-03;
+the updated renderer still needs a physical NVIDIA test.
 
 ### Earlier Qt Quick 3D prototype
 

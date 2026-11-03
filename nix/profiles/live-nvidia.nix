@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 {
-  imports = [ ./live.nix ];
+  imports = [ ./live-pc.nix ];
   image.baseName = lib.mkForce "ohmansy-0.1.0-live-nvidia-${pkgs.stdenv.hostPlatform.system}";
 
   # NVIDIA's open kernel module supports Turing and newer GPUs, including

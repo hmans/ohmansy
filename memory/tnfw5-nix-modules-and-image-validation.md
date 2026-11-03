@@ -35,8 +35,7 @@ Do not update the lock file or state versions as a side effect of another task.
 Do not add personal services, private keys, preset installed-user passwords,
 or development SSH access to the live image.
 
-Validate with `nix flake check --no-update-lock-file` on ARM Linux, then build
-`nix build --no-update-lock-file .#vm-image`. Building an image does not prove it boots:
+Validate with `nix flake check --no-update-lock-file` on the native Linux architecture. Build `.#vm-image` on ARM or `.#iso-nvidia` / `.#iso` on x86-64 when an image is needed. Building an image does not prove it boots:
 test it in a disposable VM and record what was observed.
 
 The live account intentionally has local passwordless sudo and autologin.
@@ -381,3 +380,7 @@ after desktop.kdl. The niri-config check now requires that include and ordering
 for every image profile. The check, installed system build, and live validation
 passed; a guest screenshot confirmed dark slate light-mode borders, with a
 stronger active rim and softer inactive rim.
+
+Portable ribbons (2026-11-03): physical NVIDIA live-USB logs showed OpenGL ES 3.2 with hardware rendering. The original QOpenGLFunctions_3_3_Core initialization failed before shader compilation, producing empty shader logs and the static fallback. RibbonScene now uses QOpenGLExtraFunctions, context-specific GLSL headers, glClearDepthf, and guards desktop-only FRAMEBUFFER_SRGB state. Shared shader bodies are unchanged. The ribbons flake check renders through desktop GL and ES in an isolated Xvfb display with llvmpipe, checking context type, dark/light frames, motion, and GL errors. Both passed on ARM Linux; NVIDIA runtime validation and a new ISO remain pending.
+
+PC live defaults (2026-11-03): profiles/live-pc.nix composes the generic live image; both x86 ISO variants import it. An unlocked dconf user-profile database defaults color-scheme to prefer-dark. The oneshot ohmansy-live-scale user service follows niri.service and precedes panel/wallpaper startup; it discovers output names through Niri IPC and sets all connected displays to 1.25. Niri 26.04 has no wildcard output matching. Later hotplugged displays retain automatic scaling unless the helper is restarted. Installed defaults and ARM VM 2x scaling are unchanged. All-system evaluation passed. The PC policy check was executed with native ARM packages: Niri configs, scale-script syntax, and real dconf dark default, light override, and reset passed. No new ISO or physical PC boot yet.

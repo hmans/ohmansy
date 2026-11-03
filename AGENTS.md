@@ -1,6 +1,6 @@
-# try ohmansy
+# Ohmansy and try ohmansy
 
-Native macOS host for the independent Ohmansy NixOS desktop.
+Independent NixOS desktop, plus its native macOS host.
 Use `apply_patch`, simple English, and Conventional Commits. Do not spawn agents
 or push unless asked. Preserve unrelated changes.
 
@@ -12,6 +12,10 @@ or push unless asked. Preserve unrelated changes.
    area guides. Without Means, read the Markdown files directly.
 3. Read ignored `.local/SESSION.md` if present. Verify live state before acting;
    local notes are not proof that a process, endpoint, or artifact still exists.
+   Identify the current OS, architecture, and whether this is a Mac host,
+   installed Linux system, or disposable live ISO. On Linux, start with
+   [Linux development](docs/linux-development.md). Never assume a Mac path,
+   SSH endpoint, or local handoff file exists on another machine.
 4. Run checks appropriate to the change. Update relevant memory and local handoff
    notes, then report what was verified. Distinguish built, booted, and running.
 
@@ -22,13 +26,18 @@ or push unless asked. Preserve unrelated changes.
 - Keep credentials, VM state, generated bundles, and personal configuration out
   of Git. Keep accounts and disk identities out of reusable desktop modules.
 - Never expose the host home directory to the guest.
-- Use SSH or another explicit non-UI channel for guest commands and transfers.
+- Run commands directly when the agent is inside the target Linux system.
+  From another machine, use SSH or another explicit non-UI channel for commands
+  and transfers. A local Linux agent does not need the SSH development bridge.
   Never type or paste commands into terminal windows through computer use.
   Never request passwords in chat.
 - Do not overwrite a running app bundle. Use clean shutdown; force stop is a
   power cut. Preserve installed guest users, storage, and state versions.
 - The stopped launcher must not capture Mac shortcuts. Preserve the single
   window and explicit input-lock behavior; read app memory before changing it.
+- Live USB homes are temporary. Save work to persistent storage or an authorized
+  Git remote before shutdown. Never activate a factory/live profile on an
+  installed system; retain its machine configuration and release pin.
 
 Detailed architecture, commands, troubleshooting, and verification live in
 [Means memory](memory/MEANS.md). Keep this file short.
