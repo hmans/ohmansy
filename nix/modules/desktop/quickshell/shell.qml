@@ -10,14 +10,16 @@ ShellRoot {
     id: root
     // Use the same portal-backed Qt preference as the desktop palette.
     readonly property bool darkTheme: Qt.styleHints.colorScheme === Qt.ColorScheme.Dark
-    onDarkThemeChanged: terminalTheme.restart()
-    Component.onCompleted: terminalTheme.restart()
+    onDarkThemeChanged: desktopTheme.restart()
+    Component.onCompleted: desktopTheme.restart()
     Timer {
-        id: terminalTheme
+        id: desktopTheme
         interval: 50
-        onTriggered: Quickshell.execDetached([
-            Quickshell.env("OHMANSY_TERMINAL_THEME"), root.darkTheme ? "dark" : "light"
-        ])
+        onTriggered: {
+            const mode = root.darkTheme ? "dark" : "light";
+            Quickshell.execDetached([Quickshell.env("OHMANSY_TERMINAL_THEME"), mode]);
+            Quickshell.execDetached([Quickshell.env("OHMANSY_NIRI_THEME"), mode]);
+        }
     }
     property string launcherScreen: ""
     property string launcherMode: "apps"

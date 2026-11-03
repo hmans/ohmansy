@@ -5,8 +5,8 @@ void main() {
     float aspect = size.x / size.y;
     float t = time;
     vec2 p = (uv - 0.5) * vec2(aspect, 1);
-    vec3 top = mix(vec3(0.065, 0.077, 0.12), vec3(0.93, 0.94, 0.97), lightMix);
-    vec3 bottom = mix(vec3(0.12, 0.15, 0.20), vec3(0.82, 0.86, 0.93), lightMix);
+    vec3 top = mix(vec3(0.065, 0.077, 0.12), vec3(0.80, 0.83, 0.89), lightMix);
+    vec3 bottom = mix(vec3(0.12, 0.15, 0.20), vec3(0.70, 0.76, 0.85), lightMix);
     vec3 color = mix(top, bottom, uv.y);
     float haze = noise(vec2(uv.x * 2.3 + t * 0.018, uv.y * 1.7 - t * 0.012));
     color += haze * mix(vec3(0.025, 0.035, 0.06), vec3(0.02, 0.015, 0.025), lightMix);

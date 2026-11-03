@@ -92,8 +92,19 @@ to every bar. Supporting applications, shell surfaces, and Foot update live.
 The speaker icon toggles mute; scrolling over it or using the inline slider
 adjusts volume. Neither control opens a popup. Device selection remains under
 Desktop Controls → Sound. The date has no hover tooltip.
-The transparent bar uses the `onWallpaper` palette: white text and icons with
-light hover feedback in both desktop modes. Menus retain the system palette.
+The transparent bar uses the `onWallpaper` palette: its text and icons fade with
+the animated wallpaper between light and dark modes. Menus retain the system palette.
+`Ui.Appearance` supplies the shared 150 ms InOutCubic transition. The desktop
+ribbons use muted blue-gray light backgrounds, advance at 15% of the original
+launcher speed, and target 15 FPS. During appearance transitions they briefly
+target 60 FPS. The login scene keeps its separate 30 FPS and 60% motion defaults.
+
+Window outlines follow the same appearance preference. Quickshell writes the
+selected `desktop/niri-light.kdl` or `desktop/niri-dark.kdl` palette atomically to
+`~/.local/state/ohmansy/niri-appearance.kdl`. The system Niri configuration includes
+that file optionally and reloads when it changes. Light mode uses dark slate
+outlines; dark mode uses pale translucent outlines. Custom Niri configurations
+must include the generated file to use this integration.
 
 The menu bar uses GlassSurface with no sheen and a half-point rim. The shared
 surface exposes tint and sheen independently of its default button styling.

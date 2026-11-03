@@ -65,6 +65,7 @@ in {
   };
   environment.etc."ohmansy/niri.kdl".text = ''
     include "/etc/ohmansy/desktop.kdl"
+    include optional=true "~/.local/state/ohmansy/niri-appearance.kdl"
   '';
   environment.etc."ohmansy/desktop.kdl".text =
     builtins.readFile ./desktop/niri.kdl

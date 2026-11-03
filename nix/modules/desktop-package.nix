@@ -26,6 +26,23 @@ let
     [ "$status" -eq 1 ] && exit 0
     exit "$status"
   '';
+  syncNiriTheme = pkgs.writeShellScript "ohmansy-niri-theme" ''
+    set -eu
+    case "$1" in
+      dark) palette=${./desktop/niri-dark.kdl} ;;
+      light) palette=${./desktop/niri-light.kdl} ;;
+      *) exit 2 ;;
+    esac
+    # Niri's home-relative include uses this fixed path, independent of XDG vars.
+    directory="$HOME/.local/state/ohmansy"
+    target="$directory/niri-appearance.kdl"
+    ${pkgs.coreutils}/bin/mkdir -p "$directory"
+    if ${pkgs.diffutils}/bin/cmp -s "$palette" "$target"; then exit 0; fi
+    temporary=$(${pkgs.coreutils}/bin/mktemp "$directory/.niri-appearance.XXXXXX")
+    trap '${pkgs.coreutils}/bin/rm -f "$temporary"' EXIT
+    ${pkgs.coreutils}/bin/cp "$palette" "$temporary"
+    ${pkgs.coreutils}/bin/mv -f "$temporary" "$target"
+  '';
   launchApp = pkgs.writeShellScript "ohmansy-launch-app" ''
     # Applications must not inherit QProcess pipes which close when gtk-launch
     # exits. Journal streams survive the launcher and retain application errors.
@@ -38,6 +55,7 @@ in pkgs.writeShellScriptBin "ohmansy-quickshell" ''
   export QML_IMPORT_PATH="${ui}/lib/qt-6/qml''${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
   export OHMANSY_APP_LAUNCHER="${launchApp}"
   export OHMANSY_TERMINAL_THEME="${syncTerminalTheme}"
+  export OHMANSY_NIRI_THEME="${syncNiriTheme}"
   export OHMANSY_APPEARANCE="${appearance}"
   export OHMANSY_DESKTOP="${desktop}/bin/ohmansy-desktop"
   export PATH="${pkgs.xdg-terminal-exec}/bin:$PATH"

@@ -53,6 +53,9 @@ ShellRoot {
                 active: GraphicsInfo.api === GraphicsInfo.OpenGL && !ribbonFailure && !wallpaper.imageOverride
                 source: active ? "Ribbons.qml" : ""
                 onLoaded: {
+                    item.motionSpeed = 0.15;
+                    // About 15 fps at rest; keep the short appearance fade smooth.
+                    item.frameInterval = Qt.binding(() => Ui.Appearance.transitioning ? 16 : 66);
                     item.targetLightMix = Qt.binding(() => Ui.Appearance.lightMix);
                     item.lightMix = Ui.Appearance.lightMix;
                 }
