@@ -47,7 +47,16 @@ impl Desktop {
         &self.monitors[self.active_monitor]
     }
 
+    #[cfg(test)]
     pub fn sync(&mut self, mut specs: Vec<(String, (i32, i32), f64)>) {
+        self.sync_primary(std::mem::take(&mut specs), None);
+    }
+
+    pub fn sync_primary(
+        &mut self,
+        mut specs: Vec<(String, (i32, i32), f64)>,
+        primary: Option<&str>,
+    ) {
         if specs.is_empty() {
             return;
         }
@@ -82,6 +91,11 @@ impl Desktop {
             .monitors
             .iter()
             .position(|m| m.name == active_name)
+            .or_else(|| {
+                self.monitors
+                    .iter()
+                    .position(|m| Some(m.name.as_str()) == primary)
+            })
             .unwrap_or(0);
         // Unplugging a display never destroys its windows or column widths.
         for removed in old {
@@ -232,7 +246,10 @@ impl Desktop {
         let mut left = 0;
         for m in &self.monitors {
             if x < (left + m.physical_size.0) as f64 {
-                return self.clamp(m.origin.0 as f64 + (x - left as f64) / m.scale, y / m.scale);
+                return self.clamp(
+                    m.origin.0 as f64 + (x - left as f64) / m.scale,
+                    m.origin.1 as f64 + y / m.scale,
+                );
             }
             left += m.physical_size.0;
         }

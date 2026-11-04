@@ -331,8 +331,8 @@ connector (`video=Virtual-2:1280x800@60e`) in the test guest only.
 The user subsequently confirmed successful operation on physical monitors
 (2026-11-04). Both displays work; automatic connector ordering does not match
 their physical arrangement. The agent performed no installed OS activation or
-reboot. Multi-GPU rendering, saved monitor positioning/rotation, and native
-framebuffer screenshots remain unsupported. See the session guide for commands.
+reboot. Saved monitor configuration is implemented in the output-settings update below.
+Multi-GPU rendering, rotation, and native framebuffer screenshots remain unsupported. See the session guide for commands.
 
 The stronger native VM test also passed real libinput keyboard input,
 Super+period monitor focus, Ctrl+Alt+F2, and page flips after returning to VT1.
@@ -381,3 +381,86 @@ activation environment preservation. This tests the wrapper in a VM and nested
 preview; no installed OS activation or live session restart was performed.
 Autologin still cannot unlock an encrypted keyring without its password; the
 fix makes normal prompts available on the correct display.
+
+## Shine output settings (2026-11-04)
+
+`output_config.rs` defines strict TOML rules in `$XDG_CONFIG_HOME/shine/config.toml`
+(default `~/.config/shine/config.toml`); `--config PATH` isolates development runs.
+`output_control.rs` validates live IPC patches and file reloads. Supported rules
+are name, optional stable ID, logical position, scale, primary, and optional
+WIDTHxHEIGHT@HZ mode. EDID base-block checksums and serial descriptors/numbers
+supply portable IDs; absent/invalid/duplicated identities fall back to connector
+IDs. Save snapshots connected geometry while preserving disconnected rules.
+
+The CLI supports output position/layout/scale/mode/primary/reset and config
+save/reload. File edits are polled every 250 ms. Invalid schema, unsupported modes,
+overlapping rectangles and disconnected pointer regions retain the last working
+settings. Saves are atomic, reject managed symlinks and un-reloaded external
+edits, and wait for a pending mode change. Hotplug may temporarily pack survivors
+in saved spatial order when a missing monitor creates a gap. Original preferences
+return on reconnect; migrated windows stay on the surviving monitor. The primary
+selects startup focus and unplug fallback, without stealing existing focus.
+
+Seventeen Rust tests and strict Clippy passed. The expanded two-output nested
+trial passed atomic swaps, negative/vertical arrangements, primary, mixed scales,
+physical pointer anchoring, save/reload, invalid-edit recovery, preservation of
+disconnected rules, window identities and restart persistence. Real nested key
+forwarding and packaged session/activation isolation checks also passed; the
+Firefox/GTK/cursor/clipboard integration still passed.
+
+The real-session DRM VM check passed live 1024x768 mode selection, saved reversed
+positions/primary, virtual connector unplug/reconnect with both client identities
+preserved, and a subsequent VT round trip. Linux sysfs connector force changes
+do not emit their own hotplug event; the VM also emits a card change uevent.
+That sequence exposed a VT race: the kernel may revoke DRM ownership before the
+libseat pause callback. The timer now yields after a successful VT request and
+retries transient inactive/permission failures rather than ending the session.
+No physical compositor ownership, OS activation, or live desktop restart was
+performed during implementation. A prepared personal configuration will take
+effect after installing the updated compositor; later file edits apply live.
+See [the compositor guide](../docs/compositor-development.md#monitor-configuration).
+
+## Shine general TOML preferences (2026-11-04)
+
+`preferences.rs` extends the same configuration with optional input.keyboard
+(layout/variant/options), input.touchpad (tap/natural_scroll), layout (gap and
+default_column_width), bindings, window_rules and animations. The complete
+`nix/compositor/config.example.toml` is parsed by a unit test. Widths use either
+pixels or proportion; window rules match exact app_id, with the last match
+winning. Initial rule widths are applied before the initial xdg configure when
+metadata is available, then left alone so manual widths survive reloads.
+
+Custom bindings override the default chord, and action=none removes a default.
+Mod expands to Super or Super+Alt for the running shortcut profile; exact
+modifiers preserve nested forwarding. Typed actions validate required fields and
+numeric ranges, launch argv directly, and reserve Ctrl+Alt+F1–F12 for native VT
+switches. Intercepted releases are tracked across reloads. Keyboard changes are
+compiled and broadcast to clients before preferences commit; invalid keymaps
+retain the working configuration. Native libinput applies touchpad options on
+reload and device arrival; missing options restore device defaults. Nested
+previews leave physical host touchpads alone.
+
+Scrolling uses cubic easing with an explicit duration; disabled/zero-duration
+animations snap. Gap and animation edits apply to existing layouts, while
+column-width defaults affect new windows. `ohmansy-compositor validate PATH`
+checks a file without a Wayland session; connected output modes/geometry are
+still checked on application. Status exposes effective preferences and native
+input device settings. Output saves now use toml_edit to preserve comments,
+unchanged output values and all handwritten preference sections.
+
+Twenty-one Rust tests, strict Clippy and formatting passed. The new real-client
+preference trial verified custom/disabled shortcuts, last-match app widths,
+manual-width preservation, US/German keymap reload using data-only terminal
+capture clients, layout/default-width updates, disabled animations, preserved
+comments on save and bad-keymap recovery. Firefox/GTK/cursor/clipboard, saved
+outputs/restart, real nested key forwarding and packaged session isolation tests
+also passed. The DRM VM used a guest-only uinput touchpad to verify tap/natural
+scroll on/off/reload, plus a real custom shortcut and app rule; existing mode,
+hotplug, keyring, VT and logout checks passed. No installed OS activation or
+physical input changes were performed. Existing personal output-only files remain
+compatible; install the new build before adding these sections.
+
+A long-lived agent can retain a dead Niri IPC path after login even while its
+Wayland socket belongs to Shine. The test helper now falls back, after Niri IPC
+fails, to a unique live Shine control socket matching the inherited Wayland
+display. It never assumes the desktop label alone identifies the active server.

@@ -1,0 +1,46 @@
+# Adapt connector names and logical positions to your monitors.
+[[outputs]]
+name = "DP-2"
+position = [0, 0]
+scale = 1.25
+
+[[outputs]]
+name = "DP-1"
+position = [2048, 0]
+scale = 1.25
+primary = true
+
+[input.keyboard]
+layout = "us"
+
+[input.touchpad]
+tap = true
+natural_scroll = true
+
+[layout]
+gap = 12
+default_column_width = { proportion = 0.62 }
+
+# Mod is Super in a login and Super+Alt in a nested preview.
+# Omitted bindings keep their defaults. Use action="none" to remove one.
+[bindings]
+"Mod+Return" = { action = "terminal" }
+"Mod+D" = { action = "launcher" }
+"Mod+Left" = { action = "focus-prev" }
+"Mod+Right" = { action = "focus-next" }
+"Mod+Shift+Right" = { action = "move-next" }
+"Mod+1" = { action = "workspace", value = 1 }
+"Mod+F" = { action = "fullscreen" }
+
+# Exact app_id matches. Last matching rule wins. Defaults affect new windows.
+[[window_rules]]
+match = { app_id = "firefox" }
+default_column_width = { proportion = 0.75 }
+
+[[window_rules]]
+match = { app_id = "org.gnome.TextEditor" }
+default_column_width = { pixels = 900 }
+
+[animations]
+enabled = true
+duration_ms = 180

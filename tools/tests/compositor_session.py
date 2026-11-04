@@ -32,7 +32,7 @@ def run():
     control = trial.Control(artifacts / 'control.sock')
     trial.TEST_CONTROL = control
     command = [str(args.session), '--nested']
-    command += ['--test-input', '--control-socket', control.path, '--close-after', '60', '--report', str(artifacts / 'state.json')]
+    command += ['--test-input', '--config', str(artifacts / 'config.toml'), '--control-socket', control.path, '--close-after', '60', '--report', str(artifacts / 'state.json')]
     environment = os.environ.copy()
     environment['XDG_CACHE_HOME'] = str(artifacts / 'cache')
     shortcut = ('super', 'alt')

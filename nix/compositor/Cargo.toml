@@ -9,6 +9,9 @@ publish = false
 anyhow = "1.0"
 image = { version = "0.25.8", default-features = false, features = ["png"] }
 serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+toml_edit = "0.22"
 bitflags = "2.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 smithay = { version = "=0.7.0", default-features = false, features = ["backend_winit", "wayland_frontend", "desktop", "backend_drm", "backend_gbm", "backend_libinput", "backend_udev", "backend_session_libseat"] }

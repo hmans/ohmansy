@@ -256,6 +256,12 @@ impl Smallvil {
         }
     }
     pub fn maintain_scene(&mut self) {
+        self.poll_output_config();
+        let before = self.window_preferences_applied.len();
+        self.apply_window_preferences();
+        if self.window_preferences_applied.len() != before {
+            self.apply_positions();
+        }
         if self.windows.values().any(|w| !w.alive()) {
             self.relayout();
             self.sync_focus();

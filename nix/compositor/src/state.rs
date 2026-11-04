@@ -36,6 +36,18 @@ pub struct Smallvil {
     pub ui_scale: f64,
     pub windows: BTreeMap<WindowId, Window>,
     pub layout: Desktop,
+    pub output_info: BTreeMap<String, crate::output_config::OutputInfo>,
+    pub output_settings: crate::output_config::Settings,
+    pub config_file: Option<crate::output_config::ConfigFile>,
+    pub config_error: Option<String>,
+    pub layout_warning: Option<String>,
+    pub config_revision: u64,
+    pub config_poll: std::time::Instant,
+    pub default_output_scale: f64,
+    pub configured_bindings: Vec<(crate::preferences::Chord, crate::preferences::Action)>,
+    pub applied_keyboard: crate::preferences::Keyboard,
+    pub window_preferences_applied: std::collections::BTreeSet<WindowId>,
+    pub input_devices: Vec<serde_json::Value>,
     pub nested_canvas_size: Option<(i32, i32)>,
     pub virtual_outputs: usize,
     pub native_mode: bool,
@@ -133,6 +145,18 @@ impl Smallvil {
             ui_scale: 1.25,
             windows: BTreeMap::new(),
             layout: Desktop::default(),
+            output_info: BTreeMap::new(),
+            output_settings: Default::default(),
+            config_file: None,
+            config_error: None,
+            layout_warning: None,
+            config_revision: 0,
+            config_poll: std::time::Instant::now(),
+            default_output_scale: 1.25,
+            configured_bindings: Vec::new(),
+            applied_keyboard: Default::default(),
+            window_preferences_applied: Default::default(),
+            input_devices: Vec::new(),
             nested_canvas_size: None,
             virtual_outputs: 1,
             native_mode: false,
@@ -268,21 +292,34 @@ impl Smallvil {
         if outputs.is_empty() {
             return;
         }
-        let active_name = self.layout.current().name.clone();
         for output in &outputs {
-            if output.name() == active_name
-                && output.current_scale().fractional_scale() != self.ui_scale
+            if self
+                .output_info
+                .get(&output.name())
+                .is_none_or(|info| !info.adjustable_mode)
             {
-                output.change_current_state(
-                    None,
-                    None,
-                    Some(smithay::output::Scale::Custom {
-                        advertised_integer: 2,
-                        fractional: self.ui_scale,
-                    }),
-                    None,
+                let mode = output.current_mode().unwrap();
+                self.output_info.insert(
+                    output.name(),
+                    crate::output_config::OutputInfo::virtual_output(
+                        output.name(),
+                        (mode.size.w, mode.size.h),
+                    ),
                 );
             }
+        }
+        let placements = self.output_placements(&outputs);
+        for placement in &placements {
+            let output = outputs.iter().find(|o| o.name() == placement.name).unwrap();
+            output.change_current_state(
+                None,
+                None,
+                Some(smithay::output::Scale::Custom {
+                    advertised_integer: 2,
+                    fractional: placement.scale,
+                }),
+                None,
+            );
         }
         let dead: Vec<_> = self
             .windows
@@ -293,6 +330,7 @@ impl Smallvil {
             self.layout.remove(id);
             self.windows.remove(&id);
             self.configured.remove(&id);
+            self.window_preferences_applied.remove(&id);
         }
         let specs = outputs
             .iter()
@@ -306,7 +344,16 @@ impl Smallvil {
                 })
             })
             .collect();
-        self.layout.sync(specs);
+        let primary = self.primary_output();
+        self.layout.sync_primary(specs, primary.as_deref());
+        for monitor in &mut self.layout.monitors {
+            monitor.origin = placements
+                .iter()
+                .find(|p| p.name == monitor.name)
+                .unwrap()
+                .origin;
+        }
+        self.apply_layout_preferences();
         for monitor in &self.layout.monitors {
             if let Some(output) = outputs.iter().find(|o| o.name() == monitor.name) {
                 let origin = monitor.origin.into();
@@ -367,6 +414,7 @@ impl Smallvil {
     }
 
     pub fn apply_positions(&mut self) {
+        self.apply_window_preferences();
         use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel::State;
         for (id, window) in &self.windows {
             let (min, max) = smithay::wayland::compositor::with_states(
@@ -514,7 +562,7 @@ impl Smallvil {
             }
             "vt" if self.native_mode => self.vt_request = value.map(|v| v as i32),
             "scale" => {
-                self.ui_scale = match value {
+                let scale = match value {
                     Some(percent) if (50..=200).contains(&percent) => percent as f64 / 100.0,
                     Some(_) => return Err("Scale must be 50 to 200 percent".into()),
                     None => {
@@ -525,7 +573,7 @@ impl Smallvil {
                         }
                     }
                 };
-                self.relayout();
+                return self.output_request("configure-outputs",&serde_json::json!({"outputs":[{"name":self.layout.current().name,"scale":scale}]}));
             }
             "terminal" => {
                 if self.session_mode {
@@ -597,8 +645,12 @@ impl Smallvil {
             .seat
             .get_keyboard()
             .map(|keyboard| keyboard.modifier_state());
-        let outputs: Vec<_> = self.layout.monitors.iter().enumerate().map(|(i,m)| serde_json::json!({"name":m.name,"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"scale":m.scale,"workspace":m.layout.active+1,"focused":i==self.layout.active_monitor})).collect();
-        serde_json::json!({"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+        let outputs: Vec<_> = self.layout.monitors.iter().enumerate().filter(|(_,m)|self.space.outputs().any(|o|o.name()==m.name)).map(|(i,m)| {
+            let info=self.output_info.get(&m.name);
+            let mode=self.space.outputs().find(|o|o.name()==m.name).and_then(|o|o.current_mode());
+            serde_json::json!({"name":m.name,"id":info.map(|i|&i.id),"make":info.map(|i|&i.make),"model":info.map(|i|&i.model),"modes":info.map(|i|&i.modes),"mode":mode.map(|m|serde_json::json!({"width":m.size.w,"height":m.size.h,"refresh":m.refresh})),"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"scale":m.scale,"workspace":m.layout.active+1,"primary":self.primary_output().as_deref()==Some(&m.name),"focused":i==self.layout.active_monitor})
+        }).collect();
+        serde_json::json!({"preferences":{"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }
 }
 

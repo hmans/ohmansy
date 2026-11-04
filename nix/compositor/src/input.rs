@@ -43,6 +43,7 @@ impl ShortcutModifier {
         }
     }
 
+    #[cfg(test)]
     fn matches(self, modifiers: &smithay::input::keyboard::ModifiersState) -> bool {
         modifiers.logo && !modifiers.ctrl && modifiers.alt == (self == Self::SuperAlt)
     }
@@ -119,119 +120,74 @@ impl Smallvil {
         key_state: smithay::backend::input::KeyState,
         time: u32,
     ) {
+        enum KeyAction {
+            Binding(crate::preferences::Action),
+            Vt(i32),
+            Consumed,
+        }
         self.needs_redraw = true;
         let serial = SERIAL_COUNTER.next_serial();
-
         let pressed = key_state == smithay::backend::input::KeyState::Pressed;
         let code = keycode.raw();
-        let action = self
-            .seat
-            .get_keyboard()
-            .unwrap()
-            .input::<(&str, Option<i64>), _>(
-                self,
-                keycode,
-                key_state,
-                serial,
-                time,
-                |state, modifiers, key| {
-                    if !pressed && state.shortcut_keys.remove(&code) {
-                        return FilterResult::Intercept(("none", None));
-                    }
-                    if state.native_mode && modifiers.ctrl && modifiers.alt {
-                        let vt = match code {
-                            67..=76 => Some(code - 66),
-                            95 => Some(11),
-                            96 => Some(12),
-                            _ => None,
-                        };
-                        if let Some(vt) = vt {
-                            if pressed {
-                                state.shortcut_keys.insert(code);
-                            }
-                            return FilterResult::Intercept(("vt", Some(vt as i64)));
-                        }
-                    }
-                    // Exact Alt matching lets a Super host forward Super+Alt
-                    // shortcuts to a nested compositor. Shift is an action modifier.
-                    if !state.shortcut_modifier.matches(modifiers) {
-                        return FilterResult::Forward;
-                    }
-                    let sym = key.modified_sym().raw();
-                    let action = if (10..=13).contains(&code) {
-                        Some((
-                            if modifiers.shift {
-                                "move-workspace"
-                            } else {
-                                "workspace"
-                            },
-                            Some((code - 9) as i64),
-                        ))
-                    } else {
-                        match sym {
-                            0x68 | 0x48 | 0xff51 => Some((
-                                if modifiers.shift {
-                                    "move-prev"
-                                } else {
-                                    "focus-prev"
-                                },
-                                None,
-                            )),
-                            0x6c | 0x4c | 0xff53 => Some((
-                                if modifiers.shift {
-                                    "move-next"
-                                } else {
-                                    "focus-next"
-                                },
-                                None,
-                            )),
-                            0x2d | 0x5f => Some(("resize", Some(-80))),
-                            0x3d | 0x2b => Some(("resize", Some(80))),
-                            0x66 | 0x46 => Some(("fullscreen", None)),
-                            0x71 | 0x51 => Some(("close", None)),
-                            0x64 | 0x44 => Some(("launcher", None)),
-                            0x45 if modifiers.shift => Some(("logout", None)),
-                            0xff0d => Some(("terminal", None)),
-                            0x73 | 0x53 => Some(("scale", None)),
-                            0x2c | 0x3c => Some((
-                                if modifiers.shift {
-                                    "move-output-prev"
-                                } else {
-                                    "focus-output-prev"
-                                },
-                                None,
-                            )),
-                            0x2e | 0x3e => Some((
-                                if modifiers.shift {
-                                    "move-output-next"
-                                } else {
-                                    "focus-output-next"
-                                },
-                                None,
-                            )),
-                            _ => None,
-                        }
-                    };
-                    if let Some(action) = action {
-                        if pressed {
-                            state.shortcut_keys.insert(code);
-                        }
-                        FilterResult::Intercept(action)
+        let action = self.seat.get_keyboard().unwrap().input::<KeyAction, _>(
+            self,
+            keycode,
+            key_state,
+            serial,
+            time,
+            |state, modifiers, key| {
+                if !pressed {
+                    return if state.shortcut_keys.remove(&code) {
+                        FilterResult::Intercept(KeyAction::Consumed)
                     } else {
                         FilterResult::Forward
-                    }
-                },
-            );
-        if pressed {
-            if let Some((action, value)) = action {
-                if action != "none" {
-                    if let Err(error) = self.action(action, value) {
-                        eprintln!("Window action: {error}");
+                    };
+                }
+                if state.native_mode && modifiers.ctrl && modifiers.alt {
+                    let vt = match code {
+                        67..=76 => Some(code - 66),
+                        95 => Some(11),
+                        96 => Some(12),
+                        _ => None,
+                    };
+                    if let Some(vt) = vt {
+                        state.shortcut_keys.insert(code);
+                        return FilterResult::Intercept(KeyAction::Vt(vt as i32));
                     }
                 }
-            } else {
-                self.forwarded_keys += 1;
+                let modified = [key.modified_sym().raw()];
+                let mut raw: Vec<_> = key.raw_syms().iter().map(|s| s.raw()).collect();
+                if let Some(latin) = key.raw_latin_sym_or_raw_current_sym() {
+                    raw.push(latin.raw());
+                }
+                let binding = state
+                    .configured_bindings
+                    .iter()
+                    .find(|(c, _)| c.matches(modifiers, &modified))
+                    .or_else(|| {
+                        state
+                            .configured_bindings
+                            .iter()
+                            .find(|(c, _)| c.matches(modifiers, &raw))
+                    });
+                if let Some((_, action)) = binding {
+                    let action = action.clone();
+                    state.shortcut_keys.insert(code);
+                    FilterResult::Intercept(KeyAction::Binding(action))
+                } else {
+                    FilterResult::Forward
+                }
+            },
+        );
+        match action {
+            Some(KeyAction::Binding(action)) => {
+                if let Err(error) = action.execute(self) {
+                    eprintln!("Binding action: {error}");
+                }
             }
+            Some(KeyAction::Vt(vt)) => self.vt_request = Some(vt),
+            None if pressed => self.forwarded_keys += 1,
+            _ => (),
         }
     }
 
@@ -257,6 +213,20 @@ impl Smallvil {
                     self.process_motion(position.into(), event.time_msec());
                     return;
                 }
+                let left = self
+                    .layout
+                    .monitors
+                    .iter()
+                    .map(|m| m.origin.0)
+                    .min()
+                    .unwrap_or(0);
+                let top = self
+                    .layout
+                    .monitors
+                    .iter()
+                    .map(|m| m.origin.1)
+                    .min()
+                    .unwrap_or(0);
                 let width = self
                     .layout
                     .monitors
@@ -271,7 +241,8 @@ impl Smallvil {
                     .map(|m| m.origin.1 + m.layout.size.1)
                     .max()
                     .unwrap_or(1);
-                let position = event.position_transformed((width, height).into());
+                let position = event.position_transformed((width - left, height - top).into())
+                    + smithay::utils::Point::from((left, top)).to_f64();
                 let position = self.layout.clamp(position.x, position.y);
                 self.process_motion(position.into(), event.time_msec());
             }

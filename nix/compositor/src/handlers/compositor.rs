@@ -50,6 +50,9 @@ impl CompositorHandler for Smallvil {
             }
         };
 
+        if self.apply_window_preferences() {
+            self.apply_positions();
+        }
         xdg_shell::handle_commit(&mut self.popups, &self.space, surface);
         resize_grab::handle_commit(&mut self.space, surface);
     }

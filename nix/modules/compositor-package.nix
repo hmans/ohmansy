@@ -6,7 +6,7 @@ pkgs.rustPlatform.buildRustPackage {
   pname = "ohmansy-compositor";
   version = "0.1.0";
   src = pkgs.lib.cleanSource ../compositor;
-  cargoHash = "sha256-Htg5C/1/1ryNzi++WM0fwR8jZ2TZ4AwHQs6/w+6Tixw=";
+  cargoHash = "sha256-pDd7sc/msQWtla1pImiulWIozOxqK2T69Bk7XqHRw98=";
   nativeBuildInputs = [
     pkgs.pkg-config
     pkgs.makeWrapper

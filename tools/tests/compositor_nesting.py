@@ -19,6 +19,7 @@ def run():
     trial.TEST_CONTROL = parent
     with (artifacts / 'session.log').open('w') as log:
         process = subprocess.Popen([str(trial.BINARY), '--no-clients', '--test-input',
+            '--config', str(artifacts / 'parent-config.toml'),
             '--mod-key', 'super', '--control-socket', parent.path, '--close-after', '60'], stdout=log, stderr=log)
         try:
             trial.wait_for(parent, description='parent socket')
@@ -27,6 +28,7 @@ def run():
             if focus is not None:
                 trial.focus_parent_window(focus)
             parent('launch', program=str(trial.BINARY), args=['--no-clients', '--mod-key', 'super-alt',
+                '--config', str(artifacts / 'child-config.toml'),
                 '--control-socket', child.path, '--close-after', '50'])
             trial.wait_for(child, description='child socket')
             nested = trial.wait_for(lambda: trial.window_for(parent, 'ohmansy-compositor'), description='nested surface')

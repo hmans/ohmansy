@@ -7,6 +7,9 @@ mod input;
 mod ipc;
 mod layout;
 mod native;
+mod output_config;
+mod output_control;
+mod preferences;
 mod scene;
 mod state;
 mod winit;
@@ -155,6 +158,18 @@ pub fn spawn_terminal(socket: &std::ffi::OsStr, demo: bool) -> Result<()> {
 
 fn main() -> Result<()> {
     let initial: Vec<String> = std::env::args().skip(1).collect();
+    if initial.first().is_some_and(|arg| arg == "validate") {
+        anyhow::ensure!(
+            initial.len() == 2,
+            "Usage: ohmansy-compositor validate PATH"
+        );
+        let settings = output_config::Settings::parse(&std::fs::read_to_string(&initial[1])?)
+            .map_err(anyhow::Error::msg)?;
+        preferences::bindings(&settings.bindings, input::ShortcutModifier::SuperAlt)
+            .map_err(anyhow::Error::msg)?;
+        println!("Shine configuration is valid (display modes and geometry are checked against connected outputs when applied).");
+        return Ok(());
+    }
     if initial.first().is_some_and(|argument| argument == "msg") {
         anyhow::ensure!(
             initial.get(1).is_some_and(|value| value == "--socket"),
@@ -174,6 +189,7 @@ fn main() -> Result<()> {
     let mut scale = 1.25_f64;
     let mut outputs = 1;
     let mut backend = "winit".to_owned();
+    let mut config_path = None;
     let mut close_after = None;
     let mut socket_file: Option<PathBuf> = None;
     let mut screenshot = None;
@@ -189,7 +205,7 @@ fn main() -> Result<()> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
-                println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--backend winit|drm] [--outputs 2] [--scale 1.25] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+comma/period: focus monitor; add Shift to move window\nMod+minus/equal: resize column\nMod+1..4: workspace; add Shift to move the window\nMod+Enter: terminal; F: fullscreen; Q: close; S: display scale\nMod+D: applications; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
+                println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--backend winit|drm] [--outputs 2] [--scale 1.25] [--config PATH] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+comma/period: focus monitor; add Shift to move window\nMod+minus/equal: resize column\nMod+1..4: workspace; add Shift to move the window\nMod+Enter: terminal; F: fullscreen; Q: close; S: display scale\nMod+D: applications; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\noutput position NAME X Y; output layout NAME X Y [NAME X Y...]; output scale NAME PERCENT; output primary NAME; output mode NAME WIDTHxHEIGHT[@HZ]; output reset NAME\nconfig reload|save; edits to ~/.config/shine/config.toml reload automatically.\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
                 return Ok(());
             }
             "--scale" => scale = args.next().context("--scale needs a number")?.parse()?,
@@ -200,6 +216,11 @@ fn main() -> Result<()> {
                     .parse::<usize>()?
             }
             "--backend" => backend = args.next().context("--backend needs winit or drm")?,
+            "--config" => {
+                config_path = Some(PathBuf::from(
+                    args.next().context("--config needs a TOML path")?,
+                ))
+            }
             "--close-after" => {
                 close_after = Some(Duration::from_secs(
                     args.next()
@@ -267,6 +288,7 @@ fn main() -> Result<()> {
     let display_handle = display.handle();
     let mut state = Smallvil::new(&mut event_loop, display);
     state.ui_scale = scale;
+    state.default_output_scale = scale;
     anyhow::ensure!((1..=8).contains(&outputs), "Choose 1 to 8 preview outputs");
     state.virtual_outputs = outputs;
     state.native_mode = backend == "drm";
@@ -277,6 +299,7 @@ fn main() -> Result<()> {
     } else {
         input::ShortcutModifier::SuperAlt
     });
+    state.init_output_config(config_path)?;
     std::env::set_var(
         "OHMANSY_COMPOSITOR_MODIFIER",
         state.shortcut_modifier.label(),

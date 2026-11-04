@@ -1,6 +1,24 @@
 { pkgs }:
 let
-  python = pkgs.python3.withPackages (p: [ p.dbus-next ]);
+  python = pkgs.python3.withPackages (p: [ p.dbus-next p.evdev ]);
+  touchpadFixture = pkgs.writeText "shine-touchpad-fixture.py" ''
+    import time
+    from evdev import UInput, AbsInfo, ecodes as e
+    capabilities = {
+        e.EV_KEY: [e.BTN_LEFT, e.BTN_TOUCH, e.BTN_TOOL_FINGER, e.BTN_TOOL_DOUBLETAP, e.BTN_TOOL_TRIPLETAP],
+        e.EV_ABS: [
+            (e.ABS_X, AbsInfo(0, 0, 2000, 0, 0, 20)),
+            (e.ABS_Y, AbsInfo(0, 0, 1200, 0, 0, 20)),
+            (e.ABS_MT_SLOT, AbsInfo(0, 0, 4, 0, 0, 0)),
+            (e.ABS_MT_TRACKING_ID, AbsInfo(0, 0, 65535, 0, 0, 0)),
+            (e.ABS_MT_POSITION_X, AbsInfo(0, 0, 2000, 0, 0, 20)),
+            (e.ABS_MT_POSITION_Y, AbsInfo(0, 0, 1200, 0, 0, 20)),
+        ],
+    }
+    with UInput(capabilities, name='Shine fixture touchpad', input_props=[e.INPUT_PROP_POINTER, e.INPUT_PROP_BUTTONPAD]):
+        while True:
+            time.sleep(1)
+  '';
   probe = pkgs.writeText "shine-keyring-probe.py" ''
     import asyncio
     import json
@@ -53,6 +71,15 @@ pkgs.testers.runNixOSTest {
     # guest connector on so the test exercises two independent KMS scanouts.
     boot.kernelParams = [ "video=Virtual-2:1280x800@60e" ];
     hardware.graphics.enable = true;
+    hardware.uinput.enable = true;
+    services.udev.extraRules = ''
+      SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="Shine fixture touchpad", ENV{ID_INPUT}="1", ENV{ID_INPUT_TOUCHPAD}="1", ENV{ID_INPUT_MOUSE}="0", ENV{ID_INPUT_TOUCHSCREEN}="0"
+    '';
+    systemd.services.shine-touchpad-fixture = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "systemd-modules-load.service" "systemd-udevd.service" ];
+      serviceConfig.ExecStart = "${python}/bin/python3 ${touchpadFixture}";
+    };
     security.polkit.enable = true;
     users.users.alice = { isNormalUser = true; uid = 1000; linger = true; };
     services.gnome.gnome-keyring.enable = true;
@@ -62,7 +89,11 @@ pkgs.testers.runNixOSTest {
     services.greetd = {
       enable = true;
       settings = let
-        command = "${import ../modules/compositor-session-package.nix { inherit pkgs; }}/bin/ohmansy-compositor-session --no-clients --control-socket /run/user/1000/shine.sock";
+        command = "${pkgs.writeShellScript "shine-test-session" ''
+          exec ${import ../modules/compositor-session-package.nix { inherit pkgs; }}/bin/ohmansy-compositor-session \
+            --no-clients --config /run/user/1000/shine-test.toml \
+            --control-socket /run/user/1000/shine.sock 2>/run/user/1000/shine-session.log
+        ''}";
       in {
         initial_session = { user = "alice"; inherit command; };
         default_session = { user = "alice"; command = "${pkgs.coreutils}/bin/sleep infinity"; };
@@ -112,6 +143,23 @@ pkgs.testers.runNixOSTest {
     machine.send_key('ret')
     machine.wait_for_file('/run/user/1000/shine-keyring-unlocked', timeout=20)
     as_user('set +e; SSH_AUTH_SOCK=/run/user/1000/gcr/ssh ssh-add -l >/dev/null; result=$?; test "$result" = 1')
+    def touchpad_options(enabled):
+        flag = 'true' if enabled else 'false'
+        text = '# Fixture preferences\n[input.keyboard]\nlayout="us"\n[input.touchpad]\ntap=' + flag + '\nnatural_scroll=' + flag + '\n[layout]\ngap=20\n[animations]\nenabled=false\n[bindings]\n"Mod+B"={action="fullscreen"}\n[[window_rules]]\nmatch={app_id="shine-drm-first"}\ndefault_column_width={pixels=700}\n'
+        script = 'from pathlib import Path; Path("/run/user/1000/shine-test.toml").write_text(' + repr(text) + ')'
+        as_user('python3 -c ' + shlex.quote(script))
+        for attempt in range(100):
+            state = control()
+            pads = [d for d in state['input_devices'] if d['touchpad']]
+            if pads and all(d['tap'] == enabled and d['natural_scroll'] == enabled for d in pads):
+                return
+            time.sleep(.1)
+        print(machine.succeed('journalctl -b -u shine-touchpad-fixture --no-pager'))
+        print(machine.succeed('cat /run/user/1000/shine-session.log'))
+        raise AssertionError(state)
+    touchpad_options(True)
+    touchpad_options(False)
+    touchpad_options(True)
     control("launch", program="foot", args=["--app-id=shine-drm-first", "sleep", "300"])
     machine.wait_until_succeeds("pgrep foot")
     import time
@@ -121,6 +169,7 @@ pkgs.testers.runNixOSTest {
             break
         time.sleep(.1)
     assert len(state["windows"]) == 1, state
+    assert state['windows'][0]['width'] == 700, state
     first = state["windows"][0]["id"]
     control("move-output-next")
     state = control()
@@ -137,6 +186,19 @@ pkgs.testers.runNixOSTest {
         time.sleep(.1)
     assert len(state["windows"]) == 2, state
     assert len({w["output"] for w in state["windows"]}) == 2, state
+    machine.send_key('meta_l-b')
+    for attempt in range(100):
+        state = control()
+        if state['fullscreen'] == state['focused']:
+            break
+        time.sleep(.1)
+    assert state['fullscreen'] == state['focused'] and state['focused'] is not None, state
+    machine.send_key('meta_l-b')
+    for attempt in range(100):
+        if control()['fullscreen'] is None:
+            break
+        time.sleep(.1)
+    assert control()['fullscreen'] is None
     machine.send_key("meta_l-dot")
     for attempt in range(100):
         state = control()
@@ -145,10 +207,51 @@ pkgs.testers.runNixOSTest {
         time.sleep(.1)
     assert state["active_output"] == state["outputs"][1]["name"], state
     assert all(w["render_density"] == 2 for w in state["windows"]), state
+    identities = {w['id'] for w in state['windows']}
+    first_name, second_name = [o['name'] for o in state['outputs']]
+    alternate = next(m for m in state['outputs'][1]['modes'] if m['width'] == 1024 and m['height'] == 768)
+    control('configure-outputs', outputs=[{'name': second_name, 'mode': f"1024x768@{alternate['refresh']/1000}"}])
+    for attempt in range(100):
+        state = control()
+        if state['outputs'][1]['physical_size'] == [1024, 768]:
+            break
+        time.sleep(.1)
+    assert state['outputs'][1]['physical_size'] == [1024, 768], state
+    assert state['config_error'] is None, state
+    width = state['outputs'][1]['logical_size'][0]
+    control('configure-outputs', outputs=[{'name': first_name, 'position': [width, 0]},
+                                         {'name': second_name, 'position': [0, 0], 'primary': True}])
+    control('save-config')
+    machine.wait_for_file('/run/user/1000/shine-test.toml', timeout=10)
+    # Force only guest virtual connectors; no host displays are involved.
+    machine.succeed(f"echo off > /sys/class/drm/card0-{second_name}/status")
+    # sysfs force changes do not emit a hotplug event by themselves.
+    machine.succeed('echo change > /sys/class/drm/card0/uevent')
+    for attempt in range(100):
+        state = control()
+        if len(state['outputs']) == 1:
+            break
+        time.sleep(.1)
+    assert len(state['outputs']) == 1, state
+    assert {w['id'] for w in state['windows']} == identities, state
+    assert all(w['output'] == first_name for w in state['windows']), state
+    machine.succeed(f"echo on > /sys/class/drm/card0-{second_name}/status")
+    machine.succeed('echo change > /sys/class/drm/card0/uevent')
+    for attempt in range(100):
+        state = control()
+        if len(state['outputs']) == 2 and state['outputs'][1]['physical_size'] == [1024, 768]:
+            break
+        time.sleep(.1)
+    assert len(state['outputs']) == 2, state
+    assert state['outputs'][0]['position'] == [width, 0], state
+    assert state['outputs'][1]['position'] == [0, 0] and state['outputs'][1]['primary'], state
+    assert state['outputs'][1]['physical_size'] == [1024, 768], state
+    assert {w['id'] for w in state['windows']} == identities, state
     machine.send_key("ctrl-alt-f2")
     try:
         machine.wait_until_succeeds("test $(cat /sys/class/tty/tty0/active) = tty2", timeout=15)
     except Exception:
+        print(machine.succeed('cat /run/user/1000/shine-session.log'))
         print(machine.succeed("journalctl -b -u greetd --no-pager"))
         print(control())
         raise

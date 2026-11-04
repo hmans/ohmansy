@@ -55,7 +55,27 @@ def parent_windows():
         state = Control(path)()
         return [{**window, 'pid': state['pid'], 'is_focused': window['focused']}
                 for window in state['windows']]
-    return json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"]))
+    try:
+        return json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"], stderr=subprocess.PIPE))
+    except (OSError, subprocess.CalledProcessError):
+        # A long-lived agent may retain a previous desktop's environment after
+        # login. Find only the Shine server hosting the current Wayland socket.
+        runtime = Path(os.environ['XDG_RUNTIME_DIR'])
+        display = Path(os.environ['WAYLAND_DISPLAY']).name
+        matches = []
+        for path in runtime.glob('ohmansy-compositor-*.sock'):
+            try:
+                state = Control(path)()
+                if state['wayland_display'] == display:
+                    matches.append((path, state))
+            except (OSError, ValueError, AssertionError):
+                continue
+        if len(matches) != 1:
+            raise AssertionError('Cannot identify the compositor hosting the current Wayland display')
+        path, state = matches[0]
+        os.environ['OHMANSY_COMPOSITOR_CONTROL'] = str(path)
+        return [{**window, 'pid': state['pid'], 'is_focused': window['focused']}
+                for window in state['windows']]
 
 
 def focus_parent_window(ident):
@@ -162,7 +182,7 @@ def run():
     print(f"Artifacts: {artifacts}", flush=True)
     browser = None
     with (artifacts / "session.log").open("w") as log:
-        process = subprocess.Popen([str(BINARY), "--no-clients", "--test-input", "--control-socket", control.path, "--close-after", "180", "--report", str(artifacts / "state.json")], stdout=log, stderr=log)
+        process = subprocess.Popen([str(BINARY), "--no-clients", "--test-input", "--config", str(artifacts / 'config.toml'), "--control-socket", control.path, "--close-after", "180", "--report", str(artifacts / "state.json")], stdout=log, stderr=log)
         try:
             wait_for(control, description="compositor control socket")
             own = wait_for(lambda: next((window for window in parent_windows() if window['id'] not in original and window.get('app_id') == 'ohmansy-compositor'), None), description="test window")

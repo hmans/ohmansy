@@ -1,5 +1,9 @@
 //! Direct seat, input and KMS ownership. Nested development stays in winit.
-use crate::{scene::Cursors, CalloopData, Smallvil};
+use crate::{
+    output_config::{edid_identity, OutputInfo, VideoMode},
+    scene::Cursors,
+    CalloopData, Smallvil,
+};
 use anyhow::{Context, Result};
 use smithay::{
     backend::{
@@ -13,6 +17,7 @@ use smithay::{
             DrmDevice, DrmDeviceFd, DrmEvent,
         },
         egl::{EGLContext, EGLDevice, EGLDisplay},
+        input::InputEvent,
         libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{gles::GlesRenderer, ImportDma},
         session::{libseat::LibSeatSession, Event as SessionEvent, Session},
@@ -24,8 +29,8 @@ use smithay::{
             timer::{TimeoutAction, Timer},
             EventLoop,
         },
-        drm::control::{connector, crtc, Device, ModeTypeFlags},
-        input::Libinput,
+        drm::control::{connector, crtc, Device, Mode as DrmMode, ModeTypeFlags},
+        input::{Device as InputDevice, Libinput},
         rustix::fs::OFlags,
         wayland_server::backend::GlobalId,
     },
@@ -48,6 +53,53 @@ struct Head {
     scanout: Scanout,
     pending: bool,
     dirty: bool,
+    mode: DrmMode,
+    modes: Vec<DrmMode>,
+    failed_revision: Option<u64>,
+}
+fn video_mode(mode: &DrmMode) -> VideoMode {
+    VideoMode {
+        width: mode.size().0 as i32,
+        height: mode.size().1 as i32,
+        refresh: mode.vrefresh() as i32 * 1000,
+    }
+}
+impl Head {
+    fn use_mode(&mut self, mode: DrmMode, state: &mut Smallvil) -> Result<()> {
+        self.scanout.use_mode(mode)?;
+        let video = video_mode(&mode);
+        let size = video.size().into();
+        self.scanout
+            .set_output_mode_source(OutputModeSource::Static {
+                size,
+                scale: 1.0.into(),
+                transform: Transform::Normal,
+            });
+        self.mode = mode;
+        self.dirty = true;
+        self.output.change_current_state(
+            Some(Mode {
+                size,
+                refresh: video.refresh,
+            }),
+            None,
+            None,
+            None,
+        );
+        state.relayout();
+        Ok(())
+    }
+    fn rollback(&mut self, mode: DrmMode, state: &mut Smallvil, error: String) -> Result<()> {
+        self.use_mode(mode, state)?;
+        self.scanout.reset_state()?;
+        self.scanout.reset_buffers();
+        self.failed_revision = Some(state.config_revision);
+        state.config_error = Some(format!(
+            "{} mode change failed: {error}; restored previous mode",
+            self.output.name()
+        ));
+        Ok(())
+    }
 }
 struct Native {
     session: LibSeatSession,
@@ -58,8 +110,52 @@ struct Native {
     cursors: Cursors,
     active: bool,
     rescan: bool,
+    devices: Rc<RefCell<(u64, Vec<InputDevice>)>>,
+    input_revision: Option<(u64, u64)>,
 }
 impl Native {
+    fn configure_input(&mut self, state: &mut Smallvil) {
+        let mut devices = self.devices.borrow_mut();
+        let revision = (devices.0, state.config_revision);
+        if self.input_revision == Some(revision) {
+            return;
+        }
+        state.input_devices.clear();
+        for device in &mut devices.1 {
+            // All devices belong to this udev-backed libinput context.
+            let touchpad = device.config_tap_finger_count() > 0
+                || unsafe { device.udev_device() }.is_some_and(|d| {
+                    d.property_value("ID_INPUT_TOUCHPAD") == Some(std::ffi::OsStr::new("1"))
+                });
+            if touchpad {
+                let options = &state.output_settings.input.touchpad;
+                if device.config_tap_finger_count() > 0 {
+                    let enabled = options
+                        .tap
+                        .unwrap_or_else(|| device.config_tap_default_enabled());
+                    if let Err(e) = device.config_tap_set_enabled(enabled) {
+                        state.config_error =
+                            Some(format!("Touchpad tap configuration failed: {e:?}"));
+                    }
+                }
+                if device.config_scroll_has_natural_scroll() {
+                    let enabled = options
+                        .natural_scroll
+                        .unwrap_or_else(|| device.config_scroll_default_natural_scroll_enabled());
+                    if let Err(e) = device.config_scroll_set_natural_scroll_enabled(enabled) {
+                        state.config_error =
+                            Some(format!("Touchpad scroll configuration failed: {e:?}"));
+                    }
+                }
+            }
+            state
+                .input_devices
+                .push(serde_json::json!({"name":device.name(),"touchpad":touchpad,
+                "tap":touchpad.then(||device.config_tap_enabled()),
+                "natural_scroll":touchpad.then(||device.config_scroll_natural_scroll_enabled())}));
+        }
+        self.input_revision = Some(revision);
+    }
     fn scan(&mut self, data: &mut CalloopData) -> Result<()> {
         let resources = self.drm.resource_handles()?;
         let connectors: Vec<_> = resources
@@ -78,11 +174,53 @@ impl Native {
                 continue;
             }
             let head = self.heads.remove(i);
+            data.state.output_info.remove(&head.output.name());
             data.state.space.unmap_output(&head.output);
             data.display_handle.remove_global::<Smallvil>(head.global);
         }
         for connector in connectors {
-            if self.heads.iter().any(|h| h.connector == connector.handle()) {
+            let name = format!(
+                "{}-{}",
+                connector.interface().as_str(),
+                connector.interface_id()
+            );
+            let edid = self
+                .drm
+                .get_properties(connector.handle())
+                .ok()
+                .and_then(|properties| {
+                    properties.into_iter().find_map(|(handle, value)| {
+                        self.drm
+                            .get_property(handle)
+                            .ok()
+                            .filter(|p| p.name().to_bytes() == b"EDID")
+                            .and_then(|_| self.drm.get_property_blob(value).ok())
+                    })
+                })
+                .unwrap_or_default();
+            let (id, make, model) = edid_identity(&name, &edid);
+            let preferred = *connector
+                .modes()
+                .iter()
+                .find(|m| m.mode_type().contains(ModeTypeFlags::PREFERRED))
+                .unwrap_or(&connector.modes()[0]);
+            let info = OutputInfo {
+                name: name.clone(),
+                id,
+                make: make.clone(),
+                model: model.clone(),
+                modes: connector.modes().iter().map(video_mode).collect(),
+                preferred: video_mode(&preferred),
+                adjustable_mode: true,
+            };
+            data.state.output_info.insert(name.clone(), info.clone());
+            if let Some(head) = self
+                .heads
+                .iter_mut()
+                .find(|h| h.connector == connector.handle())
+            {
+                head.modes = connector.modes().to_vec();
+                head.failed_revision = None;
                 continue;
             }
             let possible: Vec<_> = connector
@@ -98,16 +236,19 @@ impl Native {
                 eprintln!("No free CRTC for {:?}", connector.interface());
                 continue;
             };
+            let selected = data
+                .state
+                .output_settings
+                .selected_mode(&info)
+                .unwrap_or_else(|error| {
+                    data.state.config_error = Some(error);
+                    info.preferred.clone()
+                });
             let mode = *connector
                 .modes()
                 .iter()
-                .find(|m| m.mode_type().contains(ModeTypeFlags::PREFERRED))
-                .unwrap_or(&connector.modes()[0]);
-            let name = format!(
-                "{}-{}",
-                connector.interface().as_str(),
-                connector.interface_id()
-            );
+                .find(|m| video_mode(m) == selected)
+                .unwrap_or(&preferred);
             let size = (mode.size().0 as i32, mode.size().1 as i32).into();
             let surface = self.drm.create_surface(crtc, mode, &[connector.handle()])?;
             let scanout = DrmCompositor::new(
@@ -141,8 +282,8 @@ impl Native {
                         .unwrap_or((0, 0))
                         .into(),
                     subpixel: Subpixel::Unknown,
-                    make: "Unknown".into(),
-                    model: name.clone(),
+                    make,
+                    model,
                 },
             );
             let global = output.create_global::<Smallvil>(&data.display_handle);
@@ -159,7 +300,18 @@ impl Native {
                 }),
                 Some((0, 0).into()),
             );
-            output.set_preferred(wlmode);
+            for mode in connector.modes() {
+                let mode = video_mode(mode);
+                output.add_mode(Mode {
+                    size: mode.size().into(),
+                    refresh: mode.refresh,
+                });
+            }
+            let preferred = video_mode(&preferred);
+            output.set_preferred(Mode {
+                size: preferred.size().into(),
+                refresh: preferred.refresh,
+            });
             data.state.space.map_output(&output, (0, 0));
             eprintln!("Shine output {name}: {}×{}", size.w, size.h);
             self.heads.push(Head {
@@ -170,7 +322,19 @@ impl Native {
                 scanout,
                 pending: false,
                 dirty: true,
+                mode,
+                modes: connector.modes().to_vec(),
+                failed_revision: None,
             });
+        }
+        let mut counts = std::collections::BTreeMap::new();
+        for info in data.state.output_info.values() {
+            *counts.entry(info.id.clone()).or_insert(0) += 1;
+        }
+        for info in data.state.output_info.values_mut() {
+            if counts.get(&info.id).copied().unwrap_or(0) > 1 {
+                info.id = format!("connector:{}", info.name);
+            }
         }
         data.state.relayout();
         data.state.sync_focus();
@@ -188,6 +352,7 @@ impl Native {
         state.import_buffers(&mut self.renderer);
         state.space.refresh();
         state.maintain_scene();
+        self.configure_input(state);
         if state.needs_redraw {
             for h in &mut self.heads {
                 h.dirty = true;
@@ -195,21 +360,62 @@ impl Native {
             state.needs_redraw = false;
         }
         for head in &mut self.heads {
+            let original_mode = head.mode;
+            if !head.pending && head.failed_revision != Some(state.config_revision) {
+                let info = state.output_info.get(&head.output.name()).unwrap();
+                match state.output_settings.selected_mode(info) {
+                    Ok(selected) => {
+                        if let Some(mode) = head
+                            .modes
+                            .iter()
+                            .find(|m| video_mode(m) == selected)
+                            .copied()
+                        {
+                            if head.mode != mode {
+                                if let Err(error) = head.use_mode(mode, state) {
+                                    state.config_error = Some(format!(
+                                        "{} mode change rejected: {error:#}",
+                                        head.output.name()
+                                    ));
+                                    head.failed_revision = Some(state.config_revision);
+                                }
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        state.config_error = Some(error);
+                        head.failed_revision = Some(state.config_revision);
+                    }
+                }
+            }
             if head.pending || !head.dirty {
                 continue;
             }
             state.cursor_rendered_elements = 0;
             let elements =
                 state.output_elements(&mut self.renderer, &head.output, Some(&mut self.cursors));
-            let result = head.scanout.render_frame(
+            let result = match head.scanout.render_frame(
                 &mut self.renderer,
                 &elements,
                 [0.035, 0.035, 0.055, 1.0],
                 FrameFlags::empty(),
-            )?;
+            ) {
+                Ok(result) => result,
+                Err(error) if head.mode != original_mode => {
+                    head.rollback(original_mode, state, error.to_string())?;
+                    continue;
+                }
+                Err(error) => return Err(error.into()),
+            };
             head.dirty = false;
             if !result.is_empty {
-                head.scanout.queue_frame(())?;
+                if let Err(error) = head.scanout.queue_frame(()) {
+                    if head.mode != original_mode {
+                        head.rollback(original_mode, state, error.to_string())?;
+                        continue;
+                    }
+                    return Err(error.into());
+                }
                 head.pending = true;
                 state.rendered_frames += 1;
             } else {
@@ -229,11 +435,26 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
     input
         .udev_assign_seat(&seat)
         .map_err(|_| anyhow::anyhow!("Assign input seat {seat}"))?;
+    let devices = Rc::new(RefCell::new((0, Vec::<InputDevice>::new())));
+    let input_devices = devices.clone();
     event_loop
         .handle()
         .insert_source(
             LibinputInputBackend::new(input.clone()),
-            |event, _, data| {
+            move |event, _, data| {
+                match &event {
+                    InputEvent::DeviceAdded { device } => {
+                        let mut devices = input_devices.borrow_mut();
+                        devices.0 += 1;
+                        devices.1.push(device.clone());
+                    }
+                    InputEvent::DeviceRemoved { device } => {
+                        let mut devices = input_devices.borrow_mut();
+                        devices.0 += 1;
+                        devices.1.retain(|d| d != device);
+                    }
+                    _ => (),
+                }
                 data.state.process_input_event(event);
             },
         )
@@ -270,6 +491,8 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
         heads: vec![],
         cursors: Cursors::default(),
         rescan: true,
+        devices,
+        input_revision: None,
     };
     native.scan(data)?;
     let native = Rc::new(RefCell::new(native));
@@ -355,11 +578,29 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
             if let Some(vt) = data.state.vt_request.take() {
                 if let Err(e) = backend.session.change_vt(vt) {
                     eprintln!("Switch VT: {e}");
+                } else {
+                    // The kernel may revoke DRM ownership before the libseat
+                    // pause callback is dispatched. Yield before drawing again.
+                    return TimeoutAction::ToDuration(Duration::from_millis(16));
                 }
             }
             if let Err(e) = backend.draw(data) {
-                data.state.runtime_error = Some(format!("Render displays: {e:#}"));
-                data.state.loop_signal.stop();
+                let temporarily_inactive = e.chain().any(|cause| {
+                    match cause.downcast_ref::<smithay::backend::drm::DrmError>() {
+                        Some(smithay::backend::drm::DrmError::DeviceInactive) => true,
+                        Some(smithay::backend::drm::DrmError::Access(access)) => {
+                            access.source.kind() == std::io::ErrorKind::PermissionDenied
+                        }
+                        _ => false,
+                    }
+                });
+                if temporarily_inactive {
+                    // An externally initiated VT switch can race a page flip too.
+                    data.state.needs_redraw = true;
+                } else {
+                    data.state.runtime_error = Some(format!("Render displays: {e:#}"));
+                    data.state.loop_signal.stop();
+                }
             }
             TimeoutAction::ToDuration(Duration::from_millis(16))
         })

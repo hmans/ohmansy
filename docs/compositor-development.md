@@ -20,8 +20,8 @@ login screen. Applications use their normal profiles in this session.
 
 Shine handles DRM/KMS displays, seat access, input devices, and VT switching
 directly through Smithay, libseat, and libinput. Cage is no longer part of the
-session. Connected monitors on the primary GPU are placed side by side, ordered
-by connector name, with their preferred modes and a starting scale of 125%.
+session. Without saved settings, connected monitors on the primary GPU are placed
+side by side in connector order, with preferred modes and a scale of 125%.
 Each monitor has four independent scrolling workspaces. Disconnecting a monitor
 moves its windows to a remaining monitor. Niri's panel, wallpaper, and services
 remain tied to Niri.
@@ -131,12 +131,167 @@ images; they are not limited to X11.
 
 The login session uses `--backend drm`; development uses `--backend winit`
 inside the parent desktop. Native output support currently covers connectors
-on one primary GPU, with automatic preferred modes and a horizontal arrangement.
-Saved monitor configuration, rotation, multi-GPU rendering, and native
-framebuffer screenshots are not implemented. Clipboard exchange is local to
+on one primary GPU, with preferred or explicitly selected modes. Rotation,
+multi-GPU rendering, and native framebuffer screenshots are not implemented.
+Clipboard exchange is local to
 its clients. X11 clients and
 moving existing Niri windows into it are unsupported. Its 3D presentation remains
 in the separate snapshot experiment.
+
+## Configuration
+
+Shine uses one TOML file at `~/.config/shine/config.toml`, honoring
+`XDG_CONFIG_HOME`; `--config PATH` selects a separate file for development.
+Every section is optional. See the complete
+[example configuration](../nix/compositor/config.example.toml) for outputs,
+input, layout, bindings, application rules and animations.
+
+Edits reload live. Unknown fields/actions, invalid widths or shortcuts, and
+keyboard layouts that fail to compile keep the working configuration. Inspect
+`config_error` and `preferences` in status for errors and effective preferences.
+Check a file without starting a compositor:
+
+```sh
+ohmansy-compositor validate ~/.config/shine/config.toml
+```
+
+Validation checks syntax, preferences, keymaps and shortcut profiles. Supported
+display modes and monitor geometry are checked against connected outputs when
+the configuration is applied.
+
+### Input, layout and animations
+
+```toml
+[input.keyboard]
+layout = "us"
+# variant = "dvorak"
+# options = "caps:escape"
+
+[input.touchpad]
+tap = true
+natural_scroll = true
+
+[layout]
+gap = 12
+default_column_width = { proportion = 0.62 }
+
+[animations]
+enabled = true
+duration_ms = 180
+```
+
+Keyboard fields that are omitted inherit the login's XKB defaults. Touchpad
+preferences apply to native libinput touchpads and newly connected devices;
+omitted options restore device defaults. Nested previews configure their own
+keyboard mapping and leave the host's physical touchpads alone. Status includes
+`input_devices` with native touchpad settings.
+
+Gap is in logical pixels (0–128). Width is either a proportion greater than zero
+and at most one, or a pixel width (200–32768). Proportions use the output width
+minus its outer gaps; columns have a minimum width of 200. Default widths affect
+new windows. Gap changes reposition existing windows while preserving their
+column widths. Animations currently control scrolling; `duration_ms` is 0–5000,
+and disabling animations or choosing zero snaps to the destination.
+
+### Bindings and window rules
+
+```toml
+[bindings]
+"Mod+Return" = { action = "terminal" }
+"Mod+N" = { action = "launch", program = "foot", args = [] }
+"Mod+1" = { action = "workspace", value = 1 }
+"Mod+Shift+Right" = { action = "move-next" }
+"Mod+Q" = { action = "none" }
+
+[[window_rules]]
+match = { app_id = "firefox" }
+default_column_width = { proportion = 0.75 }
+```
+
+Custom bindings replace the matching default; omitted bindings keep defaults.
+`none` removes a binding and lets the client receive the chord. `Mod` is Super
+in a login and Super+Alt in a nested preview. Explicit Super, Alt, Ctrl/Control
+and Shift modifiers are also supported, with exact modifier matching. Keys use
+XKB names such as Return, Left, comma, space or F6. Ctrl+Alt+F1–F12 remain reserved
+for VT switching. Key releases stay paired with intercepted presses across reloads.
+
+Actions include terminal, launcher, logout, close, fullscreen, focus-prev/next,
+move-prev/next, focus-output-prev/next, move-output-prev/next, resize, workspace,
+move-workspace, output, scale, launch, reload-config and save-config. Resize
+uses `value` in logical pixels; workspace/move-workspace use 1–4, output is
+1-based, and scale uses a percentage. Launch executes the program and argument
+array directly. The configured terminal action still honors the OS launcher.
+
+Window rules match an exact, case-sensitive `app_id` from status. The last
+matching rule supplies the default width when a new window identifies itself.
+Existing windows retain their widths when rules or defaults reload, including
+manual resizes; client minimum/maximum constraints still apply.
+
+## Monitor configuration
+
+Shine reads `~/.config/shine/config.toml` (or `$XDG_CONFIG_HOME/shine/config.toml`).
+Use `--config PATH` for a separate development configuration. File edits reload
+automatically within roughly a quarter second; no compositor restart is needed.
+Invalid edits keep the last working configuration and report `config_error` in
+the control socket's status. No file is created until you save or write one.
+
+Positions use logical pixels: a 2560-pixel-wide monitor at scale 1.25 has logical
+width 2048. Negative positions and vertical arrangements are supported. Monitors
+must share edges so the pointer can reach every screen; overlapping rectangles
+and disconnected arrangements are rejected. For example:
+
+```toml
+[[outputs]]
+name = "DP-2"
+position = [0, 0]
+scale = 1.25
+
+[[outputs]]
+name = "DP-1"
+position = [2048, 0]
+scale = 1.25
+primary = true
+# Optional; omit to use the preferred mode:
+# mode = "3440x1440@100"
+```
+
+The primary monitor receives startup focus and is the fallback when the focused
+monitor disconnects. Changing primary does not steal focus from an existing window.
+Unconfigured monitors join the right edge of the connected layout. If unplugging
+a monitor leaves a gap, Shine temporarily arranges the survivors side by side;
+the saved arrangement returns on reconnect. Windows migrate to a remaining
+monitor and are preserved there when the disconnected monitor returns.
+
+Inspect `outputs` in status for names, IDs, modes, positions and scales. A saved
+rule can include `id = "edid:..."` to follow a monitor across connector changes.
+Shine uses EDID serials where available; anonymous, invalid or duplicated identities
+fall back to `connector:NAME`. A rule with an ID only matches that identity; omit
+the ID to match the connector name. `config save` records IDs automatically and
+keeps rules for disconnected monitors.
+
+For live changes, use the built binary or installed `ohmansy-compositor`:
+
+```sh
+ohmansy-compositor msg --socket "$OHMANSY_COMPOSITOR_CONTROL" output layout DP-2 0 0 DP-1 2048 0
+ohmansy-compositor msg --socket "$OHMANSY_COMPOSITOR_CONTROL" output primary DP-1
+ohmansy-compositor msg --socket "$OHMANSY_COMPOSITOR_CONTROL" output scale DP-2 150
+ohmansy-compositor msg --socket "$OHMANSY_COMPOSITOR_CONTROL" output mode DP-1 3440x1440@100
+ohmansy-compositor msg --socket "$OHMANSY_COMPOSITOR_CONTROL" config save
+```
+
+`output position NAME X Y` moves one output; `output layout` changes multiple
+positions atomically, which is useful when swapping monitors. `output reset NAME`
+removes its override. A scale/mode change adjusts neighbouring positions for
+ordinary horizontal or vertical layouts; more complex layouts may need a single
+configuration edit with all positions. Modes must come from the reported list;
+`preferred` restores automatic selection. Nested output resolutions follow the
+host window, so explicit resolution changes are available on the DRM backend.
+
+Live commands remain temporary until `config save`. `config reload` explicitly
+reloads the file. Saves are atomic and refuse to overwrite a symlink or an external
+edit that has not been successfully reloaded. Output saves preserve comments,
+unchanged values' formatting, and all handwritten preference sections. If Nix manages the file, edit its
+source instead. There is no visual arrangement editor yet.
 
 ## Development
 
@@ -160,6 +315,7 @@ mise run compositor-check
 mise run compositor-integration
 python3 tools/tests/compositor_nesting.py
 python3 tools/tests/compositor_monitors.py
+python3 tools/tests/compositor_preferences.py
 nix build .#checks.x86_64-linux.compositor-drm
 mise run compositor -- --scale 1.5 --close-after 10
 ```

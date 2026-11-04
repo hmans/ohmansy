@@ -105,6 +105,11 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                     } else {
                         Err("screenshot needs a path".into())
                     }
+                } else if matches!(
+                    action,
+                    "configure-outputs" | "reload-config" | "save-config"
+                ) {
+                    data.state.output_request(action, &request)
                 } else if action == "status" {
                     Ok(())
                 } else if action == "quit" {
@@ -185,7 +190,60 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
 pub fn send(path: &str, command: &[String]) -> Result<()> {
     let action = command.first().map(String::as_str).unwrap_or("status");
     let mut request = json!({"action":action});
-    if action == "launch" {
+    if action == "config" {
+        anyhow::ensure!(command.len() == 2, "Usage: config reload|save");
+        request["action"] = match command[1].as_str() {
+            "reload" => "reload-config",
+            "save" => "save-config",
+            _ => anyhow::bail!("Usage: config reload|save"),
+        }
+        .into();
+    } else if action == "output" && command.get(1).is_some_and(|s| s.parse::<i64>().is_err()) {
+        let verb = command[1].as_str();
+        let mut changes = vec![];
+        if verb == "layout" {
+            anyhow::ensure!(
+                command.len() > 2 && (command.len() - 2).is_multiple_of(3),
+                "Usage: output layout NAME X Y [NAME X Y...]"
+            );
+            for triple in command[2..].chunks_exact(3) {
+                changes.push(json!({"name":triple[0],"position":[triple[1].parse::<i32>()?,triple[2].parse::<i32>()?]}));
+            }
+        } else {
+            let name = command.get(2).context("Output name is required")?;
+            let mut change = json!({"name":name});
+            match verb {
+                "position" => {
+                    anyhow::ensure!(command.len() == 5, "Usage: output position NAME X Y");
+                    change["position"] =
+                        json!([command[3].parse::<i32>()?, command[4].parse::<i32>()?]);
+                }
+                "scale" => {
+                    anyhow::ensure!(command.len() == 4, "Usage: output scale NAME PERCENT");
+                    let percent = command[3].parse::<f64>()?;
+                    anyhow::ensure!(
+                        percent.is_finite() && (50.0..=200.0).contains(&percent),
+                        "Scale must be 50 to 200 percent"
+                    );
+                    change["scale"] = json!(percent / 100.0);
+                }
+                "mode" => {
+                    anyhow::ensure!(
+                        command.len() == 4,
+                        "Usage: output mode NAME WIDTHxHEIGHT[@HZ]|preferred"
+                    );
+                    change["mode"] = json!(command[3]);
+                }
+                "primary" | "reset" => {
+                    anyhow::ensure!(command.len() == 3, "Usage: output primary|reset NAME");
+                    change[if verb == "reset" { "reset" } else { "primary" }] = true.into();
+                }
+                _ => anyhow::bail!("Output actions: position, layout, scale, mode, primary, reset"),
+            }
+            changes.push(change);
+        }
+        request = json!({"action":"configure-outputs","outputs":changes});
+    } else if action == "launch" {
         request["program"] = command
             .get(1)
             .context("launch needs a program")?

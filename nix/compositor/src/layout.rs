@@ -16,6 +16,9 @@ pub struct Workspace {
     pub scroll: f64,
     pub target: f64,
     pub fullscreen: Option<WindowId>,
+    animation_target: f64,
+    animation_from: f64,
+    animation_elapsed: f64,
 }
 
 pub struct Layout {
@@ -23,7 +26,9 @@ pub struct Layout {
     pub active: usize,
     pub size: (i32, i32),
     pub gap: i32,
-    pub default_width: f64,
+    pub default_width: crate::preferences::Width,
+    pub animations_enabled: bool,
+    pub animation_duration: f64,
 }
 
 impl Default for Layout {
@@ -33,7 +38,9 @@ impl Default for Layout {
             active: 0,
             size: (1000, 700),
             gap: 12,
-            default_width: 0.62,
+            default_width: Default::default(),
+            animations_enabled: true,
+            animation_duration: 0.18,
         }
     }
 }
@@ -47,7 +54,7 @@ impl Layout {
     }
 
     pub fn insert(&mut self, id: WindowId) {
-        let width = ((self.size.0 - 2 * self.gap) as f64 * self.default_width).round() as i32;
+        let width = self.default_width.resolve(self.size.0 - 2 * self.gap);
         let workspace = &mut self.workspaces[self.active];
         let index = workspace
             .focused
@@ -270,11 +277,21 @@ impl Layout {
     pub fn tick(&mut self, seconds: f64) -> bool {
         let workspace = &mut self.workspaces[self.active];
         let previous = workspace.scroll;
-        let distance = workspace.target - previous;
-        workspace.scroll = if distance.abs() < 0.25 {
+        if workspace.animation_target != workspace.target {
+            workspace.animation_target = workspace.target;
+            workspace.animation_from = previous;
+            workspace.animation_elapsed = 0.0;
+        }
+        workspace.animation_elapsed += seconds.max(0.0);
+        workspace.scroll = if !self.animations_enabled
+            || self.animation_duration == 0.0
+            || workspace.animation_elapsed >= self.animation_duration
+        {
             workspace.target
         } else {
-            previous + distance * (1.0 - (-seconds.min(0.1) * 18.0).exp())
+            let progress = (workspace.animation_elapsed / self.animation_duration).clamp(0.0, 1.0);
+            workspace.animation_from
+                + (workspace.target - workspace.animation_from) * (1.0 - (1.0 - progress).powi(3))
         };
         workspace.scroll != previous
     }
@@ -306,6 +323,26 @@ impl Layout {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn animation_duration_and_disable_are_exact() {
+        let mut layout = Layout {
+            animation_duration: 0.1,
+            ..Default::default()
+        };
+        for id in 1..=5 {
+            layout.insert(id);
+        }
+        let target = layout.workspace().target;
+        assert!(target > 0.0);
+        layout.tick(0.05);
+        assert!(layout.workspace().scroll > 0.0 && layout.workspace().scroll < target);
+        layout.tick(0.05);
+        assert_eq!(layout.workspace().scroll, target);
+        layout.focus_delta(-4);
+        layout.animations_enabled = false;
+        layout.tick(0.0);
+        assert_eq!(layout.workspace().scroll, layout.workspace().target);
+    }
 
     #[test]
     fn maximize_tracks_output_size_and_restores_its_own_column() {
