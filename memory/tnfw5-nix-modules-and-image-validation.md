@@ -225,6 +225,33 @@ The first greeter version booted and its normal and compact layouts were
 visually checked. Real password login, logout, and keyring unlock still need
 user verification. No new factory or ISO image was built for this change.
 
+Alternative sessions (2026-11-04): the shared desktop imports
+`compositor.nix`, which offers **ohmansy (experimental)** alongside
+**ohmansy (Niri)**. Niri remains the default; hosts can set
+`ohmansy.compositor.enable = false`. The session is also registered with
+`services.displayManager.sessionPackages`. It uses Cage for hardware and the
+Smithay compositor for layout, currently on one output. Niri's panel and services
+remain scoped to Niri. The terminal module exposes its launcher internally so
+the alternative session honors terminal customization.
+
+The greeter reads system-generated `/etc/ohmansy/greeter-sessions.json`; the
+selected entry supplies both the executable and XDG desktop/session variables.
+Selection is disabled while submitting authentication and clears typed responses.
+PAM, keyring handling, auth retry, account switching, and live autologin policy
+remain in the existing path. The default session setting drives autologin too.
+Additional system-defined entries use `ohmansy.greeter.sessions`.
+
+The package built on x86-64. The greeter's three isolated greetd protocol flows
+passed, including selecting the experimental session across auth retry. Six
+wide/compact/narrow preview images and the selection/busy-state flow passed.
+All-system flake evaluation, native customization checks, six layout tests,
+strict Clippy, and nine development/archive tests passed. Packaged Cage sessions
+passed under nested Wayland and headless backends, including normal terminal
+startup, app picker, Cancel and confirmed sign-out, and parent desktop/activation
+environment preservation. Native Firefox/GTK integration still passed.
+These are build/runtime checks, not a physical DRM login or a rebooted image.
+No installed system, greetd service, or running desktop was activated/restarted.
+
 The login background ports app/native/Welcome.metal to GLSL in
 `nix/modules/greeter/ribbons/`, replacing the earlier Qt Quick 3D loop
 prototype. The native Ohmansy.Welcome QML plugin uses QQuickFramebufferObject

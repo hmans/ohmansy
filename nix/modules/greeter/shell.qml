@@ -18,8 +18,11 @@ ShellRoot {
     }
     Auth { id: authentication }
     FileView {
-        path: "/etc/ohmansy/greeter-session"
-        onLoaded: authentication.sessionCommand = text().trim()
+        path: "/etc/ohmansy/greeter-sessions.json"
+        onLoaded: {
+            try { authentication.configureSessions(JSON.parse(text())); }
+            catch (error) { authentication.message = "Desktop sessions are unavailable."; }
+        }
     }
     Process {
         running: true

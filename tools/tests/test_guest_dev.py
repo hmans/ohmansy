@@ -29,6 +29,8 @@ class SourceTransferTests(unittest.TestCase):
     def test_real_archive_excludes_development_access(self):
         with tarfile.open(fileobj=io.BytesIO(guest_dev.source_archive())) as archive:
             self.assertIn('nix/modules/development.nix', archive.getnames())
+            self.assertIn('nix/compositor/Cargo.lock', archive.getnames())
+            self.assertIn('nix/compositor/src/main.rs', archive.getnames())
             self.assertFalse(any(name.startswith(('.local/', 'tools/')) for name in archive.getnames()))
             self.assertFalse(any('guest-access' in name or 'development-access' in name for name in archive.getnames()))
 

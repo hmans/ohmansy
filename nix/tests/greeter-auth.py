@@ -12,7 +12,7 @@ import unittest
 
 
 class GreeterAuthTests(unittest.TestCase):
-    def run_flow(self, cancel=False):
+    def run_flow(self, cancel=False, session='niri'):
         with tempfile.TemporaryDirectory() as directory:
             server = socket.socket(socket.AF_UNIX)
             self.addCleanup(server.close)
@@ -21,7 +21,7 @@ class GreeterAuthTests(unittest.TestCase):
             server.listen(1)
             server.settimeout(15)
             env = dict(os.environ, GREETD_SOCK=address, QT_QPA_PLATFORM='offscreen',
-                       TEST_CANCEL='1' if cancel else '0', XDG_RUNTIME_DIR=directory)
+                       TEST_CANCEL='1' if cancel else '0', TEST_SESSION=session, XDG_RUNTIME_DIR=directory)
             fixture = Path(directory) / 'shell.qml'
             shutil.copyfile(Path(__file__).with_suffix('.qml'), fixture)
             shutil.copyfile(Path(__file__).parents[1] / 'modules/greeter/Auth.qml', Path(directory) / 'Auth.qml')
@@ -70,9 +70,10 @@ class GreeterAuthTests(unittest.TestCase):
                     send({'type': 'success'})
                     request = receive()
                     self.assertEqual(request['type'], 'start_session')
-                    self.assertEqual(request['cmd'], ['/test/niri-session'])
+                    self.assertEqual(request['cmd'], [f'/test/{session}-session'])
                     self.assertIn('XDG_SESSION_TYPE=wayland', request['env'])
-                    self.assertIn('XDG_CURRENT_DESKTOP=niri', request['env'])
+                    self.assertIn(f'XDG_CURRENT_DESKTOP={session}', request['env'])
+                    self.assertIn(f'XDG_SESSION_DESKTOP={session}', request['env'])
                     send({'type': 'success'})
                 output = process.communicate(timeout=10)[0].decode()
                 self.assertEqual(process.returncode, 0, output)
@@ -91,6 +92,9 @@ class GreeterAuthTests(unittest.TestCase):
 
     def test_switch_account_cancels_conversation(self):
         self.run_flow(cancel=True)
+
+    def test_experimental_session_survives_auth_retry(self):
+        self.run_flow(session='ohmansy')
 
 
 if __name__ == '__main__':

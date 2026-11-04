@@ -12,7 +12,7 @@ let
   renderBinding = binding:
     "  ${binding.key} ${binding.options or ""} hotkey-overlay-title=${builtins.toJSON binding.title} { ${binding.action}; }";
 in {
-  imports = [ ./greeter.nix ./terminal.nix ];
+  imports = [ ./greeter.nix ./terminal.nix ./compositor.nix ];
   networking.hostName = lib.mkDefault "ohmansy";
   networking.networkmanager.enable = true;
   time.timeZone = lib.mkDefault "UTC";
@@ -30,7 +30,7 @@ in {
   # in the full MBROLA voice collection. Keep it opt-in for Ohmansy; a host's
   # ordinary services.speechd.enable = true still overrides this default.
   services.speechd.enable = lib.mkOverride 900 false;
-  services.displayManager.defaultSession = "niri";
+  services.displayManager.defaultSession = lib.mkDefault "niri";
   security.polkit.enable = true;
   security.rtkit.enable = true;
   security.pam.services.swaylock = {};

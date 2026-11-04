@@ -14,6 +14,7 @@ Item {
     readonly property bool compact: height < 560
     property bool motionEnabled: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
     property bool ribbonFailure: false
+    property alias sessionPicker: sessionChoice
     readonly property bool passwordPrompt: /^password\s*:?\s*$/i.test(auth.prompt.trim())
     readonly property var sceneStats: sculpture.item ? sculpture.item.renderStats : null
     function entranceOpacity(delay) {
@@ -37,7 +38,7 @@ Item {
     }
     Connections {
         target: controller
-        function onPowerMenuOpenChanged() { accounts.popup.close(); }
+        function onPowerMenuOpenChanged() { accounts.popup.close(); sessionChoice.popup.close(); }
     }
     function reveal(item) {
         const bottom = form.y + item.y + item.height;
@@ -105,7 +106,7 @@ Item {
         layer.enabled: GraphicsInfo.api !== GraphicsInfo.Software
         layer.textureSize: Qt.size(Math.max(1, width / 2), Math.max(1, height / 2))
         property string layoutRevision: [view.width, view.height, viewport.contentY,
-            form.y, form.implicitHeight, accounts.popup.visible].join(":")
+            form.y, form.implicitHeight, accounts.popup.visible, sessionChoice.popup.visible].join(":")
     }
     Text {
         anchors { left: parent.left; top: parent.top; margins: view.compact ? 20 : 32 }
@@ -155,90 +156,35 @@ Item {
             Layout.bottomMargin: 8
             horizontalAlignment: Text.AlignHCenter
         }
-        ComboBox {
+        GreeterChoice {
             id: accounts
             opacity: view.entranceOpacity(90)
-            HoverHandler {
-                enabled: accounts.enabled
-                cursorShape: Qt.PointingHandCursor
-            }
+            backdrop: blurredBackdrop
             visible: !form.otherUser
             Layout.fillWidth: true
             implicitHeight: view.compact ? 56 : 64
             model: controller.users
-            textRole: "label"
             Accessible.name: "Account"
-            font { family: "Inter"; pixelSize: 19; weight: Font.Medium }
-            palette { text: "#e0def4"; buttonText: "#e0def4"; button: "#252832"; base: "#252832"; highlight: "#645373"; highlightedText: "#ffffff" }
-            leftPadding: 22
-            rightPadding: 60
-            indicator: Image {
-                x: accounts.width - width - 20
-                y: (accounts.height - height) / 2
-                width: 24
-                height: 24
-                source: Theme.chevron
-                sourceSize: Qt.size(48, 48)
-                opacity: accounts.hovered || accounts.popup.visible ? 0.95 : 0.65
-                rotation: accounts.popup.visible ? 180 : 0
-                Behavior on opacity { NumberAnimation { duration: 120 } }
-                Behavior on rotation { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-            }
-            contentItem: Text {
-                text: accounts.displayText
-                font: accounts.font
-                color: "#f5f3fa"
-                renderType: Text.QtRendering
-                verticalAlignment: Text.AlignVCenter
-                elide: Text.ElideRight
-            }
-            background: GlassSurface {
-                backdrop: blurredBackdrop
-                highlighted: accounts.hovered
-                pressed: accounts.down
-                focused: accounts.visualFocus
-            }
-            delegate: ItemDelegate {
-                id: accountOption
-                HoverHandler {
-                    enabled: accountOption.enabled
-                    cursorShape: Qt.PointingHandCursor
-                }
-                required property var modelData
-                required property int index
-                width: accounts.width - 12
-                height: 56
-                leftPadding: 16
-                text: modelData.label
-                font: accounts.font
-                highlighted: accounts.highlightedIndex === index
-                contentItem: Text {
-                    text: parent.text
-                    font: accounts.font
-                    color: "#f0eaf8"
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                }
-                background: Rectangle {
-                    radius: 8
-                    color: parent.highlighted ? "#496e598d" : "transparent"
-                }
-            }
-            popup: Popup {
-                y: accounts.height + 6
-                width: accounts.width
-                padding: 6
-                implicitHeight: Math.min(contentItem.implicitHeight + 12, 240)
-                background: GlassSurface { backdrop: blurredBackdrop; highlighted: true }
-                contentItem: ListView {
-                    clip: true
-                    implicitHeight: contentHeight
-                    model: accounts.popup.visible ? accounts.delegateModel : null
-                    currentIndex: accounts.highlightedIndex
-                    ScrollIndicator.vertical: ScrollIndicator {}
-                }
-            }
             onActivated: auth.selectUser(controller.users[currentIndex].name)
+        }
+        Text {
+            text: "Session"
+            color: "#c8c4d6"
+            font { family: "Inter"; pixelSize: 14 }
+            Layout.leftMargin: 4
+        }
+        GreeterChoice {
+            id: sessionChoice
+            objectName: "sessionChoice"
+            backdrop: blurredBackdrop
+            Layout.fillWidth: true
+            implicitHeight: view.compact ? 48 : 56
+            model: auth.sessions
+            currentIndex: auth.sessionIndex
+            enabled: !auth.busy && auth.sessions.length > 0
+            Accessible.name: "Desktop session"
+            onActivated: auth.selectSession(currentIndex)
+            onActiveFocusChanged: if (activeFocus) view.reveal(sessionChoice)
         }
         GreeterField {
             id: username
@@ -304,8 +250,8 @@ Item {
             onActiveFocusChanged: if (activeFocus) view.reveal(signIn)
             primary: true
             text: auth.busy ? "Signing in…" : "Sign in"
-            enabled: !auth.busy && (auth.waiting || (form.otherUser && username.text.trim() !== ""))
-            dimmed: auth.busy || !(auth.waiting || (form.otherUser && username.text.trim() !== ""))
+            enabled: auth.sessions.length > 0 && !auth.busy && (auth.waiting || (form.otherUser && username.text.trim() !== ""))
+            dimmed: !enabled
             onClicked: {
                 if (auth.waiting) auth.submit(response.text);
                 else auth.selectUser(username.text);

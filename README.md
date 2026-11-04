@@ -1,6 +1,6 @@
 # ohmansy
 
-**Ohmansy** is a NixOS desktop built around Niri. **try ohmansy** is its native
+**ohmansy** is a NixOS desktop built around Niri. **try ohmansy** is its native
 macOS host, with an accelerated guest display and a persistent private VM disk.
 
 Quickshell supplies the per-monitor panel, workspace buttons, clock, audio
@@ -16,6 +16,9 @@ override the shell through the standard NixOS user options.
 Quickshell also supplies the login screen, backed by greetd and PAM. It runs
 in a separate Niri greeter session, then starts the selected user's desktop.
 The greeter source is in `nix/modules/greeter/`.
+Its session picker offers **ohmansy (Niri)** by default and the experimental
+scrolling compositor as **ohmansy (experimental)**. See
+[compositor sessions and development](docs/compositor-development.md).
 Both shells share the `Ohmansy.Ui` components in `nix/modules/ui/`, including
 glass surfaces, controls, icons, and transitions. Niri supplies background
 blur behind the desktop popups. The menu bar has a transparent background.
@@ -49,6 +52,8 @@ on the separate, ignored `flakey/` reference repository.
 | `tools/build/` | App bundling, engine staging, icons, and signing |
 | `tools/release/` | Image packaging, manifests, and source archives |
 | `tools/tests/` | Python tooling and guest-setup regression tests |
+| `nix/compositor/` | Experimental scrolling Wayland compositor |
+| `experiments/` | Spatial rendering prototypes |
 | `docs/` | Development workflows and architecture |
 | `memory/` | Means collection of durable engineering findings and lessons |
 | `.local/`, `.build/`, `dist/` | Ignored local state, build cache, and artifacts |

@@ -11,6 +11,7 @@ let
     modules = [ ohmansyModules.default { system.stateVersion = "25.11"; } ];
   }).config;
   desktopOnly = evaluate [ ohmansyModules.desktop ];
+  withoutCompositor = evaluate [ ohmansyModules.desktop { ohmansy.compositor.enable = false; } ];
   softwareOnly = evaluate [ ohmansyModules.software ];
   noFish = evaluate [ ohmansyModules.default { programs.fish.enable = false; } ];
   noFishStyle = evaluate [ ohmansyModules.software { ohmansy.fishStyle.enable = false; } ];
@@ -38,6 +39,11 @@ let
 in
 assert hostOwnedState.system.stateVersion == "25.11";
 assert defaults.programs.firefox.enable && defaults.programs.fish.enable;
+assert defaults.services.displayManager.defaultSession == "niri";
+assert defaults.ohmansy.greeter.sessions ? niri;
+assert defaults.ohmansy.greeter.sessions ? ohmansy;
+assert !(withoutCompositor.ohmansy.greeter.sessions ? ohmansy);
+assert withoutCompositor.ohmansy.greeter.sessions ? niri;
 assert noBrowserStyle.programs.firefox.enable && noBrowserStyle.programs.firefox.autoConfig == "";
 assert custom.programs.firefox.autoConfig == "";
 assert defaults.users.defaultUserShell == pkgs.fish;

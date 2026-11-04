@@ -9,8 +9,34 @@ QtObject {
     property bool echo: false
     property bool waiting: false
     property bool busy: false
-    property string sessionCommand: ""
+    property var sessions: []
+    property int sessionIndex: -1
+    readonly property var selectedSession: sessionIndex >= 0 && sessionIndex < sessions.length
+        ? sessions[sessionIndex] : null
     signal clearResponse()
+
+    function configureSessions(configuration) {
+        const entries = configuration.sessions;
+        if (!Array.isArray(entries) || !entries.length
+                || entries.some(entry => !entry.id || !entry.label
+                    || typeof entry.command !== "string" || !entry.command.startsWith("/")
+                    || typeof entry.desktop !== "string" || !/^[A-Za-z0-9_:-]+$/.test(entry.desktop))) {
+            message = "Desktop sessions are unavailable.";
+            return;
+        }
+        const index = entries.findIndex(entry => entry.id === configuration.default);
+        if (index < 0) {
+            message = "The default desktop session is unavailable.";
+            return;
+        }
+        sessions = entries;
+        sessionIndex = index;
+    }
+    function selectSession(index) {
+        if (busy || index < 0 || index >= sessions.length) return;
+        sessionIndex = index;
+        clearResponse();
+    }
 
     function selectUser(name) {
         retry.stop();
@@ -75,13 +101,15 @@ QtObject {
             root.clearResponse();
             root.waiting = false;
             root.busy = true;
-            if (!root.sessionCommand) {
+            const session = root.selectedSession;
+            if (!session) {
                 root.message = "The desktop session is unavailable.";
                 Greetd.cancelSession();
                 root.busy = false;
                 return;
             }
-            Greetd.launch([root.sessionCommand], ["XDG_SESSION_TYPE=wayland", "XDG_CURRENT_DESKTOP=niri"]);
+            Greetd.launch([session.command], ["XDG_SESSION_TYPE=wayland",
+                "XDG_CURRENT_DESKTOP=" + session.desktop, "XDG_SESSION_DESKTOP=" + session.id]);
         }
     }
 }

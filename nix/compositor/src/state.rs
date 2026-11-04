@@ -1,0 +1,502 @@
+use std::{collections::BTreeMap, ffi::OsString, sync::Arc};
+
+use smithay::{
+    desktop::{PopupManager, Space, Window, WindowSurfaceType},
+    input::{Seat, SeatState},
+    reexports::{
+        calloop::{generic::Generic, EventLoop, Interest, LoopSignal, Mode, PostAction},
+        wayland_server::{
+            backend::{ClientData, ClientId, DisconnectReason},
+            protocol::wl_surface::WlSurface,
+            Display, DisplayHandle,
+        },
+    },
+    utils::{IsAlive, Logical, Point},
+    wayland::{
+        compositor::{CompositorClientState, CompositorState},
+        dmabuf::{DmabufGlobal, DmabufState, ImportNotifier},
+        fractional_scale::FractionalScaleManagerState,
+        output::OutputManagerState,
+        selection::data_device::DataDeviceState,
+        shell::xdg::decoration::XdgDecorationState,
+        shell::xdg::XdgShellState,
+        shm::ShmState,
+        socket::ListeningSocketSource,
+        viewporter::ViewporterState,
+    },
+};
+
+use crate::layout::{Layout, WindowId};
+use crate::CalloopData;
+
+pub struct Smallvil {
+    pub start_time: std::time::Instant,
+    pub socket_name: OsString,
+    pub ui_scale: f64,
+    pub windows: BTreeMap<WindowId, Window>,
+    pub layout: Layout,
+    pub next_window: WindowId,
+    pub configured: BTreeMap<WindowId, (i32, i32, bool, bool)>,
+    pub needs_redraw: bool,
+    pub shortcut_keys: std::collections::BTreeSet<u32>,
+    pub dmabuf_state: DmabufState,
+    pub dmabuf_global: Option<DmabufGlobal>,
+    pub pending_imports: Vec<(smithay::backend::allocator::dmabuf::Dmabuf, ImportNotifier)>,
+    pub dmabuf_imports: u64,
+    pub dmabuf_failures: u64,
+    pub fractional_scale_state: FractionalScaleManagerState,
+    pub viewporter_state: ViewporterState,
+    pub decoration_state: XdgDecorationState,
+    pub primary_selection_state:
+        smithay::wayland::selection::primary_selection::PrimarySelectionState,
+    pub cursor_shape_state: smithay::wayland::cursor_shape::CursorShapeManagerState,
+    pub cursor_image: smithay::input::pointer::CursorImageStatus,
+    pub drag_icon: Option<WlSurface>,
+    pub popup_events: u64,
+    pub popup_grabs: u64,
+    pub test_input: bool,
+    pub session_mode: bool,
+    pub screenshot: Option<std::path::PathBuf>,
+    pub commits: u64,
+    pub rendered_frames: u64,
+    pub forwarded_keys: u64,
+    pub selection_updates: u64,
+    pub runtime_error: Option<String>,
+    pub display_handle: DisplayHandle,
+
+    pub space: Space<Window>,
+    pub loop_signal: LoopSignal,
+
+    // Smithay State
+    pub compositor_state: CompositorState,
+    pub xdg_shell_state: XdgShellState,
+    pub shm_state: ShmState,
+    pub output_manager_state: OutputManagerState,
+    pub seat_state: SeatState<Smallvil>,
+    pub data_device_state: DataDeviceState,
+    pub popups: PopupManager,
+
+    pub seat: Seat<Self>,
+}
+
+impl Smallvil {
+    pub fn new(event_loop: &mut EventLoop<CalloopData>, display: Display<Self>) -> Self {
+        let start_time = std::time::Instant::now();
+
+        let dh = display.handle();
+
+        let compositor_state = CompositorState::new::<Self>(&dh);
+        let xdg_shell_state = XdgShellState::new::<Self>(&dh);
+        let shm_state = ShmState::new::<Self>(&dh, vec![]);
+        let output_manager_state = OutputManagerState::new_with_xdg_output::<Self>(&dh);
+        let mut seat_state = SeatState::new();
+        let data_device_state = DataDeviceState::new::<Self>(&dh);
+        let popups = PopupManager::default();
+
+        // A seat is a group of keyboards, pointer and touch devices.
+        // A seat typically has a pointer and maintains a keyboard focus and a pointer focus.
+        let mut seat: Seat<Self> = seat_state.new_wl_seat(&dh, "winit");
+
+        // Notify clients that we have a keyboard, for the sake of the example we assume that keyboard is always present.
+        // You may want to track keyboard hot-plug in real compositor.
+        seat.add_keyboard(Default::default(), 200, 25).unwrap();
+
+        // Notify clients that we have a pointer (mouse)
+        // Here we assume that there is always pointer plugged in
+        seat.add_pointer();
+
+        // A space represents a two-dimensional plane. Windows and Outputs can be mapped onto it.
+        //
+        // Windows get a position and stacking order through mapping.
+        // Outputs become views of a part of the Space and can be rendered via Space::render_output.
+        let space = Space::default();
+
+        let socket_name = Self::init_wayland_listener(display, event_loop);
+
+        // Get the loop signal, used to stop the event loop
+        let loop_signal = event_loop.get_signal();
+
+        Self {
+            start_time,
+            display_handle: dh.clone(),
+
+            space,
+            loop_signal,
+            socket_name,
+            ui_scale: 1.25,
+            windows: BTreeMap::new(),
+            layout: Layout::default(),
+            next_window: 1,
+            configured: BTreeMap::new(),
+            needs_redraw: true,
+            shortcut_keys: Default::default(),
+            dmabuf_state: DmabufState::new(),
+            dmabuf_global: None,
+            pending_imports: vec![],
+            dmabuf_imports: 0,
+            dmabuf_failures: 0,
+            fractional_scale_state: FractionalScaleManagerState::new::<Self>(&dh),
+            viewporter_state: ViewporterState::new::<Self>(&dh),
+            decoration_state: XdgDecorationState::new::<Self>(&dh),
+            primary_selection_state:
+                smithay::wayland::selection::primary_selection::PrimarySelectionState::new::<Self>(
+                    &dh,
+                ),
+            cursor_shape_state: smithay::wayland::cursor_shape::CursorShapeManagerState::new::<Self>(
+                &dh,
+            ),
+            cursor_image: smithay::input::pointer::CursorImageStatus::Named(
+                ::winit::window::CursorIcon::Default,
+            ),
+            drag_icon: None,
+            popup_events: 0,
+            popup_grabs: 0,
+            test_input: false,
+            session_mode: false,
+            screenshot: None,
+            commits: 0,
+            rendered_frames: 0,
+            forwarded_keys: 0,
+            selection_updates: 0,
+            runtime_error: None,
+
+            compositor_state,
+            xdg_shell_state,
+            shm_state,
+            output_manager_state,
+            seat_state,
+            data_device_state,
+            popups,
+            seat,
+        }
+    }
+
+    fn init_wayland_listener(
+        display: Display<Smallvil>,
+        event_loop: &mut EventLoop<CalloopData>,
+    ) -> OsString {
+        // Creates a new listening socket, automatically choosing the next available `wayland` socket name.
+        let listening_socket = ListeningSocketSource::new_auto().unwrap();
+
+        // Get the name of the listening socket.
+        // Clients will connect to this socket.
+        let socket_name = listening_socket.socket_name().to_os_string();
+
+        let loop_handle = event_loop.handle();
+
+        loop_handle
+            .insert_source(listening_socket, move |client_stream, _, state| {
+                // Inside the callback, you should insert the client into the display.
+                //
+                // You may also associate some data with the client when inserting the client.
+                state
+                    .display_handle
+                    .insert_client(client_stream, Arc::new(ClientState::default()))
+                    .unwrap();
+            })
+            .expect("Failed to init the wayland event source.");
+
+        // You also need to add the display itself to the event loop, so that client events will be processed by wayland-server.
+        loop_handle
+            .insert_source(
+                Generic::new(display, Interest::READ, Mode::Level),
+                |_, display, state| {
+                    // Safety: we don't drop the display
+                    unsafe {
+                        display
+                            .get_mut()
+                            .dispatch_clients(&mut state.state)
+                            .unwrap();
+                    }
+                    Ok(PostAction::Continue)
+                },
+            )
+            .unwrap();
+
+        socket_name
+    }
+
+    pub fn surface_under(
+        &self,
+        pos: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<f64, Logical>)> {
+        self.space
+            .element_under(pos)
+            .and_then(|(window, location)| {
+                window
+                    .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                    .map(|(s, p)| (s, (p + location).to_f64()))
+            })
+    }
+
+    pub fn relayout(&mut self) {
+        let Some(output) = self.space.outputs().next().cloned() else {
+            return;
+        };
+        let Some(geometry) = self.space.output_geometry(&output) else {
+            return;
+        };
+        let dead: Vec<_> = self
+            .windows
+            .iter()
+            .filter_map(|(id, window)| (!window.alive()).then_some(*id))
+            .collect();
+        for id in dead {
+            self.layout.remove(id);
+            self.windows.remove(&id);
+            self.configured.remove(&id);
+        }
+        self.layout.set_size((geometry.size.w, geometry.size.h));
+        self.apply_positions();
+    }
+
+    pub fn focus_next(&mut self) {
+        self.layout.focus_delta(1);
+        self.sync_focus();
+    }
+
+    pub fn window_id(&self, surface: &WlSurface) -> Option<WindowId> {
+        self.windows.iter().find_map(|(id, window)| {
+            (window.toplevel().unwrap().wl_surface() == surface).then_some(*id)
+        })
+    }
+
+    pub fn focus_id(&mut self, id: i64) -> Result<(), String> {
+        let id = u64::try_from(id).map_err(|_| "Window id must be positive")?;
+        if !self.windows.get(&id).is_some_and(|window| window.alive()) {
+            return Err("Window does not exist".into());
+        }
+        self.layout.focus(id);
+        Ok(())
+    }
+
+    pub fn add_window(&mut self, window: Window) {
+        let id = self.next_window;
+        self.next_window += 1;
+        self.windows.insert(id, window);
+        self.layout.insert(id);
+        self.relayout();
+        self.sync_focus();
+    }
+
+    pub fn apply_positions(&mut self) {
+        use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel::State;
+        for (id, window) in &self.windows {
+            let (min, max) = smithay::wayland::compositor::with_states(
+                window.toplevel().unwrap().wl_surface(),
+                |states| {
+                    let mut cached = states
+                        .cached_state
+                        .get::<smithay::wayland::shell::xdg::SurfaceCachedState>();
+                    let state = cached.current();
+                    (state.min_size.w, state.max_size.w)
+                },
+            );
+            self.layout.constrain_width(*id, min, max);
+        }
+        let geometries = self.layout.geometries();
+        for (id, window) in &self.windows {
+            if !geometries.iter().any(|geometry| geometry.0 == *id) {
+                self.space.unmap_elem(window);
+            }
+        }
+        for (id, x, y, width, height) in geometries {
+            let Some(window) = self.windows.get(&id).cloned() else {
+                continue;
+            };
+            let fullscreen = self.layout.workspace().fullscreen == Some(id);
+            let maximized = self
+                .layout
+                .workspace()
+                .columns
+                .iter()
+                .any(|column| column.id == id && column.restore_width.is_some());
+            let configuration = (width, height, fullscreen, maximized);
+            if self.configured.get(&id) != Some(&configuration) {
+                let toplevel = window.toplevel().unwrap();
+                toplevel.with_pending_state(|state| {
+                    state.size = Some((width, height).into());
+                    for edge in [
+                        State::TiledLeft,
+                        State::TiledRight,
+                        State::TiledTop,
+                        State::TiledBottom,
+                    ] {
+                        state.states.set(edge);
+                    }
+                    if maximized {
+                        state.states.set(State::Maximized);
+                    } else {
+                        state.states.unset(State::Maximized);
+                    }
+                    if fullscreen {
+                        state.states.set(State::Fullscreen);
+                    } else {
+                        state.states.unset(State::Fullscreen);
+                    }
+                });
+                if toplevel.is_initial_configure_sent() {
+                    toplevel.send_pending_configure();
+                }
+                self.configured.insert(id, configuration);
+            }
+            self.space.map_element(window, (x, y), false);
+        }
+        if let Some(window) = self.layout.focused().and_then(|id| self.windows.get(&id)) {
+            self.space.raise_element(window, false);
+        }
+        self.needs_redraw = true;
+    }
+
+    pub fn sync_focus(&mut self) {
+        let focused = self.layout.focused();
+        for (id, window) in &self.windows {
+            window.set_activated(Some(*id) == focused);
+            if window.toplevel().unwrap().is_initial_configure_sent() {
+                window.toplevel().unwrap().send_pending_configure();
+            }
+        }
+        let surface = focused
+            .and_then(|id| self.windows.get(&id))
+            .map(|window| window.toplevel().unwrap().wl_surface().clone());
+        self.seat.get_keyboard().unwrap().set_focus(
+            self,
+            surface,
+            smithay::utils::SERIAL_COUNTER.next_serial(),
+        );
+        self.apply_positions();
+    }
+
+    pub fn action(&mut self, action: &str, value: Option<i64>) -> Result<(), String> {
+        let roots: Vec<_> = self
+            .windows
+            .values()
+            .map(|window| window.toplevel().unwrap().wl_surface().clone())
+            .collect();
+        for root in roots {
+            let popups: Vec<_> = PopupManager::popups_for_surface(&root)
+                .map(|(popup, _)| popup)
+                .collect();
+            for popup in popups {
+                let _ = PopupManager::dismiss_popup(&root, &popup);
+            }
+        }
+        let serial = smithay::utils::SERIAL_COUNTER.next_serial();
+        if let Some(keyboard) = self.seat.get_keyboard() {
+            if keyboard.is_grabbed() {
+                keyboard.unset_grab(self);
+            }
+        }
+        if let Some(pointer) = self.seat.get_pointer() {
+            if pointer.is_grabbed() {
+                pointer.unset_grab(self, serial, self.start_time.elapsed().as_millis() as u32);
+            }
+        }
+        match action {
+            "focus-next" => self.layout.focus_delta(1),
+            "focus-prev" => self.layout.focus_delta(-1),
+            "focus" => self.focus_id(value.ok_or("focus needs a window id")?)?,
+            "move-next" => self.layout.reorder(1),
+            "move-prev" => self.layout.reorder(-1),
+            "resize" => self.layout.resize(
+                value
+                    .ok_or("resize needs a pixel delta")?
+                    .clamp(-2000, 2000) as i32,
+            ),
+            "workspace" => {
+                let index = value.ok_or("workspace needs an index from 1 to 4")?;
+                if !(1..=4).contains(&index) {
+                    return Err("Workspace must be from 1 to 4".into());
+                }
+                self.layout.switch_workspace(index as usize - 1);
+            }
+            "move-workspace" => {
+                let index = value.ok_or("move-workspace needs an index from 1 to 4")?;
+                if !(1..=4).contains(&index) {
+                    return Err("Workspace must be from 1 to 4".into());
+                }
+                self.layout.move_to_workspace(index as usize - 1);
+            }
+            "fullscreen" => self.layout.toggle_fullscreen(),
+            "scale" => {
+                self.ui_scale = match value {
+                    Some(percent) if (50..=200).contains(&percent) => percent as f64 / 100.0,
+                    Some(_) => return Err("Scale must be 50 to 200 percent".into()),
+                    None => {
+                        if self.ui_scale >= 2.0 {
+                            1.0
+                        } else {
+                            (self.ui_scale * 4.0).floor() / 4.0 + 0.25
+                        }
+                    }
+                };
+            }
+            "terminal" => {
+                if self.session_mode {
+                    crate::spawn_session_tool(&self.socket_name, "TERMINAL")
+                        .map_err(|error| error.to_string())?;
+                } else {
+                    crate::spawn_terminal(&self.socket_name, false)
+                        .map_err(|error| error.to_string())?;
+                }
+            }
+            "launcher" => crate::spawn_session_tool(&self.socket_name, "LAUNCHER")
+                .map_err(|error| error.to_string())?,
+            "logout" => crate::spawn_session_tool(&self.socket_name, "LOGOUT")
+                .map_err(|error| error.to_string())?,
+            "close" => {
+                if let Some(window) = self.layout.focused().and_then(|id| self.windows.get(&id)) {
+                    window.toplevel().unwrap().send_close();
+                }
+            }
+            _ => return Err(format!("Unknown action: {action}")),
+        }
+        self.sync_focus();
+        Ok(())
+    }
+
+    pub fn status(&self) -> serde_json::Value {
+        use smithay::{
+            backend::renderer::utils::RendererSurfaceStateUserData,
+            wayland::{compositor::with_states, shell::xdg::XdgToplevelSurfaceData},
+        };
+        let windows: Vec<_> = self.windows.iter().map(|(id, window)| {
+            // Popup lookup accesses surface state too; do it before taking
+            // the surface-state lock used for client metadata.
+            let popups = PopupManager::popups_for_surface(window.toplevel().unwrap().wl_surface()).count();
+            let client_geometry = window.geometry();
+            with_states(window.toplevel().unwrap().wl_surface(), |states| {
+                let metadata = states.data_map.get::<XdgToplevelSurfaceData>().unwrap().lock().unwrap();
+                let (scale, size, surface_size) = states.data_map.get::<RendererSurfaceStateUserData>().map(|state| {
+                    let state = state.lock().unwrap();
+                    (state.buffer_scale(), state.buffer_size().map(|size| (size.w, size.h)), state.surface_size().map(|size| (size.w, size.h)))
+                }).unwrap_or((1, None, None));
+                let workspace = self.layout.workspaces.iter().position(|workspace| workspace.columns.iter().any(|column| column.id == *id));
+                let width = workspace.and_then(|index| self.layout.workspaces[index].columns.iter().find(|column| column.id == *id)).map(|column| column.width);
+                let density = size.zip(surface_size).filter(|(_, surface)| surface.0 > 0).map(|(buffer, surface)| buffer.0 as f64 * scale as f64 / surface.0 as f64);
+                let geometry = self.layout.geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
+                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
+            })
+        }).collect();
+        let keyboard_focus = self
+            .seat
+            .get_keyboard()
+            .and_then(|keyboard| keyboard.current_focus())
+            .and_then(|surface| self.window_id(&surface));
+        let modifiers = self
+            .seat
+            .get_keyboard()
+            .map(|keyboard| keyboard.modifier_state());
+        serde_json::json!({"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+    }
+}
+
+#[derive(Default)]
+pub struct ClientState {
+    pub compositor_state: CompositorClientState,
+}
+
+impl ClientData for ClientState {
+    fn initialized(&self, _client_id: ClientId) {}
+    fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
+}

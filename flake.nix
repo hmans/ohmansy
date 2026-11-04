@@ -52,6 +52,8 @@
         modules = [ ./nix/profiles/live-nvidia.nix ];
       };
       desktopPackages = pkgs: {
+        compositor = import ./nix/modules/compositor-package.nix { inherit pkgs; };
+        compositor-session = import ./nix/modules/compositor-session-package.nix { inherit pkgs; };
         herdr = herdr.packages.${pkgs.stdenv.hostPlatform.system}.default;
         desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
         display-preview = pkgs.writeShellScriptBin "ohmansy-display-preview" ''
@@ -140,6 +142,14 @@
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        greeter-ui = import ./nix/tests/greeter-ui.nix { pkgs = pcPkgs; };
+        greeter-auth = pcPkgs.runCommand "ohmansy-greeter-auth" {
+          nativeBuildInputs = [ pcPkgs.python3 (import ./nix/modules/greeter-package.nix { pkgs = pcPkgs; }) ];
+        } ''
+          export HOME="$TMPDIR"
+          python3 ${./nix}/tests/greeter-auth.py
+          touch "$out"
+        '';
         displays-ui = import ./nix/tests/displays-ui.nix { pkgs = pcPkgs; };
         installer-ui = import ./nix/tests/installer-ui.nix { pkgs = pcPkgs; };
         offline-installer = offlinePolicy pcPkgs pcInstalledBase pcInstaller;
@@ -169,6 +179,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        greeter-ui = import ./nix/tests/greeter-ui.nix { inherit pkgs; };
         displays-ui = import ./nix/tests/displays-ui.nix { inherit pkgs; };
         installer-ui = import ./nix/tests/installer-ui.nix { inherit pkgs; };
         offline-installer = offlinePolicy pkgs installedBase installer;
@@ -244,7 +255,12 @@
       };
       devShells = nixpkgs.lib.genAttrs [ system pcSystem ] (target:
         let tools = nixpkgs.legacyPackages.${target};
-        in { default = tools.mkShell {
+        in { spatial = tools.mkShell {
+          packages = with tools; [ rustup pkg-config gcc mise python3 niri wl-clipboard foot firefox gnome-text-editor ];
+          buildInputs = with tools; [ wayland libxkbcommon libGL ];
+          LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL ]);
+          OHMANSY_SPATIAL_FONT = "${tools.inter}/share/fonts/truetype/Inter.ttc";
+        }; default = tools.mkShell {
           packages = with tools; [ git nixfmt nil statix python3 niri ripgrep ];
         }; });
     };

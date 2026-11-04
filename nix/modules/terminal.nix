@@ -18,6 +18,13 @@ let
   '';
 in {
   options.ohmansy.terminal = {
+    launcher = lib.mkOption {
+      type = lib.types.package;
+      readOnly = true;
+      internal = true;
+      default = launcher;
+      description = "Launcher for the configured desktop terminal.";
+    };
     package = lib.mkOption {
       type = lib.types.package;
       default = pkgs.foot;

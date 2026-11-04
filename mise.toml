@@ -1,3 +1,34 @@
+[tools]
+rust = { version = "1.90.0", profile = "minimal", components = "rustfmt,clippy" }
+
+[tasks.spatial]
+description = "Run the spatial window experiment inside the current desktop"
+run = "bash tools/dev/spatial.sh run"
+
+[tasks.spatial-check]
+description = "Check the Rust spatial window experiment"
+run = "bash tools/dev/spatial.sh check"
+
+[tasks.compositor]
+description = "Run the nested Wayland compositor with live applications"
+run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run"
+
+[tasks.compositor-check]
+description = "Check the nested Wayland compositor"
+run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh check"
+
+[tasks.compositor-desktop]
+description = "Try the scrolling desktop with a browser, editor, and terminal"
+run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run --desktop"
+
+[tasks.compositor-integration]
+description = "Test disposable browser/editor clients in the nested compositor"
+run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh integration"
+
+[tasks.compositor-session]
+description = "Preview the packaged experimental desktop session"
+run = "nix run --no-update-lock-file .#compositor-session -- --nested"
+
 [tasks.clean]
 description = "Remove unused build artifacts; preserve VM state unless explicitly selected"
 run = "python3 tools/dev/clean.py"

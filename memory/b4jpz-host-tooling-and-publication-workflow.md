@@ -111,6 +111,108 @@ files for secrets and generated artifacts. Scan reachable history before first
 publication or a history rewrite. Use redacted secret-scanner output and keep
 reports under .local/. Do not push unless the current task authorizes it.
 
+## Experimental login session
+
+The scrolling compositor is shipped from `nix/compositor/` through
+`nix/modules/compositor-package.nix`. Keeping its Cargo sources under `nix/`
+also includes them in the offline release source and source archives. Rust
+dependencies have a fixed Cargo hash; runtime assets use a store path rather
+than Cargo's temporary build directory.
+
+`mise run compositor-session` previews the packaged Cage-hosted session.
+The installed module uses the configured terminal launcher and normal shell,
+a normal-window Wofi app picker (Ctrl+Alt+D), and confirmed sign-out
+(Ctrl+Alt+Shift+E). Confirmation disables Wofi config/history so Cancel remains
+the default. A dedicated D-Bus session receives the inner Wayland socket via
+dbus-update-activation-environment without importing it into the systemd user
+manager. This preserves another running desktop during previews.
+
+Packaged nested and headless session trials passed normal terminal startup at
+2x, app picking, canceled/confirmed logout, and preservation of parent windows
+and activation variables. Native Firefox/GTK integration passed after promotion.
+Physical DRM login and reboot testing remain unverified. See the
+[session guide](../docs/compositor-development.md).
+
+## Spatial window lab
+
+For actual interactive Wayland clients, use `mise run compositor-desktop`, backed
+by `nix/compositor/`. This Smithay 0.7 smallvil-derived nested compositor
+opens isolated Firefox and GTK editor instances plus Foot on its own socket.
+Columns retain their widths and scroll into view, with four workspaces,
+fullscreen, client maximize requests, column resizing, popup grabs, and local
+clipboard/primary selection support. Shortcuts use Ctrl+Alt: H/L focus, Enter
+starts a terminal, S cycles UI scale. Ctrl+Alt+function keys switch Linux virtual
+terminals and must not be used as compositor shortcuts. Plain function keys remain application
+input. `mise run compositor` retains the smaller terminal demo. See
+[compositor development](../docs/compositor-development.md). The login session uses Cage for hardware display/input; there is no native DRM
+backend or live 3D presentation in the Smithay compositor yet.
+
+The nested output uses `Scale::Custom` with `advertised_integer: 2` and a separate
+fractional display scale, plus integer and fractional surface preferences of 2x.
+Foot and GTK may use buffer_scale=1 with viewporter; compute density from buffer
+pixels divided by logical surface size. Actual Foot, GTK, and Firefox density
+was 2.0. GPU clients use DMA-BUF v4 feedback from the renderer's EGL device;
+imports are validated before accepting the buffer.
+
+`mise run compositor-check` passed formatting, six layout tests, and strict
+Clippy. `mise run compositor-integration` passed with five live windows,
+persistent widths, directional keyboard navigation, resizing/reordering,
+workspaces/fullscreen, 150% display scale with 2x Firefox content, native GTK
+popup grabs, Firefox subsurface menus and pointer selection, exact bidirectional
+clipboard exchange, native document typing, and idle rendering on an empty
+workspace. GPU imports had zero failures. Every original Niri window ID/PID was
+preserved and the trial exited cleanly. A framebuffer image was visually checked.
+No installed OS profile or desktop service was activated or replaced.
+
+The private owner-only IPC socket supplies status, launch, layout actions, and
+screenshots. Test key/pointer injection is enabled only by `--test-input`, which
+ignores physical parent input. The test never types terminal commands and uses
+fresh browser/editor state. Synchronize clipboard tests on selection publication,
+and explicitly click the GTK document after testing its menu before typing.
+
+Keep `flush_clients` in the event-loop callback even while rendering is idle;
+otherwise new clients stall during registry negotiation. Never call geometry or
+popup traversal inside `with_states` for the same surface: it recursively locks
+surface state and deadlocks. Firefox HTML selects can use wl_subsurface rather
+than xdg_popup, so test open state and chosen value rather than popup counts.
+Client shadows also affect pointer coordinates; surface size and xdg geometry
+are distinct. D-Bus and portal/session integration remain unfinished.
+
+GPU readback detail: Smithay's `map_texture` makes its EGL context surfaceless.
+Mapping a screenshot before `backend.submit` caused an EGL allocation/present
+failure under Zink/NVK. Queue the framebuffer copy while bound, present, then
+map and save; the next render bind restores the surface. The native test passed
+with this ordering. Test keys use normal Linux physical keycodes through the
+private socket and the same key handler as Winit input.
+
+The Rust and OpenGL experiment in `experiments/spatial/` runs inside the existing
+Wayland desktop. `mise run spatial` launches it; `spatial-check` runs formatting,
+perspective-picking tests, and Clippy. See [the lab guide](../docs/spatial-lab.md).
+It displays refreshable Niri window captures, not live Wayland client surfaces.
+Only generated test surfaces provide a known 2x source; existing windows retain
+their captured resolution. No desktop service or installed profile is replaced.
+
+Mise pins Rust, while `devShells.<system>.spatial` supplies native libraries and
+NixOS's patched rustup. The generic rustup-init downloaded by mise cannot run
+through NixOS's stub loader. The launcher bootstraps through the packaged rustup
+and uses `mise link` to register the resulting toolchain. On a fresh checkout,
+run `bash tools/dev/spatial.sh run` before mise can auto-install the Rust tool.
+Keep Cargo's incremental cache in ignored `.build/spatial/`.
+
+Niri's `screenshot-window --path` still changes the regular clipboard. The lab
+preserves its advertised formats and restores them only when its own screenshot
+remains selected. A separate source process serves the restored clipboard after
+the preview exits; it naturally exits when the selection changes. Closing the
+preview during capture waits for restoration. Do not replace this with a broad
+process kill or a desktop restart.
+
+Verified on 2026-11-04: native Rust build, two scene tests, formatting, and Clippy;
+the Wayland preview rendered on an RTX 3060 Ti through Mesa Zink/NVK. Generated
+surfaces and captures of six actual windows were visually checked. Integration
+checks preserved all six original window IDs/PIDs and restored text, HTML, and
+binary clipboard formats byte-for-byte, including after the capture process
+exited. No OS build, activation, reboot, or live per-window streaming was tested.
+
 CI actions are pinned. The AppArmor exception in .github/ permits user namespaces
 only for the Nix unshare executable on disposable runners; do not replace it
 with a global security disable. CI artifacts are not public GitHub releases.
