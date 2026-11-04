@@ -56,7 +56,7 @@ add it to the host's module imports. Then rebuild:
 sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
-The optional utility bundle defaults to Git, mise, Vim, curl, wget, jq, Python,
+The optional utility bundle defaults to Git, mise, herdr, Vim, curl, wget, jq, Python,
 fastfetch, btop, and htop. These defaults live in `nix/modules/software.nix`,
 exported by the root flake as `nixosModules.software`.
 Assigning `ohmansy.software.packages` replaces that list; ordinary
@@ -64,6 +64,11 @@ Assigning `ohmansy.software.packages` replaces that list; ordinary
 standard NixOS enable options. Disabling Fish restores NixOS's Bash default
 unless you select another shell. Individual accounts can set
 `users.users.<name>.shell` instead.
+
+Run `herdr` in a terminal to open its agent workspace. It comes from the upstream
+Nix flake, pinned to `v0.9.5`, for both PC and ARM systems. It updates with
+ohmansy through Nix. To select another upstream release when maintaining ohmansy,
+change `inputs.herdr.url` in `flake.nix` and run `nix flake update herdr`.
 
 The shared software defaults add `~/.local/bin` to `PATH`, including in Fish.
 Set `environment.localBinInPath = false;` to disable this. Log out and back in

@@ -1,28 +1,28 @@
-{ nixpkgs, pkgs, system }:
+{ nixpkgs, pkgs, system, ohmansyModules, herdrPackage }:
 let
   lib = nixpkgs.lib;
   evaluate = modules: (lib.nixosSystem {
     inherit system;
     modules = modules ++ [ { system.stateVersion = "26.05"; } ];
   }).config;
-  defaults = evaluate [ ../modules/default.nix ];
+  defaults = evaluate [ ohmansyModules.default ];
   hostOwnedState = (lib.nixosSystem {
     inherit system;
-    modules = [ ../modules/default.nix { system.stateVersion = "25.11"; } ];
+    modules = [ ohmansyModules.default { system.stateVersion = "25.11"; } ];
   }).config;
-  desktopOnly = evaluate [ ../modules/desktop.nix ];
-  softwareOnly = evaluate [ ../modules/software.nix ];
-  noFish = evaluate [ ../modules/default.nix { programs.fish.enable = false; } ];
-  noFishStyle = evaluate [ ../modules/software.nix { ohmansy.fishStyle.enable = false; } ];
-  customPrompt = evaluate [ ../modules/software.nix {
+  desktopOnly = evaluate [ ohmansyModules.desktop ];
+  softwareOnly = evaluate [ ohmansyModules.software ];
+  noFish = evaluate [ ohmansyModules.default { programs.fish.enable = false; } ];
+  noFishStyle = evaluate [ ohmansyModules.software { ohmansy.fishStyle.enable = false; } ];
+  customPrompt = evaluate [ ohmansyModules.software {
     programs.starship.settings.directory.style = "bold blue";
   } ];
-  differentPreset = evaluate [ ../modules/software.nix {
+  differentPreset = evaluate [ ohmansyModules.software {
     programs.starship.presets = [ "plain-text-symbols" ];
   } ];
-  noBrowserStyle = evaluate [ ../modules/software.nix { ohmansy.firefoxStyle.enable = false; } ];
+  noBrowserStyle = evaluate [ ohmansyModules.software { ohmansy.firefoxStyle.enable = false; } ];
   custom = evaluate [
-    ../modules/default.nix
+    ohmansyModules.default
     {
       programs.firefox.enable = false;
       programs.fish.enable = false;
@@ -45,6 +45,9 @@ assert defaults.environment.etc."xdg/xdg-terminals.list".text == "foot.desktop\n
 assert defaults.environment.etc ? "xdg/foot/foot.ini";
 assert !desktopOnly.programs.firefox.enable && !desktopOnly.programs.fish.enable;
 assert !softwareOnly.programs.niri.enable;
+assert builtins.elem herdrPackage defaults.environment.systemPackages;
+assert builtins.elem herdrPackage softwareOnly.environment.systemPackages;
+assert !(builtins.any (package: lib.getName package == "herdr") desktopOnly.environment.systemPackages);
 assert noFish.users.defaultUserShell == pkgs.bashInteractive;
 assert softwareOnly.programs.starship.enable;
 assert !noFish.programs.starship.enable && !noFishStyle.programs.starship.enable;
@@ -56,6 +59,7 @@ assert custom.users.defaultUserShell == pkgs.zsh;
 assert custom.ohmansy.software.packages == [];
 assert builtins.elem pkgs.hello custom.environment.systemPackages;
 assert !(builtins.elem pkgs.git custom.environment.systemPackages);
+assert !(builtins.elem herdrPackage custom.environment.systemPackages);
 assert !(builtins.elem pkgs.fish custom.environment.systemPackages);
 assert !(custom.environment.etc ? "xdg/foot/foot.ini");
 assert !(lib.hasInfix "match app-id=\"^foot$\"" custom.environment.etc."ohmansy/desktop.kdl".text);

@@ -16,11 +16,28 @@ assert pkgs.lib.hasInfix output config.environment.etc."ohmansy/niri.kdl".text;
 assert config.systemd.sockets ? ohmansy-first-boot;
 assert !config.services.displayManager.autoLogin.enable;
 assert !config.services.openssh.enable;
+assert builtins.elem appliance.pkgs.herdr config.environment.systemPackages;
 pkgs.runCommand "ohmansy-factory-platform" {} ''
   grep -F 'system = "${pkgs.stdenv.hostPlatform.system}";' ${installation}/flake.nix
   if grep -F '@SYSTEM@' ${installation}/flake.nix; then
     echo 'Unresolved installed platform' >&2
     exit 1
   fi
+  ${pkgs.python3}/bin/python3 - ${installation}/flake.lock <<'PY'
+  import json, sys
+  lock = json.load(open(sys.argv[1]))
+  nodes = lock['nodes']
+  def resolve(target):
+      if isinstance(target, str):
+          return nodes[target]
+      node = nodes[lock['root']]
+      for name in target:
+          node = resolve(node['inputs'][name])
+      return node
+  for node in nodes.values():
+      for target in node.get('inputs', {}).values():
+          resolve(target)
+  assert resolve(['ohmansy', 'herdr'])['locked']['repo'] == 'herdr'
+  PY
   touch "$out"
 ''

@@ -387,6 +387,24 @@ stub loader on the installed x86 system. Use the Nix package; task execution
 does not require shell activation. The pinned package ran and the native
 customization check passed. Installed-system activation remains pending.
 
+Herdr packaging (2026-11-04): the default software bundle includes terminal
+herdr from the upstream `herdrdev/herdr` flake at `v0.9.5`. Keep its upstream
+Nixpkgs and Rust overlay pins; ohmansy's Nixpkgs release pin is unchanged.
+The root flake exports the package on both Linux architectures and a narrow
+overlay exposing `pkgs.herdr`. The public default/software modules and internal
+image configurations apply that overlay. Replacing `ohmansy.software.packages`
+with an empty list still omits herdr; desktop-only imports do not install it.
+The customization check now exercises the public modules.
+
+Nested inputs introduced a lock-generation requirement: follows paths in
+`installation-package.nix` must be prefixed with `ohmansy` when placing the
+release under the generated host flake. The factory-platform check resolves
+every generated input reference. Native customization/factory-platform checks,
+all-system flake evaluation, offline metadata inspection of the generated host
+flake, and six factory/ISO Python tests passed. The x86 package built and ran
+`--version` and `--help`; ARM was evaluated, not built or run. No image rebuild,
+boot test, or installed-system activation was performed.
+
 Module layering (2026-11-02): default.nix composes desktop.nix and software.nix.
 The public flake exports default, desktop, software, and vm modules. Factory,
 live, and newly generated installer hosts use the combined module. Direct

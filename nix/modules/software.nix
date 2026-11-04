@@ -6,6 +6,7 @@
     default = with pkgs; [
       git
       mise
+      herdr
       vim
       curl
       wget
@@ -16,7 +17,7 @@
       htop
     ];
     description = ''
-      Optional command-line tools bundled with Ohmansy. Assign a list to replace
+      Optional command-line tools bundled with ohmansy. Assign a list to replace
       these defaults, or an empty list to omit them. Add unrelated software with
       environment.systemPackages.
     '';

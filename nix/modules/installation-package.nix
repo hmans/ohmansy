@@ -20,6 +20,11 @@ in pkgs.runCommand "ohmansy-installation" { nativeBuildInputs = [ pkgs.nix pkgs.
   from pathlib import Path
   source, output = sys.argv[1:]
   lock = json.loads((Path(source) / 'flake.lock').read_text())
+  # Follows paths start at the lock root. Nest this release under ohmansy.
+  for node in lock['nodes'].values():
+      for name, target in node.get('inputs', {}).items():
+          if isinstance(target, list):
+              node['inputs'][name] = ['ohmansy', *target]
   upstream = lock['nodes'].pop(lock['root'])
   lock['nodes']['ohmansy'] = {
       'inputs': upstream['inputs'],

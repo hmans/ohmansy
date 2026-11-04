@@ -2,52 +2,57 @@
   description = "Ohmansy — a portable Niri desktop, persistent VM, and live images";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+  inputs.herdr.url = "github:herdrdev/herdr/v0.9.5";
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, herdr }:
     let
+      nixosSystem = args: nixpkgs.lib.nixosSystem (args // {
+        modules = args.modules ++ [{ nixpkgs.overlays = [ self.overlays.default ]; }];
+      });
       system = "aarch64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      live = nixpkgs.lib.nixosSystem {
+      live = nixosSystem {
         inherit system;
         modules = [ ./nix/profiles/live-vm.nix ];
       };
-      appliance = nixpkgs.lib.nixosSystem {
+      appliance = nixosSystem {
         inherit system;
         modules = [ ./nix/profiles/factory.nix ];
       };
-      installer = nixpkgs.lib.nixosSystem {
+      installer = nixosSystem {
         inherit system;
         specialArgs.installedSystem = installedBase.config.system.build.toplevel;
         modules = [ ./nix/profiles/installer.nix ./nix/profiles/live-vm.nix ];
       };
-      installedBase = nixpkgs.lib.nixosSystem {
+      installedBase = nixosSystem {
         inherit system;
         modules = [ ./nix/profiles/installed-base.nix ];
       };
       pcSystem = "x86_64-linux";
       pcPkgs = nixpkgs.legacyPackages.${pcSystem};
-      pcAppliance = nixpkgs.lib.nixosSystem {
+      pcAppliance = nixosSystem {
         system = pcSystem;
         modules = [ ./nix/profiles/factory.nix ];
       };
-      pcInstaller = nixpkgs.lib.nixosSystem {
+      pcInstaller = nixosSystem {
         system = pcSystem;
         specialArgs.installedSystem = pcInstalledBase.config.system.build.toplevel;
         modules = [ ./nix/profiles/installer.nix ./nix/profiles/live-pc.nix ];
       };
-      pcInstalledBase = nixpkgs.lib.nixosSystem {
+      pcInstalledBase = nixosSystem {
         system = pcSystem;
         modules = [ ./nix/profiles/installed-base.nix ];
       };
-      pcLive = nixpkgs.lib.nixosSystem {
+      pcLive = nixosSystem {
         system = pcSystem;
         modules = [ ./nix/profiles/live-pc.nix ];
       };
-      pcNvidia = nixpkgs.lib.nixosSystem {
+      pcNvidia = nixosSystem {
         system = pcSystem;
         modules = [ ./nix/profiles/live-nvidia.nix ];
       };
       desktopPackages = pkgs: {
+        herdr = herdr.packages.${pkgs.stdenv.hostPlatform.system}.default;
         desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
         display-preview = pkgs.writeShellScriptBin "ohmansy-display-preview" ''
           exec ${import ./nix/modules/desktop-package.nix { inherit pkgs; }}/bin/ohmansy-quickshell \
@@ -104,9 +109,18 @@
           touch "$out"
         '';
     in {
-      nixosModules.default = import ./nix/modules/default.nix;
+      overlays.default = final: _prev: {
+        herdr = herdr.packages.${final.stdenv.hostPlatform.system}.default;
+      };
+      nixosModules.default = {
+        imports = [ ./nix/modules/default.nix ];
+        nixpkgs.overlays = [ self.overlays.default ];
+      };
       nixosModules.desktop = import ./nix/modules/desktop.nix;
-      nixosModules.software = import ./nix/modules/software.nix;
+      nixosModules.software = {
+        imports = [ ./nix/modules/software.nix ];
+        nixpkgs.overlays = [ self.overlays.default ];
+      };
       nixosModules.vm = import ./nix/modules/vm.nix;
       nixosModules.firstBoot = import ./nix/modules/first-boot.nix;
       nixosModules.updates = import ./nix/modules/updates.nix;
@@ -141,6 +155,8 @@
         };
         customization = import ./nix/tests/customization.nix {
           inherit nixpkgs;
+          ohmansyModules = self.nixosModules;
+          herdrPackage = herdr.packages.${pcSystem}.default;
           pkgs = pcPkgs;
           system = pcSystem;
         };
@@ -159,7 +175,11 @@
         factory-platform = import ./nix/tests/factory-platform.nix { inherit pkgs appliance; };
         ribbons = import ./nix/tests/ribbons.nix { inherit pkgs; };
         development-module = import ./nix/tests/development.nix { inherit nixpkgs pkgs system; };
-        customization = import ./nix/tests/customization.nix { inherit nixpkgs pkgs system; };
+        customization = import ./nix/tests/customization.nix {
+          inherit nixpkgs pkgs system;
+          ohmansyModules = self.nixosModules;
+          herdrPackage = herdr.packages.${system}.default;
+        };
         greeter-auth = pkgs.runCommand "ohmansy-greeter-auth" {
           nativeBuildInputs = [ pkgs.python3 (import ./nix/modules/greeter-package.nix { inherit pkgs; }) ];
         } ''
