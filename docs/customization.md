@@ -65,6 +65,10 @@ standard NixOS enable options. Disabling Fish restores NixOS's Bash default
 unless you select another shell. Individual accounts can set
 `users.users.<name>.shell` instead.
 
+The shared software defaults add `~/.local/bin` to `PATH`, including in Fish.
+Set `environment.localBinInPath = false;` to disable this. Log out and back in
+after rebuilding to load the updated session environment.
+
 Log out and back in after changing the default shell so the desktop receives
 the new `SHELL` environment variable. Existing shells keep running.
 

@@ -359,6 +359,16 @@ Customization checks cover enabled/disabled styling, Fish opt-out, individual
 Starship style overrides, and alternate presets without leaked colors. Installed
 build passed; actual light/dark Foot previews confirmed separators and icons.
 Existing Fish/Foot processes need restart to load prompt/font changes.
+Local commands (2026-11-04): software.nix defaults
+`environment.localBinInPath = true` with mkDefault. NixOS's generated environment
+prepends each user's `~/.local/bin` to PATH, including through Fish's foreign-env
+integration. This is independent of prompt styling. A host can disable it with
+`environment.localBinInPath = false`. Native x86 customization check passed;
+default/override evaluation and an isolated Fish process loading the built
+set-environment confirmed the setting and PATH order. No installed-system
+activation was performed. Log out and back in after rebuilding to refresh the
+session environment.
+
 Pastel Powerline only sets segment backgrounds upstream, so its text inherited
 black in light terminals. fish-style.nix now supplies explicit #f5f5f5 text for
 all preset segments, preserving the user's preferred dark-mode look. Defaults
