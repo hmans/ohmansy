@@ -9,6 +9,12 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Nix-ld (2026-11-04): `nix/modules/software.nix` enables
+`programs.nix-ld.enable = true` for the shared software configuration.
+An isolated snapshot of committed sources plus this setting evaluated it to
+true in all seven exported ARM/x86 system configurations. This was evaluation
+only; no system or image was built, activated, or boot-tested.
+
 Desktop appearance defaults (2026-11-04): keep the unlocked dconf dark default
 in `nix/modules/desktop.nix`, not `profiles/live-pc.nix`. The live-only setting
 made the installer look dark while freshly installed owners started light.
