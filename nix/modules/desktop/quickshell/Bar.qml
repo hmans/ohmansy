@@ -13,20 +13,29 @@ PanelWindow {
     required property var niriState
     required property var audio
     required property var appearance
+    required property var displays
     property bool launcherActive: false
     property string launcherMode: "apps"
     signal launcherRequested()
     signal launcherDismissed()
+    signal displayRequested()
     Launcher {
         barWindow: bar
-        opened: bar.launcherActive && bar.launcherMode !== "shortcuts"
+        opened: bar.launcherActive && bar.launcherMode !== "shortcuts" && bar.launcherMode !== "displays"
         requestedMode: bar.launcherMode
         niriState: bar.niriState
         onDismissed: bar.launcherDismissed()
+        onDisplayRequested: bar.displayRequested()
     }
     ShortcutPanel {
         barWindow: bar
         opened: bar.launcherActive && bar.launcherMode === "shortcuts"
+        onDismissed: bar.launcherDismissed()
+    }
+    DisplayPanel {
+        barWindow: bar
+        controller: bar.displays
+        opened: bar.launcherActive && bar.launcherMode === "displays"
         onDismissed: bar.launcherDismissed()
     }
     readonly property string installerCommand: Quickshell.env("OHMANSY_INSTALLER") || ""

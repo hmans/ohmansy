@@ -49,6 +49,10 @@
       };
       desktopPackages = pkgs: {
         desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
+        display-preview = pkgs.writeShellScriptBin "ohmansy-display-preview" ''
+          exec ${import ./nix/modules/desktop-package.nix { inherit pkgs; }}/bin/ohmansy-quickshell \
+            --path ${./nix/modules/desktop/quickshell}/display-preview.qml "$@"
+        '';
         wallpaper = import ./nix/modules/wallpaper-package.nix { inherit pkgs; };
         greeter-preview = pkgs.writeShellScriptBin "ohmansy-greeter-preview" ''
           preview=preview.qml
@@ -122,6 +126,7 @@
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        displays-ui = import ./nix/tests/displays-ui.nix { pkgs = pcPkgs; };
         installer-ui = import ./nix/tests/installer-ui.nix { pkgs = pcPkgs; };
         offline-installer = offlinePolicy pcPkgs pcInstalledBase pcInstaller;
         factory-platform = import ./nix/tests/factory-platform.nix {
@@ -148,6 +153,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        displays-ui = import ./nix/tests/displays-ui.nix { inherit pkgs; };
         installer-ui = import ./nix/tests/installer-ui.nix { inherit pkgs; };
         offline-installer = offlinePolicy pkgs installedBase installer;
         factory-platform = import ./nix/tests/factory-platform.nix { inherit pkgs appliance; };

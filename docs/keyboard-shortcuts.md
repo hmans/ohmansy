@@ -31,6 +31,18 @@ Cliphist's per-user database; notification history uses Mako's last 100 retained
 notifications. Neither history is written to the system configuration or Git.
 Bluetooth controls need a Bluetooth adapter; the development VM has none.
 
+Choose **Displays** in Desktop controls (**Mod+Comma**) to select a monitor,
+set UI scale, or choose a refresh rate at its current resolution. Choose
+**Apply**, then **Keep changes** within 15 seconds; **Revert**, closing the
+panel, or letting the timer expire restores the previous settings. Use
+**Refresh** after connecting or disconnecting monitors.
+
+Kept settings live in `~/.config/ohmansy/displays.json` (or under
+`$XDG_CONFIG_HOME`) and are restored when you log in with the same monitor on
+the same connector. Reconnecting a monitor during a session may require applying
+its settings again. These are personal preferences; shared desktop defaults
+remain in the repository.
+
 The wallpaper controls can select an image or return to animated ribbons.
 An image selection is saved under the user's XDG state directory and survives
 desktop restarts.

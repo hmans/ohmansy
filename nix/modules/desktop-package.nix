@@ -2,6 +2,15 @@
 let
   ui = import ./quickshell-ui.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
+  displays = import ./display-package.nix { inherit pkgs; };
+  previewDisplay = pkgs.writeShellScript "ohmansy-preview-display" ''
+    # The preview worker must outlive a shell reload/crash so its timeout can
+    # restore the previous settings. Only this small relay belongs to Quickshell.
+    exec ${pkgs.systemd}/bin/systemd-run --user --pipe --wait --collect --quiet \
+      --setenv=NIRI_SOCKET="$NIRI_SOCKET" \
+      --setenv=XDG_CONFIG_HOME="''${XDG_CONFIG_HOME:-$HOME/.config}" \
+      ${displays}/bin/ohmansy-displays preview "$@"
+  '';
   appearance = pkgs.writeShellScript "ohmansy-appearance" ''
     export GSETTINGS_SCHEMA_DIR=${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}/glib-2.0/schemas
     case "$1" in
@@ -58,6 +67,8 @@ in pkgs.writeShellScriptBin "ohmansy-quickshell" ''
   export OHMANSY_NIRI_THEME="${syncNiriTheme}"
   export OHMANSY_APPEARANCE="${appearance}"
   export OHMANSY_DESKTOP="${desktop}/bin/ohmansy-desktop"
+  export OHMANSY_DISPLAYS="${displays}/bin/ohmansy-displays"
+  export OHMANSY_DISPLAY_PREVIEW="${previewDisplay}"
   export PATH="${pkgs.xdg-terminal-exec}/bin:$PATH"
   exec ${pkgs.quickshell}/bin/quickshell "$@"
 ''

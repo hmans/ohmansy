@@ -19,6 +19,7 @@ function entries(mode, pending) {
         ] : [];
     }
     if (mode === "controls") return [
+        { id: "displays", name: "Displays", icon: "preferences-desktop-display-symbolic" },
         { id: "sound", name: "Sound", icon: "audio-volume-high-symbolic" },
         { id: "network", name: "Network", icon: "network-wired-symbolic" },
         { id: "bluetooth", name: "Bluetooth", icon: "bluetooth-symbolic" },

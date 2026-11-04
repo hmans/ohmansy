@@ -56,6 +56,7 @@ PanelWindow {
         }
     }
     signal dismissed()
+    signal displayRequested()
     property string launchError: ""
     property string launchingName: ""
     Process {
@@ -89,6 +90,7 @@ PanelWindow {
     onMatchesChanged: results.currentIndex = matches.length ? 0 : -1
     function launch(app) {
         if (!app || !opened || appLaunch.running) return;
+        if (app.id === "displays") { displayRequested(); return; }
         if (app.kind === "back") { mode = "power"; search.clear(); return; }
         if (app.confirm) { pendingAction = app.id; mode = "confirm"; search.clear(); return; }
         if (app.kind === "notification") {

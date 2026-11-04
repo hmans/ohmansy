@@ -6,6 +6,7 @@ let
   };
   wallpaper = import ./wallpaper-package.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
+  displays = import ./display-package.nix { inherit pkgs; };
   shortcutGroups = builtins.fromJSON (builtins.readFile ./desktop/shortcuts.json);
   shortcutBindings = lib.concatMap (group: group.bindings) shortcutGroups;
   renderBinding = binding:
@@ -44,7 +45,7 @@ in {
 
   # No account, credentials, machine identifiers, or personal services here.
   environment.systemPackages = with pkgs; [
-    desktop quickshell mako swaybg swaylock nautilus
+    desktop displays quickshell mako swaybg swaylock nautilus
     playerctl wireplumber
     xwayland-satellite adwaita-icon-theme wl-clipboard
   ];
@@ -70,6 +71,18 @@ in {
       ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --watch ${pkgs.cliphist}/bin/cliphist store";
       Restart = "on-failure";
       UMask = "0077";
+    };
+  };
+  systemd.user.services.ohmansy-displays = {
+    description = "Restore saved display settings";
+    wantedBy = [ "niri.service" ];
+    after = [ "niri.service" ];
+    before = [ "quickshell.service" "ohmansy-wallpaper.service" ];
+    partOf = [ "niri.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${displays}/bin/ohmansy-displays restore";
+      RemainAfterExit = true;
     };
   };
   environment.etc."ohmansy/niri.kdl".text = ''

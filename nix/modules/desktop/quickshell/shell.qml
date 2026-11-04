@@ -36,13 +36,14 @@ ShellRoot {
         function close(): void { root.launcherScreen = ""; }
         function ping(): string { return "ready"; }
         function openMenu(mode: string): void {
-            if (!["apps", "windows", "clipboard", "power", "controls", "notifications", "shortcuts"].includes(mode)) return;
+            if (!["apps", "windows", "clipboard", "power", "controls", "notifications", "shortcuts", "displays"].includes(mode)) return;
             root.toggleLauncher(niri.focusedOutput || Quickshell.screens[0].name, mode);
         }
     }
     NiriState { id: niri }
     AudioState { id: audioState }
     AppearanceState { id: appearanceState }
+    DisplayState { id: displayState }
     Variants {
         model: Quickshell.screens
         Bar {
@@ -52,9 +53,11 @@ ShellRoot {
             niriState: niri
             audio: audioState
             appearance: appearanceState
+            displays: displayState
             launcherActive: root.launcherScreen === modelData.name
             launcherMode: root.launcherMode
             onLauncherRequested: root.toggleLauncher(modelData.name)
+            onDisplayRequested: root.toggleLauncher(modelData.name, "displays")
             onLauncherDismissed: if (root.launcherScreen === modelData.name) root.launcherScreen = ""
         }
     }

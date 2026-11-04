@@ -77,6 +77,12 @@ use the Linux checks above here.
 
 ## Test an installed system with local sources
 
+Use `mise run display-ui` (or `nix run .#display-preview`) to preview display
+controls with simulated monitors. It cannot change the current displays.
+`nix build .#checks.x86_64-linux.displays-ui` checks the selection and
+confirmation flow and renders wide, narrow, short, pending, empty, and error
+states. The equivalent check is also available on `aarch64-linux`.
+
 Implement shared OS and desktop changes in the repository's reusable modules,
 packages, and defaults. This makes them part of ohmansy for future builds and
 installations. Local activation tests those source changes on your machine;

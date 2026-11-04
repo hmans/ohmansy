@@ -1,7 +1,7 @@
 # Fixed actions only. Clipboard content and window titles are never shell code.
 case "${1:-}" in
   menu)
-    case "${2:-}" in apps|windows|clipboard|power|controls|notifications|shortcuts) ;; *) exit 2 ;; esac
+    case "${2:-}" in apps|windows|clipboard|power|controls|notifications|shortcuts|displays) ;; *) exit 2 ;; esac
     systemctl --user start quickshell.service
     for _attempt in $(seq 1 40); do
       if quickshell ipc --path /etc/xdg/quickshell/ohmansy/shell.qml call launcher ping >/dev/null 2>&1; then
@@ -73,6 +73,7 @@ case "${1:-}" in
     ;;
   control-action)
     case "${2:-}" in
+      displays) exec "$0" menu displays ;;
       sound) command=(pavucontrol) ;;
       network) command=(nm-connection-editor) ;;
       bluetooth) command=(blueman-manager) ;;

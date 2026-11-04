@@ -14,6 +14,10 @@ run = "bash tools/dev/os-rebuild.sh test"
 description = "Activate checkout changes and select them for future boots"
 run = "bash tools/dev/os-rebuild.sh switch"
 
+[tasks.display-ui]
+description = "Preview display controls with simulated monitors"
+run = "nix run --no-update-lock-file .#display-preview"
+
 [tasks.installer-iso]
 description = "Build the installer ISO when its sources change"
 sources = ["flake.nix", "flake.lock", "nix/**/*", "tools/build/installer-iso.sh"]

@@ -425,6 +425,30 @@ The transparent bar uses Theme.onWallpaper and forwards it into QuietButton;
 this fixes text, icons, slider, and hover colors independently of light/dark
 mode. Tray images are rendered white. Other surfaces retain the system palette.
 
+Display controls (2026-11-04): Desktop controls → Displays opens DisplayPanel.qml
+and DisplayView.qml. DisplayState.qml talks to the packaged Python helper
+desktop/displays.py. The helper queries Niri outputs and offers exact refresh
+rates at the current resolution plus fractional UI scales. Preview changes
+revert after 15 seconds, on Revert, or on closing the panel. The worker runs in
+a transient user service outside Quickshell's lifetime; EOF and timeout restore
+the previous mode and scale. A simulated-worker test killed the relay and
+verified rollback without any real display commands. Keep writes user-owned
+XDG_CONFIG_HOME/ohmansy/displays.json atomically, preserving other saved outputs.
+The ohmansy-displays user service restores saved choices at login only when the
+connector and monitor identity match. Reconnecting during a session may require
+applying again. No personal hardware settings are stored in reusable modules.
+
+`mise run display-ui` / `nix run .#display-preview` uses simulated monitors.
+The displays-ui check runs the UI flow and renders wide, narrow, short,
+confirmation, empty, and error states, asserting action bounds. Native x86
+builds of the shell, preview, customization check, and displays-ui check passed;
+13 backend tests plus four desktop helper tests passed. A hidden panel loaded
+in the active Wayland session and real monitor enumeration passed read-only.
+No installed-system activation or physical mode/scale changes were performed.
+Qt offscreen cannot load layer-shell panel types; verify those under Wayland.
+The broader Python suite had sandbox socket errors and a Mac-only /bin/cp test;
+automatic approval review rejected an elevated rerun of the full suite.
+
 Firefox styling (2026-11-02): software.nix imports firefox-style.nix. Packaged
 AutoConfig registers a USER_SHEET scoped to browser.xhtml, without writing user
 profiles or replacing userChrome.css. Compact density and hidden bookmarks are
