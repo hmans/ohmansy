@@ -22,6 +22,7 @@
       description = "Ohmansy host text clipboard";
       wantedBy = [ "niri.service" ];
       after = [ "niri.service" ];
+      bindsTo = [ "niri.service" ];
       partOf = [ "niri.service" ];
       path = [ pkgs.wl-clipboard ];
       serviceConfig = {

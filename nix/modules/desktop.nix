@@ -56,6 +56,9 @@ in {
   systemd.user.services.ohmansy-lock = {
     description = "Ohmansy screen lock";
     after = [ "niri.service" ];
+    # PartOf handles stop/restart jobs; BindsTo also handles Niri exiting itself.
+    # Without it, desktop services can restart against a vanished display.
+    bindsTo = [ "niri.service" ];
     partOf = [ "niri.service" ];
     serviceConfig = {
       Type = "forking";
@@ -66,6 +69,7 @@ in {
     description = "Ohmansy clipboard history";
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
+    bindsTo = [ "niri.service" ];
     partOf = [ "niri.service" ];
     serviceConfig = {
       ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --watch ${pkgs.cliphist}/bin/cliphist store";
@@ -77,6 +81,7 @@ in {
     description = "Restore saved display settings";
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
+    bindsTo = [ "niri.service" ];
     before = [ "quickshell.service" "ohmansy-wallpaper.service" ];
     partOf = [ "niri.service" ];
     serviceConfig = {
@@ -98,6 +103,7 @@ in {
     description = "Ohmansy desktop wallpaper";
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
+    bindsTo = [ "niri.service" ];
     partOf = [ "niri.service" ];
     serviceConfig = {
       ExecStart = "${wallpaper}/bin/ohmansy-wallpaper";
@@ -110,6 +116,7 @@ in {
     description = "Ohmansy desktop panel";
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
+    bindsTo = [ "niri.service" ];
     partOf = [ "niri.service" ];
     # Desktop entries often use bare command names. Include the user's and
     # system's installed apps, not just the panel's own helper programs.
@@ -132,6 +139,7 @@ in {
     description = "Ohmansy desktop authentication agent";
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
+    bindsTo = [ "niri.service" ];
     partOf = [ "niri.service" ];
     serviceConfig = {
       ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";

@@ -331,6 +331,28 @@ theme. The installed build, Niri validation, seven targeted tests, live window
 picker, and power confirmation passed. Final icon loading had no warnings.
 Real unlock, physical media keys, and multiple monitors remain untested.
 
+Session lifetime (2026-11-04): desktop user services need both `After=niri.service`
+and `BindsTo=niri.service`. `PartOf` alone propagates systemd stop/restart jobs,
+but does not stop companions when Niri exits itself. A physical PC's previous-boot
+journal recorded `quitting after confirming exit dialog`, followed by the panel,
+wallpaper, clipboard, and polkit services restarting against a missing display.
+There was no lock-service start. The next login reached PAM session opening while
+the old user manager was still stopping a terminal scope; the exact login stall
+was not established. Do not describe this evidence as a Swaylock or GPU crash.
+
+The shared desktop, VM clipboard, and PC live-scale services now bind to Niri's
+lifetime, retaining PartOf for explicit restarts. An isolated real systemd user
+test using the generated dependency graph reproduced all eight companions
+surviving compositor exit with the old settings. With BindsTo, clean exit and
+compositor failure stopped them all; a fresh session started them again, and
+child failure still restarted the child while the compositor lived. Native x86
+flake checks and four action-dispatch tests passed. The dispatch tests confirm
+that Lock starts only the lock service and that a failed lock blocks suspend;
+they do not exercise PAM unlock or graphical logout/login. A runtime drop-in can
+test the dependency change without restarting Niri; it disappears at reboot.
+Installed systems still need a rebuild for persistence. Physical lock/unlock
+and a complete logout/login cycle with the fix remain unverified.
+
 Shortcut help uses ShortcutPanel.qml and the shared desktop glass palette.
 `desktop/shortcuts.json` is the source for both generated Niri bindings and
 the installed help data; custom bindings outside it are not displayed.
