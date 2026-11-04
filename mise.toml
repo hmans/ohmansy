@@ -2,6 +2,18 @@
 description = "Remove unused build artifacts; preserve VM state unless explicitly selected"
 run = "python3 tools/dev/clean.py"
 
+[tasks.os-build]
+description = "Build this machine's OS with the ohmansy checkout"
+run = "bash tools/dev/os-rebuild.sh build"
+
+[tasks.os-test]
+description = "Activate checkout changes without changing the boot default"
+run = "bash tools/dev/os-rebuild.sh test"
+
+[tasks.os-switch]
+description = "Activate checkout changes and select them for future boots"
+run = "bash tools/dev/os-rebuild.sh switch"
+
 [tasks.installer-iso]
 description = "Build the installer ISO when its sources change"
 sources = ["flake.nix", "flake.lock", "nix/**/*", "tools/build/installer-iso.sh"]

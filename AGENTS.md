@@ -23,6 +23,9 @@ or push unless asked. Preserve unrelated changes.
 
 ## Essential boundaries
 
+- Implement shared OS and desktop changes in this repo's reusable modules,
+  packages, and defaults so they ship in ohmansy. Use the current installation
+  to test them; keep machine-only settings in its local configuration.
 - `flakey/` is ignored reference material, never an official flake input or staged
   content. Its old VM was deleted. Do not recreate it as a fallback.
 - Keep credentials, VM state, generated bundles, and personal configuration out

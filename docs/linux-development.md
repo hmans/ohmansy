@@ -77,6 +77,14 @@ use the Linux checks above here.
 
 ## Test an installed system with local sources
 
+Implement shared OS and desktop changes in the repository's reusable modules,
+packages, and defaults. This makes them part of ohmansy for future builds and
+installations. Local activation tests those source changes on your machine;
+editing only `/etc/nixos` or runtime files does not put a change into ohmansy.
+Keep hardware, disks, accounts, and personal preferences in the machine's
+configuration. Existing installations receive shared changes when rebuilt or
+updated; activating this machine does not update other installations.
+
 This section is for an installed Ohmansy system, including the persistent VM.
 It is not for the live USB. Inspect `/etc/nixos/flake.nix` first: the generated
 configuration has an `ohmansy` input and a host named `ohmansy`. Custom host
@@ -84,6 +92,30 @@ configurations may use different names.
 
 Keep its accounts, disk layout, hardware modules, state version, and local
 preferences. Build with a temporary source override from the checkout:
+
+```sh
+mise run os-build
+mise run os-test
+# Once satisfied, activate and select the build for future boots:
+mise run os-switch
+```
+
+These tasks use `/etc/nixos#ohmansy` and override its `ohmansy` input with this
+checkout. They leave the installed release pin and lock file unchanged. `os-build`
+only builds; `os-test` activates without changing the boot default; `os-switch`
+activates and changes the boot default. Test and switch may restart services.
+Use a planned boot activation and restart for login-manager, kernel, or
+graphics-driver changes, as described below.
+
+Inspect a command without building or activating with `mise run os-test -- --dry-run`.
+For a custom installed configuration, set `OHMANSY_SYSTEM_FLAKE`, for example:
+
+```sh
+OHMANSY_SYSTEM_FLAKE=/path/to/machine-config#my-host mise run os-build
+```
+
+Mise is optional: `bash tools/dev/os-rebuild.sh build` (or `test` / `switch`)
+runs the same helper. The equivalent build command is:
 
 ```sh
 sudo nixos-rebuild build --flake /etc/nixos#ohmansy \
