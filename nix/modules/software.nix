@@ -15,6 +15,7 @@
       fastfetch
       btop
       htop
+      psmisc
     ];
     description = ''
       Optional command-line tools bundled with ohmansy. Assign a list to replace

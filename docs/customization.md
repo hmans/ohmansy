@@ -57,8 +57,8 @@ sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
 The optional utility bundle defaults to Git, mise, herdr, Vim, curl, wget, jq, Python,
-fastfetch, btop, and htop. These defaults live in `nix/modules/software.nix`,
-exported by the root flake as `nixosModules.software`.
+fastfetch, btop, htop, and psmisc (including `killall`). These defaults live in
+`nix/modules/software.nix`, exported by the root flake as `nixosModules.software`.
 Assigning `ohmansy.software.packages` replaces that list; ordinary
 `environment.systemPackages` entries add to it. Firefox and Fish use their
 standard NixOS enable options. Disabling Fish restores NixOS's Bash default
