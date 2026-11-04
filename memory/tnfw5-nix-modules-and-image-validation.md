@@ -386,6 +386,14 @@ optional utility bundle to provide `killall`. The evaluated x86 factory defaults
 include it; the pinned package's `killall --version` and native customization
 check passed. No image rebuild or installed-system activation was performed.
 
+Build tools (2026-11-04): `software.nix` includes `gcc`, `gnumake`, `python3`,
+and `pkg-config` in the default utility bundle passed to
+`environment.systemPackages`. Python 3 was already included. Hosts can still
+replace the bundle through `ohmansy.software.packages`. All seven public
+NixOS image configurations evaluated with all four tools on their respective
+ARM/x86 platforms; the native x86 customization check passed. No image build,
+boot test, or installed-system activation was performed.
+
 Mise packaging (2026-11-04): software.nix includes `pkgs.mise` in the optional
 utility bundle. The `mise.run` generic Linux executable failed with NixOS's
 stub loader on the installed x86 system. Use the Nix package; task execution

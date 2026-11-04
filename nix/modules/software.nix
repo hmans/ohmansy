@@ -11,7 +11,10 @@
       curl
       wget
       jq
+      gcc
+      gnumake
       python3
+      pkg-config
       fastfetch
       btop
       htop
