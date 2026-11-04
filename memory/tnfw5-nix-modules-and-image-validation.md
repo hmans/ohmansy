@@ -235,8 +235,8 @@ Alternative sessions (2026-11-04): the shared desktop imports
 `compositor.nix`, which offers **Shine (experimental)** alongside
 **ohmansy (Niri)**. Niri remains the default; hosts can set
 `ohmansy.compositor.enable = false`. The session is also registered with
-`services.displayManager.sessionPackages`. It uses Cage for hardware and the
-Smithay compositor for layout, currently on one output. Niri's panel and services
+`services.displayManager.sessionPackages`. It runs Shine's native DRM/KMS and libinput backend directly, with independent
+workspaces on connected outputs of the primary GPU. Cage has been removed. Niri's panel and services
 remain scoped to Niri. The terminal module exposes its launcher internally so
 the alternative session honors terminal customization.
 
@@ -675,3 +675,17 @@ type-2 AppImage containing an AppRun script; an argument with spaces arrived
 intact. Test cache/artifacts stayed under ignored .local/. No live binfmt
 registration or OS activation was performed, and ARM runtime was not tested.
 Apps must match the machine architecture; this does not add CPU emulation.
+
+Shine multi-monitor update (2026-11-04): `compositor-drm` is an x86-64 NixOS VM
+check with two virtio GPU outputs. It booted Shine through greetd, rendered real
+clients, moved windows, changed a single output scale, and resumed after a VT
+round trip. The packaged nested session retained terminal/launcher/logout and
+parent environment preservation. The user subsequently confirmed both physical monitors working
+(2026-11-04), with the automatic horizontal arrangement in the wrong order.
+This is user-confirmed hardware behavior, separate from the VM checks above.
+Saved output positioning is still a next step.
+
+The stronger native VM test also passed real libinput keyboard input,
+Super+period monitor focus, Ctrl+Alt+F2, and page flips after returning to VT1.
+The VM must enable polkit just like the shared desktop: logind's SwitchTo
+request otherwise fails even though root chvt works. Keep VM waits bounded.

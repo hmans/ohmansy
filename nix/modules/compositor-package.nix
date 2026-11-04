@@ -6,7 +6,7 @@ pkgs.rustPlatform.buildRustPackage {
   pname = "ohmansy-compositor";
   version = "0.1.0";
   src = pkgs.lib.cleanSource ../compositor;
-  cargoHash = "sha256-12XS/brE2MTRi82HPyOW6lU/gR+eSHu80ebi+uQAHRQ=";
+  cargoHash = "sha256-Htg5C/1/1ryNzi++WM0fwR8jZ2TZ4AwHQs6/w+6Tixw=";
   nativeBuildInputs = [
     pkgs.pkg-config
     pkgs.makeWrapper
@@ -15,6 +15,11 @@ pkgs.rustPlatform.buildRustPackage {
     pkgs.wayland
     pkgs.libxkbcommon
     pkgs.libGL
+    pkgs.libgbm
+    pkgs.libdrm
+    pkgs.libinput
+    pkgs.seatd
+    pkgs.udev
   ];
   OHMANSY_COMPOSITOR_ASSETS = "${../compositor}";
   postFixup = ''

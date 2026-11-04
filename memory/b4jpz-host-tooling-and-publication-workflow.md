@@ -129,7 +129,8 @@ also includes them in the offline release source and source archives. Rust
 dependencies have a fixed Cargo hash; runtime assets use a store path rather
 than Cargo's temporary build directory.
 
-`mise run compositor-session` previews the packaged Cage-hosted session.
+`mise run compositor-session` previews the packaged nested session. Normal logins
+now run Shine's DRM backend directly; Cage has been removed from the wrapper.
 The installed module uses the configured terminal launcher and normal shell,
 a normal-window Wofi app picker (Super+D), and confirmed sign-out
 (Super+Shift+E). Confirmation disables Wofi config/history so Cancel remains
@@ -137,10 +138,11 @@ the default. A dedicated D-Bus session receives the inner Wayland socket via
 dbus-update-activation-environment without importing it into the systemd user
 manager. This preserves another running desktop during previews.
 
-Packaged nested and headless session trials passed normal terminal startup at
+Earlier Cage nested/headless trials passed normal terminal startup at
 2x, app picking, canceled/confirmed logout, and preservation of parent windows
 and activation variables. Native Firefox/GTK integration passed after promotion.
-Physical DRM login and reboot testing remain unverified. See the
+The initial development checks did not verify physical DRM login; see the
+multi-monitor update below for subsequent user confirmation. See the
 [session guide](../docs/compositor-development.md).
 
 Shortcut profiles (2026-11-04): login sessions use Super and nested runs use
@@ -168,8 +170,8 @@ clipboard/primary selection support. Shortcuts use Super in login sessions and S
 H/L focus, Enter starts a terminal, S cycles UI scale. Ctrl+Alt+function keys switch Linux virtual
 terminals and must not be used as compositor shortcuts. Plain function keys remain application
 input. `mise run compositor` retains the smaller terminal demo. See
-[compositor development](../docs/compositor-development.md). The login session uses Cage for hardware display/input; there is no native DRM
-backend or live 3D presentation in the Smithay compositor yet.
+[compositor development](../docs/compositor-development.md). The login session now uses Shine's native DRM backend; live 3D presentation
+remains in the separate snapshot experiment.
 
 The nested output uses `Scale::Custom` with `advertised_integer: 2` and a separate
 fractional display scale, plus integer and fractional surface preferences of 2x.
@@ -287,3 +289,39 @@ exited. No OS build, activation, reboot, or live per-window streaming was tested
 CI actions are pinned. The AppArmor exception in .github/ permits user namespaces
 only for the Nix unshare executable on disposable runners; do not replace it
 with a global security disable. CI artifacts are not public GitHub releases.
+
+## Shine multiple monitors (2026-11-04)
+
+`native.rs` owns the primary GPU through libseat, DRM/KMS and GBM/EGL, with
+libinput events and session pause/resume for VT switching. Each connected
+connector gets its preferred mode and its own page-flipped scanout. The session
+wrapper selects `--backend drm`; `--nested` keeps winit without Cage. No host
+DRM device was acquired during development testing.
+
+`desktop.rs` keeps independent scrolling layouts and four workspaces per output,
+with output-local cropping in `scene.rs`. Outputs are horizontal in connector
+name order; scales are per monitor, initially 125%, with client rendering still
+2x. Mod+comma/period focuses a monitor, Shift moves a window. Removed monitor
+windows migrate without losing column widths. Relative and absolute pointers
+are clamped to the monitor union; scale changes preserve physical position.
+
+`--outputs 2` simulates two actual Wayland outputs in one nested canvas. The
+monitor trial passed independent workspaces/fullscreen, window movement and
+mixed scales. Existing Firefox/GTK/cursor/clipboard integration, real nested
+shortcut forwarding, and packaged session launcher/logout checks passed while
+preserving parent windows and activation environment. Twelve Rust unit tests
+and strict Clippy passed. The `compositor-drm` NixOS VM check booted two virtual
+KMS outputs, moved real Foot clients between them, changed one scale, and
+resumed rendering after a VT round trip. Headless QEMU needs a forced second
+connector (`video=Virtual-2:1280x800@60e`) in the test guest only.
+
+The user subsequently confirmed successful operation on physical monitors
+(2026-11-04). Both displays work; automatic connector ordering does not match
+their physical arrangement. The agent performed no installed OS activation or
+reboot. Multi-GPU rendering, saved monitor positioning/rotation, and native
+framebuffer screenshots remain unsupported. See the session guide for commands.
+
+The stronger native VM test also passed real libinput keyboard input,
+Super+period monitor focus, Ctrl+Alt+F2, and page flips after returning to VT1.
+The VM must enable polkit just like the shared desktop: logind's SwitchTo
+request otherwise fails even though root chvt works. Keep VM waits bounded.

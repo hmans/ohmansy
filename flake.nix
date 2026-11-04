@@ -142,6 +142,7 @@
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        compositor-drm = import ./nix/tests/compositor-drm.nix { pkgs = pcPkgs; };
         cursor-theme = import ./nix/tests/cursor-theme.nix { pkgs = pcPkgs; };
         greeter-ui = import ./nix/tests/greeter-ui.nix { pkgs = pcPkgs; };
         greeter-auth = pcPkgs.runCommand "ohmansy-greeter-auth" {
@@ -259,7 +260,7 @@
         let tools = nixpkgs.legacyPackages.${target};
         in { spatial = tools.mkShell {
           packages = with tools; [ rustup pkg-config gcc mise python3 niri wl-clipboard foot firefox gnome-text-editor ];
-          buildInputs = with tools; [ wayland libxkbcommon libGL ];
+          buildInputs = with tools; [ wayland libxkbcommon libGL libgbm libdrm libinput seatd udev ];
           LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL ]);
           OHMANSY_SPATIAL_FONT = "${tools.inter}/share/fonts/truetype/Inter.ttc";
           shellHook = ''. ${(import ./nix/modules/cursor-theme.nix { pkgs = tools; }).environment}'';

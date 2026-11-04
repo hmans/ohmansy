@@ -5,10 +5,7 @@ use smithay::{
         egl::EGLDevice,
         renderer::{
             damage::OutputDamageTracker,
-            element::{
-                surface::{render_elements_from_surface_tree, WaylandSurfaceRenderElement},
-                Kind,
-            },
+            element::utils::{Relocate, RelocateRenderElement},
             gles::GlesRenderer,
             ExportMem, ImportDma, TextureMapping,
         },
@@ -29,6 +26,25 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn resize(
+    state: &mut Smallvil,
+    outputs: &[Output],
+    size: smithay::utils::Size<i32, smithay::utils::Physical>,
+) {
+    state.nested_canvas_size = Some((size.w, size.h));
+    for (i, output) in outputs.iter().enumerate() {
+        let left = size.w * i as i32 / outputs.len() as i32;
+        let right = size.w * (i + 1) as i32 / outputs.len() as i32;
+        let mode = Mode {
+            size: ((right - left).max(1), size.h.max(1)).into(),
+            refresh: 60_000,
+        };
+        output.change_current_state(Some(mode), None, None, None);
+        output.set_preferred(mode);
+    }
+    state.relayout();
+}
+
 pub fn init_winit(
     event_loop: &mut EventLoop<CalloopData>,
     data: &mut CalloopData,
@@ -42,57 +58,50 @@ pub fn init_winit(
         })
         .with_inner_size(::winit::dpi::LogicalSize::new(1360.0, 850.0));
     let (mut graphics, events) = winit::init_from_attributes::<GlesRenderer>(attributes)
-        .map_err(|error| anyhow::anyhow!("{error}"))?;
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
     let formats = graphics.renderer().dmabuf_formats();
     let device = EGLDevice::device_for_display(graphics.renderer().egl_context().display())
-        .and_then(|device| {
-            device
-                .render_device_path()
-                .or_else(|_| device.drm_device_path())
-        })
+        .and_then(|d| d.render_device_path().or_else(|_| d.drm_device_path()))
         .ok()
         .and_then(|path| std::fs::metadata(path).ok())
-        .map(|metadata| metadata.rdev());
+        .map(|m| m.rdev());
     let global = if let Some(device) = device {
-        let feedback = DmabufFeedbackBuilder::new(device, formats.clone()).build()?;
+        let feedback = DmabufFeedbackBuilder::new(device, formats).build()?;
         data.state
             .dmabuf_state
             .create_global_with_default_feedback::<Smallvil>(&data.display_handle, &feedback)
     } else {
-        eprintln!("No EGL device metadata: using DMA-BUF v3 fallback");
         data.state
             .dmabuf_state
             .create_global::<Smallvil>(&data.display_handle, formats)
     };
     data.state.dmabuf_global = Some(global);
-    let mode = Mode {
-        size: graphics.window_size(),
-        refresh: 60_000,
-    };
-    let output = Output::new(
-        "ohmansy-lab".into(),
-        PhysicalProperties {
-            size: (0, 0).into(),
-            subpixel: Subpixel::Unknown,
-            make: "ohmansy".into(),
-            model: "Shine".into(),
-        },
-    );
-    let _global = output.create_global::<Smallvil>(&data.display_handle);
-    output.change_current_state(
-        Some(mode),
-        Some(Transform::Flipped180),
-        Some(Scale::Custom {
-            advertised_integer: 2,
-            fractional: data.state.ui_scale,
-        }),
-        Some((0, 0).into()),
-    );
-    output.set_preferred(mode);
-    data.state.space.map_output(&output, (0, 0));
-    data.state.relayout();
-    let mut damage_tracker = OutputDamageTracker::from_output(&output);
-    let mut last_scale = data.state.ui_scale;
+    let mut outputs = vec![];
+    for i in 0..data.state.virtual_outputs {
+        let output = Output::new(
+            format!("SHINE-{}", i + 1),
+            PhysicalProperties {
+                size: (0, 0).into(),
+                subpixel: Subpixel::Unknown,
+                make: "ohmansy".into(),
+                model: "Shine preview".into(),
+            },
+        );
+        output.create_global::<Smallvil>(&data.display_handle);
+        output.change_current_state(
+            None,
+            Some(Transform::Normal),
+            Some(Scale::Custom {
+                advertised_integer: 2,
+                fractional: data.state.ui_scale,
+            }),
+            Some((0, 0).into()),
+        );
+        data.state.space.map_output(&output, (0, 0));
+        outputs.push(output);
+    }
+    resize(&mut data.state, &outputs, graphics.window_size());
+    let mut tracker = OutputDamageTracker::new(graphics.window_size(), 1.0, Transform::Flipped180);
     let backend = Rc::new(RefCell::new(graphics));
     let timer_backend = backend.clone();
     let mut tick = Instant::now();
@@ -105,14 +114,8 @@ pub fn init_winit(
                 state.apply_positions();
             }
             tick = now;
-            if state.windows.values().any(|window| !window.alive()) {
-                state.relayout();
-                state.sync_focus();
-            }
+            state.maintain_scene();
             if state.screenshot.is_some() && state.start_time.elapsed() > Duration::from_secs(2) {
-                state.needs_redraw = true;
-            }
-            if matches!(&state.cursor_image, smithay::input::pointer::CursorImageStatus::Surface(surface) if !surface.alive()) {
                 state.needs_redraw = true;
             }
             if state.needs_redraw || !state.pending_imports.is_empty() {
@@ -120,8 +123,7 @@ pub fn init_winit(
             }
             TimeoutAction::ToDuration(Duration::from_millis(16))
         })
-        .map_err(|error| anyhow::anyhow!("{}", error.error))?;
-
+        .map_err(|e| anyhow::anyhow!("{}", e.error))?;
     event_loop
         .handle()
         .insert_source(events, move |event, _, data| {
@@ -129,78 +131,15 @@ pub fn init_winit(
             let state = &mut data.state;
             match event {
                 WinitEvent::Resized { size, .. } => {
-                    output.change_current_state(
-                        Some(Mode {
-                            size,
-                            refresh: 60_000,
-                        }),
-                        None,
-                        None,
-                        None,
-                    );
-                    state.relayout();
+                    resize(state, &outputs, size);
+                    tracker = OutputDamageTracker::new(size, 1.0, Transform::Flipped180);
                 }
                 WinitEvent::Input(event) => state.process_input_event(event),
-                WinitEvent::Focus(false) if !state.test_input => {
-                    // Releases can go to another host window after focus moves.
-                    // Winit's synthetic releases are filtered by Smithay, so
-                    // clear our pressed state explicitly to avoid stuck Super.
-                    let keyboard = state.seat.get_keyboard().unwrap();
-                    let time = state.start_time.elapsed().as_millis() as u32;
-                    for key in keyboard.pressed_keys() {
-                        state.process_key(key, smithay::backend::input::KeyState::Released, time);
-                    }
-                }
+                WinitEvent::Focus(false) if !state.test_input => state.release_keys(),
                 WinitEvent::Redraw => {
-                    use smithay::input::pointer::{CursorImageAttributes, CursorImageStatus};
-                    for (buffer, notifier) in state.pending_imports.drain(..) {
-                        if backend.renderer().import_dmabuf(&buffer, None).is_ok() {
-                            state.dmabuf_imports += 1;
-                            let _ = notifier.successful::<Smallvil>();
-                        } else {
-                            state.dmabuf_failures += 1;
-                            notifier.failed();
-                        }
-                    }
-                    if state.ui_scale != last_scale {
-                        let pointer_pixels = state.seat.get_pointer().unwrap().current_location().to_physical(last_scale);
-                        last_scale = state.ui_scale;
-                        output.change_current_state(
-                            None,
-                            None,
-                            Some(Scale::Custom {
-                                advertised_integer: 2,
-                                fractional: last_scale,
-                            }),
-                            None,
-                        );
-                        state.relayout();
-                        // Keep the pointer at the same physical pixel and
-                        // refresh its surface focus after the layout changes.
-                        if let Some(geometry) = state.space.output_geometry(&output) {
-                            let position = pointer_pixels.to_logical(last_scale);
-                            state.process_motion((
-                                position.x.clamp(0.0, (geometry.size.w as f64 - 1.0).max(0.0)),
-                                position.y.clamp(0.0, (geometry.size.h as f64 - 1.0).max(0.0)),
-                            ).into(), state.start_time.elapsed().as_millis() as u32);
-                        }
-                        backend.window().set_title(&format!(
-                            "Shine · {:.0}% scale",
-                            last_scale * 100.0
-                        ));
-                    }
+                    state.import_buffers(backend.renderer());
                     state.space.refresh();
-                    // Clients acknowledge a scale-induced resize asynchronously.
-                    // Re-enter a surface that grows under a stationary pointer.
-                    let pointer = state.seat.get_pointer().unwrap();
-                    let position = pointer.current_location();
-                    let under = state.surface_under(position).map(|(surface, _)| surface);
-                    if !pointer.is_grabbed() && pointer.current_focus() != under {
-                        state.process_motion(position, state.start_time.elapsed().as_millis() as u32);
-                    }
-                    if matches!(&state.cursor_image, CursorImageStatus::Surface(surface) if !surface.alive()) {
-                        state.cursor_image = CursorImageStatus::default_named();
-                    }
+                    state.maintain_scene();
                     state.needs_redraw = false;
                     let size = backend.window_size();
                     if size.w <= 0 || size.h <= 0 {
@@ -210,82 +149,55 @@ pub fn init_winit(
                     let mut screenshot = None;
                     let render = (|| -> anyhow::Result<()> {
                         let (renderer, mut framebuffer) = backend.bind()?;
-                        let mut overlays: Vec<WaylandSurfaceRenderElement<GlesRenderer>> = vec![];
-                        let pointer = state.seat.get_pointer().unwrap().current_location();
-                        if let CursorImageStatus::Surface(surface) = &state.cursor_image {
-                            let hotspot =
-                                smithay::wayland::compositor::with_states(surface, |states| {
-                                    states
-                                        .data_map
-                                        .get::<std::sync::Mutex<CursorImageAttributes>>()
-                                        .map(|attributes| attributes.lock().unwrap().hotspot)
-                                        .unwrap_or_default()
-                                });
-                            overlays.extend(render_elements_from_surface_tree(
-                                renderer,
-                                surface,
-                                (pointer - hotspot.to_f64())
-                                    .to_physical_precise_round(state.ui_scale),
-                                state.ui_scale,
-                                1.0,
-                                Kind::Cursor,
-                            ));
+                        let mut elements = vec![];
+                        let mut left = 0;
+                        state.cursor_rendered_elements = 0;
+                        for output in &outputs {
+                            elements.extend(
+                                state
+                                    .output_elements(renderer, output, None)
+                                    .into_iter()
+                                    .map(|e| {
+                                        RelocateRenderElement::from_element(
+                                            e,
+                                            (left, 0),
+                                            Relocate::Relative,
+                                        )
+                                    }),
+                            );
+                            left += output.current_mode().unwrap().size.w;
                         }
-                        state.cursor_rendered_elements = overlays.len();
-                        if let Some(surface) = &state.drag_icon {
-                            overlays.extend(render_elements_from_surface_tree(
-                                renderer,
-                                surface,
-                                pointer.to_physical_precise_round(state.ui_scale),
-                                state.ui_scale,
-                                1.0,
-                                Kind::Unspecified,
-                            ));
-                        }
-                        smithay::desktop::space::render_output::<
-                            _,
-                            WaylandSurfaceRenderElement<GlesRenderer>,
-                            _,
-                            _,
-                        >(
-                            &output,
+                        tracker.render_output(
                             renderer,
                             &mut framebuffer,
-                            1.0,
                             0,
-                            [&state.space],
-                            &overlays,
-                            &mut damage_tracker,
+                            &elements,
                             [0.035, 0.035, 0.055, 1.0],
                         )?;
                         if state.start_time.elapsed() > Duration::from_secs(2) {
                             if let Some(path) = state.screenshot.take() {
-                                let mapping = renderer.copy_framebuffer(
-                                    &framebuffer,
-                                    Rectangle::from_size((size.w, size.h).into()),
-                                    smithay::backend::allocator::Fourcc::Abgr8888,
-                                )?;
-                                screenshot = Some((path, mapping));
+                                screenshot = Some((
+                                    path,
+                                    renderer.copy_framebuffer(
+                                        &framebuffer,
+                                        Rectangle::from_size((size.w, size.h).into()),
+                                        smithay::backend::allocator::Fourcc::Abgr8888,
+                                    )?,
+                                ));
                             }
                         }
                         Ok(())
                     })();
-                    if let Err(error) = render {
-                        state.runtime_error = Some(format!("{error:#}"));
-                        state.loop_signal.stop();
-                        return;
-                    }
-                    if let Err(error) = backend.submit(Some(&[damage])) {
-                        state.runtime_error = Some(error.to_string());
+                    if let Err(e) =
+                        render.and_then(|_| backend.submit(Some(&[damage])).map_err(Into::into))
+                    {
+                        state.runtime_error = Some(format!("{e:#}"));
                         state.loop_signal.stop();
                         return;
                     }
                     state.rendered_frames += 1;
-                    // A live cursor surface with no buffer is also a client's
-                    // request to hide the cursor. Only destroyed surfaces fall
-                    // back to the named default above.
                     match &state.cursor_image {
-                        CursorImageStatus::Named(icon) => {
+                        smithay::input::pointer::CursorImageStatus::Named(icon) => {
                             backend.window().set_cursor(*icon);
                             backend.window().set_cursor_visible(true);
                         }
@@ -293,7 +205,6 @@ pub fn init_winit(
                     }
                     if let Some((path, mapping)) = screenshot {
                         let result = (|| -> anyhow::Result<()> {
-                            // Map after swap: readback makes the EGL context surfaceless.
                             let bytes = backend.renderer().map_texture(&mapping)?;
                             let mut image = image::RgbaImage::from_raw(
                                 size.w as u32,
@@ -304,27 +215,15 @@ pub fn init_winit(
                             if mapping.flipped() {
                                 image::imageops::flip_vertical_in_place(&mut image);
                             }
-                            image.save(&path)?;
-                            eprintln!("Saved compositor image: {}", path.display());
+                            image.save(path)?;
                             Ok(())
                         })();
-                        if let Err(error) = result {
-                            eprintln!("Screenshot failed: {error:#}");
+                        if let Err(e) = result {
+                            eprintln!("Screenshot failed: {e:#}");
                         }
                     }
-                    state.space.elements().for_each(|window| {
-                        window.send_frame(
-                            &output,
-                            state.start_time.elapsed(),
-                            Some(Duration::ZERO),
-                            |_, _| Some(output.clone()),
-                        );
-                    });
-                    if let CursorImageStatus::Surface(surface) = &state.cursor_image {
-                        smithay::desktop::utils::send_frames_surface_tree(
-                            surface, &output, state.start_time.elapsed(),
-                            Some(Duration::ZERO), |_, _| Some(output.clone()),
-                        );
+                    for output in &outputs {
+                        state.send_output_frames(output);
                     }
                     state.popups.cleanup();
                     let _ = data.display_handle.flush_clients();
@@ -333,6 +232,44 @@ pub fn init_winit(
                 _ => (),
             }
         })
-        .map_err(|error| anyhow::anyhow!("{}", error.error))?;
+        .map_err(|e| anyhow::anyhow!("{}", e.error))?;
     Ok(())
+}
+
+impl Smallvil {
+    pub fn release_keys(&mut self) {
+        let keyboard = self.seat.get_keyboard().unwrap();
+        let time = self.start_time.elapsed().as_millis() as u32;
+        for key in keyboard.pressed_keys() {
+            self.process_key(key, smithay::backend::input::KeyState::Released, time);
+        }
+    }
+    pub fn import_buffers(&mut self, renderer: &mut GlesRenderer) {
+        for (buffer, notifier) in self.pending_imports.drain(..) {
+            if renderer.import_dmabuf(&buffer, None).is_ok() {
+                self.dmabuf_imports += 1;
+                let _ = notifier.successful::<Smallvil>();
+            } else {
+                self.dmabuf_failures += 1;
+                notifier.failed();
+            }
+        }
+    }
+    pub fn maintain_scene(&mut self) {
+        if self.windows.values().any(|w| !w.alive()) {
+            self.relayout();
+            self.sync_focus();
+        }
+        if matches!(&self.cursor_image,smithay::input::pointer::CursorImageStatus::Surface(s) if !s.alive())
+        {
+            self.cursor_image = smithay::input::pointer::CursorImageStatus::default_named();
+            self.needs_redraw = true;
+        }
+        let pointer = self.seat.get_pointer().unwrap();
+        let position = pointer.current_location();
+        let under = self.surface_under(position).map(|(s, _)| s);
+        if !pointer.is_grabbed() && pointer.current_focus() != under {
+            self.process_motion(position, self.start_time.elapsed().as_millis() as u32);
+        }
+    }
 }

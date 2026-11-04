@@ -19,7 +19,6 @@ def manager_display_environment():
 
 def run():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--headless', action='store_true')
     parser.add_argument('--session', type=Path, default=trial.ROOT / '.local/compositor-session/bin/ohmansy-compositor-session')
     args = parser.parse_args()
     base = trial.ROOT / '.local/compositor-tests'
@@ -31,13 +30,11 @@ def run():
     original_environment = manager_display_environment()
     control = trial.Control(artifacts / 'control.sock')
     trial.TEST_CONTROL = control
-    command = [str(args.session)] + ([] if args.headless else ['--nested'])
+    command = [str(args.session), '--nested']
     command += ['--test-input', '--control-socket', control.path, '--close-after', '60', '--report', str(artifacts / 'state.json')]
     environment = os.environ.copy()
     environment['XDG_CACHE_HOME'] = str(artifacts / 'cache')
-    if args.headless:
-        environment.update(WLR_BACKENDS='headless', WLR_HEADLESS_OUTPUTS='1', WLR_RENDERER='pixman', LIBGL_ALWAYS_SOFTWARE='1')
-    shortcut = ('super',) if args.headless else ('super', 'alt')
+    shortcut = ('super', 'alt')
     with (artifacts / 'session.log').open('w') as log:
         process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
         try:
@@ -45,7 +42,7 @@ def run():
             pid = state['pid']
             terminal = trial.wait_for(lambda: next((window for window in control()['windows'] if window['app_id'] == 'foot'), None), description='normal session terminal')
             trial.wait_for(lambda: next(window for window in control()['windows'] if window['id'] == terminal['id'])['render_density'] == 2, description='2x session terminal')
-            if not args.headless and original_focus is not None:
+            if original_focus is not None:
                 trial.focus_parent_window(original_focus)
             trial.keys(control, pid, terminal['id'], [32], shortcut)
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='application picker')
@@ -76,7 +73,7 @@ def run():
             assert all(remaining.get(ident) == pid for ident, pid in original.items()), 'Original desktop windows changed'
             assert manager_display_environment() == original_environment, 'Parent activation environment changed'
     (artifacts / 'verification.json').write_text(json.dumps({
-        'backend': 'headless' if args.headless else 'wayland',
+        'backend': 'wayland',
         'normal_terminal': True, 'applications': True, 'cancel_logout': True,
         'confirmed_logout': True, 'original_windows_preserved': True,
         'parent_activation_environment_preserved': True,

@@ -18,11 +18,13 @@ The experimental session opens your configured terminal and normal login shell.
 confirmation; Cancel keeps the desktop running, while Sign out returns to the
 login screen. Applications use their normal profiles in this session.
 
-Cage supplies DRM/KMS display handling, input devices, and VT switching. It hosts
-Shine fullscreen, which manages its own clients and layout.
-This adds a composition layer; it is a bridge until the compositor has its own
-hardware backend. The session currently uses one monitor (Cage's last connected
-output). Niri's panel, wallpaper, and services remain tied to Niri.
+Shine handles DRM/KMS displays, seat access, input devices, and VT switching
+directly through Smithay, libseat, and libinput. Cage is no longer part of the
+session. Connected monitors on the primary GPU are placed side by side, ordered
+by connector name, with their preferred modes and a starting scale of 125%.
+Each monitor has four independent scrolling workspaces. Disconnecting a monitor
+moves its windows to a remaining monitor. Niri's panel, wallpaper, and services
+remain tied to Niri.
 
 This session is experimental: it has no screen locking, screen sharing, IME,
 X11 support, or complete desktop portal integration. Keep Niri available as the
@@ -73,15 +75,27 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | --- | --- |
 | Mod+H/L or Left/Right | Focus previous/next column |
 | Mod+Shift+H/L or Left/Right | Move column left/right |
+| Mod+comma/period | Focus previous/next monitor |
+| Mod+Shift+comma/period | Move window to previous/next monitor |
 | Mod+minus/equal | Narrow/widen the focused column |
 | Mod+1–4 | Switch workspace |
 | Mod+Shift+1–4 | Move the focused window to a workspace |
 | Mod+Enter | Open a terminal |
 | Mod+F | Toggle fullscreen |
 | Mod+Q | Close the focused window |
-| Mod+S | Cycle display scale from 100% to 200% |
+| Mod+S | Cycle the focused monitor's scale from 100% to 200% |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
+
+To preview multiple monitors inside one development window:
+
+```sh
+mise run compositor-desktop -- --outputs 2
+```
+
+The halves are separate Wayland outputs, with independent scales, workspaces,
+and clipping. This preview uses the same layout and rendering as the hardware
+backend. Click a window or use the monitor shortcut to select its monitor.
 
 `mise run compositor` starts the smaller terminal and animated terminal demo.
 The separate [spatial lab](spatial-lab.md) demonstrates 3D presentation using
@@ -107,9 +121,12 @@ cursor assets while honoring existing `XCURSOR_THEME`, `XCURSOR_SIZE`, and
 `XCURSOR_PATH` preferences. These Xcursor settings also apply to Wayland cursor
 images; they are not limited to X11.
 
-The Smithay compositor has no direct display/input backend of its own; the login
-session uses Cage for that role. The development demo runs directly inside the
-parent desktop. Clipboard exchange is local to its clients. X11 clients and
+The login session uses `--backend drm`; development uses `--backend winit`
+inside the parent desktop. Native output support currently covers connectors
+on one primary GPU, with automatic preferred modes and a horizontal arrangement.
+Saved monitor configuration, rotation, multi-GPU rendering, and native
+framebuffer screenshots are not implemented. Clipboard exchange is local to
+its clients. X11 clients and
 moving existing Niri windows into it are unsupported. Its 3D presentation remains
 in the separate snapshot experiment.
 
@@ -134,6 +151,8 @@ Restart the nested process to try code changes; no OS rebuild is needed.
 mise run compositor-check
 mise run compositor-integration
 python3 tools/tests/compositor_nesting.py
+python3 tools/tests/compositor_monitors.py
+nix build .#checks.x86_64-linux.compositor-drm
 mise run compositor -- --scale 1.5 --close-after 10
 ```
 
@@ -147,11 +166,12 @@ The nesting trial checks real Wayland key forwarding between a Super host and
 a Super+Alt child, including focus changes and independent scale shortcuts.
 
 After building `nix build --out-link .local/compositor-session .#compositor-session`,
-`python3 tools/tests/compositor_session.py` checks the packaged Cage session,
+`python3 tools/tests/compositor_session.py` checks the packaged nested session,
 normal terminal, app picker, canceled and confirmed sign-out, and preservation
-of the parent desktop and its activation environment. Add `--headless` to exercise
-Cage's headless backend without a parent display. These checks do not establish
-a successful physical DRM login or a booted system image.
+of the parent desktop and its activation environment. The `compositor-drm` NixOS
+VM check exercises two virtual KMS outputs, per-monitor scaling and window moves,
+and leaving and returning to the session's VT. These checks do not establish
+a successful physical DRM login or a booted system image on your hardware.
 
 For local automation or a future shell, enable the private control socket:
 
@@ -167,10 +187,14 @@ In another terminal, use the built binary:
 .build/spatial/debug/ohmansy-compositor msg --socket .local/compositor-control.sock launch foot
 ```
 
-The socket has owner-only permissions. Status includes window geometry, workspace,
+The socket has owner-only permissions. Status includes outputs, their scales,
+positions, active workspaces, and each window's output, plus window geometry, workspace,
 render density, and render/import counters. Commands also include `focus ID`,
 `focus-next`, `focus-prev`, `move-next`, `move-prev`, `resize DELTA`, `workspace N`,
 `move-workspace N`, `fullscreen`, `terminal`, `close`, `screenshot PNG`, and `quit`.
+Use `output N` to focus a monitor (starting at 1), `focus-output-next` or
+`focus-output-prev` to cycle, and `move-output-next` or `move-output-prev` to move
+the focused window. `scale PERCENT` affects the focused monitor.
 Test key and pointer commands are disabled in normal sessions.
 
 `--socket-file PATH` writes the nested Wayland socket name for launching clients
@@ -179,6 +203,6 @@ instead of the default demos. Use separate-instance options for applications
 that normally reuse a running process. Do not import the experimental display
 into the global systemd or D-Bus environment.
 
-`--screenshot PATH.png` saves the framebuffer after startup without changing the
+In nested mode, `--screenshot PATH.png` saves the framebuffer after startup without changing the
 clipboard. `--report PATH.json` writes final status when the session ends. Keep
 these development artifacts under ignored `.local/`.

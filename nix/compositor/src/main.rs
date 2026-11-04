@@ -1,10 +1,13 @@
 #![allow(irrefutable_let_patterns)]
 
+mod desktop;
 mod grabs;
 mod handlers;
 mod input;
 mod ipc;
 mod layout;
+mod native;
+mod scene;
 mod state;
 mod winit;
 
@@ -169,6 +172,8 @@ fn main() -> Result<()> {
         .init();
 
     let mut scale = 1.25_f64;
+    let mut outputs = 1;
+    let mut backend = "winit".to_owned();
     let mut close_after = None;
     let mut socket_file: Option<PathBuf> = None;
     let mut screenshot = None;
@@ -184,10 +189,17 @@ fn main() -> Result<()> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
-                println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--scale 1.25] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+minus/equal: resize column\nMod+1..4: workspace; add Shift to move the window\nMod+Enter: terminal; F: fullscreen; Q: close; S: display scale\nMod+D: applications; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
+                println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--backend winit|drm] [--outputs 2] [--scale 1.25] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+comma/period: focus monitor; add Shift to move window\nMod+minus/equal: resize column\nMod+1..4: workspace; add Shift to move the window\nMod+Enter: terminal; F: fullscreen; Q: close; S: display scale\nMod+D: applications; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
                 return Ok(());
             }
             "--scale" => scale = args.next().context("--scale needs a number")?.parse()?,
+            "--outputs" => {
+                outputs = args
+                    .next()
+                    .context("--outputs needs a number")?
+                    .parse::<usize>()?
+            }
+            "--backend" => backend = args.next().context("--backend needs winit or drm")?,
             "--close-after" => {
                 close_after = Some(Duration::from_secs(
                     args.next()
@@ -239,7 +251,11 @@ fn main() -> Result<()> {
         "Scale must be between 0.5 and 2.0"
     );
     anyhow::ensure!(
-        std::env::var_os("WAYLAND_DISPLAY").is_some(),
+        backend != "drm" || screenshot.is_none(),
+        "Framebuffer screenshots currently require the winit backend"
+    );
+    anyhow::ensure!(
+        backend == "drm" || std::env::var_os("WAYLAND_DISPLAY").is_some(),
         "Use ohmansy-compositor-session for a login session, or start inside a Wayland desktop"
     );
     anyhow::ensure!(
@@ -251,6 +267,9 @@ fn main() -> Result<()> {
     let display_handle = display.handle();
     let mut state = Smallvil::new(&mut event_loop, display);
     state.ui_scale = scale;
+    anyhow::ensure!((1..=8).contains(&outputs), "Choose 1 to 8 preview outputs");
+    state.virtual_outputs = outputs;
+    state.native_mode = backend == "drm";
     state.test_input = test_input;
     state.session_mode = session_mode;
     state.shortcut_modifier = shortcut_modifier.unwrap_or(if session_mode {
@@ -267,7 +286,11 @@ fn main() -> Result<()> {
         state,
         display_handle,
     };
-    crate::winit::init_winit(&mut event_loop, &mut data)?;
+    match backend.as_str() {
+        "winit" => crate::winit::init_winit(&mut event_loop, &mut data)?,
+        "drm" => crate::native::init_native(&mut event_loop, &mut data)?,
+        _ => anyhow::bail!("Backend must be winit or drm"),
+    }
     let control_path = control_socket.unwrap_or_else(|| {
         PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").unwrap())
             .join(format!("ohmansy-compositor-{}.sock", std::process::id()))
@@ -360,7 +383,7 @@ fn main() -> Result<()> {
         }
     }
     if let Some(error) = data.state.runtime_error {
-        anyhow::bail!("Nested renderer stopped: {error}");
+        anyhow::bail!("Shine stopped: {error}");
     }
     Ok(())
 }

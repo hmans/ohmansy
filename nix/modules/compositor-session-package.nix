@@ -30,9 +30,11 @@ let
     # --nested is an explicit preview. A login must acquire displays itself,
     # even if stale display variables were inherited from the greeter.
     mod_key=super
+    backend=drm
     if [ "''${1:-}" = --nested ]; then
       shift
       mod_key=super-alt
+      backend=winit
     else
       unset WAYLAND_DISPLAY DISPLAY WAYLAND_SOCKET NIRI_SOCKET
     fi
@@ -47,15 +49,14 @@ let
     export OHMANSY_COMPOSITOR_SESSION_SETUP=${setup}
     # Keep activation scoped to this bus, including when previewing inside Niri.
     exec ${pkgs.dbus}/bin/dbus-run-session -- \
-      ${pkgs.cage}/bin/cage -s -m last -- \
-      ${compositor}/bin/ohmansy-compositor --session --mod-key "$mod_key" "$@"
+      ${compositor}/bin/ohmansy-compositor --backend "$backend" --session --mod-key "$mod_key" "$@"
   '';
 in
 pkgs.runCommand "ohmansy-compositor-session"
   {
     passthru.providedSessions = [ "ohmansy" ];
     meta = {
-      description = "Shine desktop session hosted by Cage";
+      description = "Shine desktop session with direct display and input support";
       platforms = pkgs.lib.platforms.linux;
       mainProgram = "ohmansy-compositor-session";
     };

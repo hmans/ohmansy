@@ -96,7 +96,9 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                         Err("key needs a physical code and pressed boolean".into())
                     }
                 } else if action == "screenshot" {
-                    if let Some(path) = request["path"].as_str() {
+                    if data.state.native_mode {
+                        Err("Framebuffer screenshots are currently available in nested mode".into())
+                    } else if let Some(path) = request["path"].as_str() {
                         data.state.screenshot = Some(PathBuf::from(path));
                         data.state.needs_redraw = true;
                         Ok(())

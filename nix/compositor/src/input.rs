@@ -1,7 +1,7 @@
 use smithay::{
     backend::input::{
         AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
-        KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent,
+        KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent, PointerMotionEvent,
     },
     input::{
         keyboard::FilterResult,
@@ -78,8 +78,7 @@ impl Smallvil {
 
         if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
             if let Some((window, _loc)) = self
-                .space
-                .element_under(pointer.current_location())
+                .window_under(pointer.current_location())
                 .map(|(w, l)| (w.clone(), l))
             {
                 if let Some(id) = self.window_id(window.toplevel().unwrap().wl_surface()) {
@@ -87,6 +86,13 @@ impl Smallvil {
                     self.sync_focus();
                 }
             } else {
+                if let Some(index) = self
+                    .layout
+                    .at(pointer.current_location().x, pointer.current_location().y)
+                {
+                    self.layout.focus_monitor(index);
+                    self.ui_scale = self.layout.current().scale;
+                }
                 self.space.elements().for_each(|window| {
                     window.set_activated(false);
                     window.toplevel().unwrap().send_pending_configure();
@@ -132,6 +138,20 @@ impl Smallvil {
                     if !pressed && state.shortcut_keys.remove(&code) {
                         return FilterResult::Intercept(("none", None));
                     }
+                    if state.native_mode && modifiers.ctrl && modifiers.alt {
+                        let vt = match code {
+                            67..=76 => Some(code - 66),
+                            95 => Some(11),
+                            96 => Some(12),
+                            _ => None,
+                        };
+                        if let Some(vt) = vt {
+                            if pressed {
+                                state.shortcut_keys.insert(code);
+                            }
+                            return FilterResult::Intercept(("vt", Some(vt as i64)));
+                        }
+                    }
                     // Exact Alt matching lets a Super host forward Super+Alt
                     // shortcuts to a nested compositor. Shift is an action modifier.
                     if !state.shortcut_modifier.matches(modifiers) {
@@ -173,6 +193,22 @@ impl Smallvil {
                             0x45 if modifiers.shift => Some(("logout", None)),
                             0xff0d => Some(("terminal", None)),
                             0x73 | 0x53 => Some(("scale", None)),
+                            0x2c | 0x3c => Some((
+                                if modifiers.shift {
+                                    "move-output-prev"
+                                } else {
+                                    "focus-output-prev"
+                                },
+                                None,
+                            )),
+                            0x2e | 0x3e => Some((
+                                if modifiers.shift {
+                                    "move-output-next"
+                                } else {
+                                    "focus-output-next"
+                                },
+                                None,
+                            )),
                             _ => None,
                         }
                     };
@@ -208,19 +244,36 @@ impl Smallvil {
             InputEvent::Keyboard { event, .. } => {
                 self.process_key(event.key_code(), event.state(), event.time_msec())
             }
-            InputEvent::PointerMotion { .. } => {}
+            InputEvent::PointerMotion { event, .. } => {
+                let position = self.seat.get_pointer().unwrap().current_location() + event.delta();
+                let position = self.layout.clamp(position.x, position.y);
+                self.process_motion(position.into(), event.time_msec());
+            }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let geometry = self
-                    .space
-                    .outputs()
-                    .next()
-                    .cloned()
-                    .and_then(|output| self.space.output_geometry(&output));
-                if let Some(geometry) = geometry {
-                    let position =
-                        event.position_transformed(geometry.size) + geometry.loc.to_f64();
-                    self.process_motion(position, event.time_msec());
+                if let Some((width, height)) = self.nested_canvas_size {
+                    let position = self
+                        .layout
+                        .canvas_point(event.x_transformed(width), event.y_transformed(height));
+                    self.process_motion(position.into(), event.time_msec());
+                    return;
                 }
+                let width = self
+                    .layout
+                    .monitors
+                    .iter()
+                    .map(|m| m.origin.0 + m.layout.size.0)
+                    .max()
+                    .unwrap_or(1);
+                let height = self
+                    .layout
+                    .monitors
+                    .iter()
+                    .map(|m| m.origin.1 + m.layout.size.1)
+                    .max()
+                    .unwrap_or(1);
+                let position = event.position_transformed((width, height).into());
+                let position = self.layout.clamp(position.x, position.y);
+                self.process_motion(position.into(), event.time_msec());
             }
             InputEvent::PointerButton { event, .. } => {
                 self.process_button(event.button_code(), event.state(), event.time_msec())

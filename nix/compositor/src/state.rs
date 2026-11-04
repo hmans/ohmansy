@@ -26,7 +26,8 @@ use smithay::{
     },
 };
 
-use crate::layout::{Layout, WindowId};
+use crate::desktop::Desktop;
+use crate::layout::WindowId;
 use crate::CalloopData;
 
 pub struct Smallvil {
@@ -34,7 +35,11 @@ pub struct Smallvil {
     pub socket_name: OsString,
     pub ui_scale: f64,
     pub windows: BTreeMap<WindowId, Window>,
-    pub layout: Layout,
+    pub layout: Desktop,
+    pub nested_canvas_size: Option<(i32, i32)>,
+    pub virtual_outputs: usize,
+    pub native_mode: bool,
+    pub vt_request: Option<i32>,
     pub next_window: WindowId,
     pub configured: BTreeMap<WindowId, (i32, i32, bool, bool)>,
     pub needs_redraw: bool,
@@ -127,7 +132,11 @@ impl Smallvil {
             socket_name,
             ui_scale: 1.25,
             windows: BTreeMap::new(),
-            layout: Layout::default(),
+            layout: Desktop::default(),
+            nested_canvas_size: None,
+            virtual_outputs: 1,
+            native_mode: false,
+            vt_request: None,
             next_window: 1,
             configured: BTreeMap::new(),
             needs_redraw: true,
@@ -224,22 +233,57 @@ impl Smallvil {
         &self,
         pos: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<f64, Logical>)> {
-        self.space
-            .element_under(pos)
-            .and_then(|(window, location)| {
-                window
-                    .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
-                    .map(|(s, p)| (s, (p + location).to_f64()))
-            })
+        self.window_under(pos).and_then(|(window, location)| {
+            window
+                .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                .map(|(s, p)| (s, (p + location).to_f64()))
+        })
+    }
+
+    pub fn window_under(&self, pos: Point<f64, Logical>) -> Option<(&Window, Point<i32, Logical>)> {
+        let monitor = self.layout.at(pos.x, pos.y)?;
+        self.space.elements().rev().find_map(|window| {
+            let id = self.window_id(window.toplevel()?.wl_surface())?;
+            if self.layout.owner(id) != Some(monitor) {
+                return None;
+            }
+            let location = self.space.element_location(window)? - window.geometry().loc;
+            window
+                .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                .map(|_| (window, location))
+        })
     }
 
     pub fn relayout(&mut self) {
-        let Some(output) = self.space.outputs().next().cloned() else {
+        let pointer = self.seat.get_pointer().unwrap().current_location();
+        let anchor = self.layout.at(pointer.x, pointer.y).map(|i| {
+            let m = &self.layout.monitors[i];
+            (
+                m.name.clone(),
+                (pointer.x - m.origin.0 as f64) * m.scale,
+                (pointer.y - m.origin.1 as f64) * m.scale,
+            )
+        });
+        let outputs: Vec<_> = self.space.outputs().cloned().collect();
+        if outputs.is_empty() {
             return;
-        };
-        let Some(geometry) = self.space.output_geometry(&output) else {
-            return;
-        };
+        }
+        let active_name = self.layout.current().name.clone();
+        for output in &outputs {
+            if output.name() == active_name
+                && output.current_scale().fractional_scale() != self.ui_scale
+            {
+                output.change_current_state(
+                    None,
+                    None,
+                    Some(smithay::output::Scale::Custom {
+                        advertised_integer: 2,
+                        fractional: self.ui_scale,
+                    }),
+                    None,
+                );
+            }
+        }
         let dead: Vec<_> = self
             .windows
             .iter()
@@ -250,8 +294,47 @@ impl Smallvil {
             self.windows.remove(&id);
             self.configured.remove(&id);
         }
-        self.layout.set_size((geometry.size.w, geometry.size.h));
+        let specs = outputs
+            .iter()
+            .filter_map(|o| {
+                o.current_mode().map(|mode| {
+                    (
+                        o.name(),
+                        (mode.size.w, mode.size.h),
+                        o.current_scale().fractional_scale(),
+                    )
+                })
+            })
+            .collect();
+        self.layout.sync(specs);
+        for monitor in &self.layout.monitors {
+            if let Some(output) = outputs.iter().find(|o| o.name() == monitor.name) {
+                let origin = monitor.origin.into();
+                output.change_current_state(None, None, None, Some(origin));
+                self.space.map_output(output, origin);
+            }
+        }
+        self.ui_scale = self.layout.current().scale;
         self.apply_positions();
+        let position = anchor
+            .and_then(|(name, x, y)| {
+                self.layout
+                    .monitors
+                    .iter()
+                    .find(|m| m.name == name)
+                    .map(|m| {
+                        (
+                            m.origin.0 as f64 + x / m.scale,
+                            m.origin.1 as f64 + y / m.scale,
+                        )
+                    })
+            })
+            .unwrap_or((pointer.x, pointer.y));
+        let position = self.layout.clamp(position.0, position.1);
+        self.process_motion(
+            position.into(),
+            self.start_time.elapsed().as_millis() as u32,
+        );
     }
 
     pub fn focus_next(&mut self) {
@@ -308,13 +391,8 @@ impl Smallvil {
             let Some(window) = self.windows.get(&id).cloned() else {
                 continue;
             };
-            let fullscreen = self.layout.workspace().fullscreen == Some(id);
-            let maximized = self
-                .layout
-                .workspace()
-                .columns
-                .iter()
-                .any(|column| column.id == id && column.restore_width.is_some());
+            let fullscreen = self.layout.fullscreen_for(id);
+            let maximized = self.layout.maximized_for(id);
             let configuration = (width, height, fullscreen, maximized);
             if self.configured.get(&id) != Some(&configuration) {
                 let toplevel = window.toplevel().unwrap();
@@ -353,6 +431,7 @@ impl Smallvil {
     }
 
     pub fn sync_focus(&mut self) {
+        self.ui_scale = self.layout.current().scale;
         let focused = self.layout.focused();
         for (id, window) in &self.windows {
             window.set_activated(Some(*id) == focused);
@@ -422,6 +501,18 @@ impl Smallvil {
                 self.layout.move_to_workspace(index as usize - 1);
             }
             "fullscreen" => self.layout.toggle_fullscreen(),
+            "focus-output-next" => self.layout.monitor_delta(1, false),
+            "focus-output-prev" => self.layout.monitor_delta(-1, false),
+            "move-output-next" => self.layout.monitor_delta(1, true),
+            "move-output-prev" => self.layout.monitor_delta(-1, true),
+            "output" => {
+                let index = value.ok_or("output needs a 1-based index")?;
+                if index < 1 || index as usize > self.layout.monitors.len() {
+                    return Err("Output does not exist".into());
+                }
+                self.layout.focus_monitor(index as usize - 1);
+            }
+            "vt" if self.native_mode => self.vt_request = value.map(|v| v as i32),
             "scale" => {
                 self.ui_scale = match value {
                     Some(percent) if (50..=200).contains(&percent) => percent as f64 / 100.0,
@@ -434,6 +525,7 @@ impl Smallvil {
                         }
                     }
                 };
+                self.relayout();
             }
             "terminal" => {
                 if self.session_mode {
@@ -487,11 +579,13 @@ impl Smallvil {
                     let state = state.lock().unwrap();
                     (state.buffer_scale(), state.buffer_size().map(|size| (size.w, size.h)), state.surface_size().map(|size| (size.w, size.h)))
                 }).unwrap_or((1, None, None));
-                let workspace = self.layout.workspaces.iter().position(|workspace| workspace.columns.iter().any(|column| column.id == *id));
-                let width = workspace.and_then(|index| self.layout.workspaces[index].columns.iter().find(|column| column.id == *id)).map(|column| column.width);
+                let owner=self.layout.owner(*id);
+                let layout=owner.map(|i|&self.layout.monitors[i].layout);
+                let workspace = layout.and_then(|l|l.workspaces.iter().position(|workspace| workspace.columns.iter().any(|column| column.id == *id)));
+                let width = workspace.and_then(|index| layout.unwrap().workspaces[index].columns.iter().find(|column| column.id == *id)).map(|column| column.width);
                 let density = size.zip(surface_size).filter(|(_, surface)| surface.0 > 0).map(|(buffer, surface)| buffer.0 as f64 * scale as f64 / surface.0 as f64);
                 let geometry = self.layout.geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
-                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
+                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
             })
         }).collect();
         let keyboard_focus = self
@@ -503,7 +597,8 @@ impl Smallvil {
             .seat
             .get_keyboard()
             .map(|keyboard| keyboard.modifier_state());
-        serde_json::json!({"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+        let outputs: Vec<_> = self.layout.monitors.iter().enumerate().map(|(i,m)| serde_json::json!({"name":m.name,"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"scale":m.scale,"workspace":m.layout.active+1,"focused":i==self.layout.active_monitor})).collect();
+        serde_json::json!({"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }
 }
 

@@ -169,14 +169,21 @@ impl XdgShellHandler for Smallvil {
     ) {
         if let Some(id) = self.window_id(surface.wl_surface()) {
             self.layout.focus(id);
-            self.layout.workspaces[self.layout.active].fullscreen = Some(id);
+            let active = self.layout.active;
+            self.layout.workspaces[active].fullscreen = Some(id);
             self.sync_focus();
         }
     }
 
-    fn unfullscreen_request(&mut self, _surface: ToplevelSurface) {
-        self.layout.workspaces[self.layout.active].fullscreen = None;
-        self.relayout();
+    fn unfullscreen_request(&mut self, surface: ToplevelSurface) {
+        if let Some(index) = self
+            .window_id(surface.wl_surface())
+            .and_then(|id| self.layout.owner(id))
+        {
+            let layout = &mut self.layout.monitors[index].layout;
+            layout.workspaces[layout.active].fullscreen = None;
+            self.relayout();
+        }
     }
 
     fn maximize_request(&mut self, surface: ToplevelSurface) {
@@ -272,7 +279,16 @@ impl Smallvil {
             return;
         };
 
-        let output = self.space.outputs().next().unwrap();
+        let Some(owner) = self.window_id(&root).and_then(|id| self.layout.owner(id)) else {
+            return;
+        };
+        let Some(output) = self
+            .space
+            .outputs()
+            .find(|o| o.name() == self.layout.monitors[owner].name)
+        else {
+            return;
+        };
         let output_geo = self.space.output_geometry(output).unwrap();
         let window_geo = self.space.element_geometry(window).unwrap();
 
