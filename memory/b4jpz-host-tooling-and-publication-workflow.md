@@ -337,3 +337,24 @@ The stronger native VM test also passed real libinput keyboard input,
 Super+period monitor focus, Ctrl+Alt+F2, and page flips after returning to VT1.
 The VM must enable polkit just like the shared desktop: logind's SwitchTo
 request otherwise fails even though root chvt works. Keep VM waits bounded.
+
+## Shine credential access (2026-11-04)
+
+After the user logged into the native session, Git HTTPS used GitHub CLI's
+credential helper, not SSH. The existing login keyring was locked on the regular
+user D-Bus, while Shine applications inherited a private session bus. GitHub CLI
+reported an invalid token with source `default` when keyring access failed; this
+was not evidence that the stored token had expired. After the user unlocked the
+standard graphical keyring dialog, the same token authenticated successfully
+with the helper scoped to `DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus`.
+Both pending feature commits then pushed successfully.
+
+The regular user bus activation environment lacked a Wayland display, so its
+system prompter could not launch visibly. Running the packaged gcr-prompter on
+the active display with that bus allowed the normal unlock dialog to work.
+Secret Service Unlock and Prompt calls must share a persistent D-Bus connection;
+a prompt disappears when its requesting client disconnects. Never read or print
+secrets to diagnose this, or request passwords in chat. Check collection Locked
+and service ownership instead. The GCR SSH socket existed, but SSH_AUTH_SOCK was
+absent from Shine's inherited environment. Normal-session bus/agent integration
+is still incomplete; preserve private-bus isolation for nested previews.
