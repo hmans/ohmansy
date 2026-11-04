@@ -91,6 +91,51 @@
         "action": "focus-monitor-right"
       },
       {
+        "key": "Mod+1",
+        "title": "Focus workspace 1",
+        "action": "focus-workspace 1"
+      },
+      {
+        "key": "Mod+2",
+        "title": "Focus workspace 2",
+        "action": "focus-workspace 2"
+      },
+      {
+        "key": "Mod+3",
+        "title": "Focus workspace 3",
+        "action": "focus-workspace 3"
+      },
+      {
+        "key": "Mod+4",
+        "title": "Focus workspace 4",
+        "action": "focus-workspace 4"
+      },
+      {
+        "key": "Mod+5",
+        "title": "Focus workspace 5",
+        "action": "focus-workspace 5"
+      },
+      {
+        "key": "Mod+6",
+        "title": "Focus workspace 6",
+        "action": "focus-workspace 6"
+      },
+      {
+        "key": "Mod+7",
+        "title": "Focus workspace 7",
+        "action": "focus-workspace 7"
+      },
+      {
+        "key": "Mod+8",
+        "title": "Focus workspace 8",
+        "action": "focus-workspace 8"
+      },
+      {
+        "key": "Mod+9",
+        "title": "Focus workspace 9",
+        "action": "focus-workspace 9"
+      },
+      {
         "key": "Mod+Page_Up",
         "title": "Workspace above",
         "action": "focus-workspace-up"

@@ -49,6 +49,7 @@ desktop restarts.
 | Mod+Ctrl+Left/Right | Focus the adjacent monitor |
 | Mod+Ctrl+Shift+Left/Right | Move the column to the adjacent monitor |
 | Mod+Page Up/Down | Focus the adjacent workspace |
+| Mod+1–9 | Focus workspace 1–9 on the current monitor |
 | Mod+Shift+Page Up/Down | Move the column to the adjacent workspace |
 
 ## Layout

@@ -337,6 +337,9 @@ the installed help data; custom bindings outside it are not displayed.
 Firefox launch (2026-11-04): shared `Mod+Shift+Return` spawns `firefox` and
 appears in shortcut help. Native x86 customization check validated the generated
 bindings and Niri configuration; no installed-system activation was performed.
+Numbered workspaces (2026-11-04): shared `Mod+1` through `Mod+9` use Niri's
+`focus-workspace` with numeric indices on the current monitor. Native x86
+customization check passed; installed-system activation remains pending.
 Mod+Shift+Slash opens the searchable panel. Super+T and Super+B were removed
 at the user's request; Super+Return still opens Foot. Keep JavaScript compatible
 with Qt's engine: Array.flatMap passed Node tests but failed in Quickshell 0.3.0;
