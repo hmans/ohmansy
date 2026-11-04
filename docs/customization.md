@@ -87,6 +87,16 @@ retain store paths; removing a default does not immediately erase its files.
 Nautilus and the sound, network, Bluetooth, clipboard, and lock tools remain
 part of the desktop integration in this version.
 
+## Cursor theme
+
+ohmansy uses Bibata Modern Classic at size 24 for the desktop and login screen.
+The desktop supplies the Xcursor assets and an unlocked GTK preference;
+your saved GTK cursor choice takes priority. Shine's session and development
+wrappers also honor `XCURSOR_THEME`, `XCURSOR_SIZE`, and `XCURSOR_PATH`.
+
+After installing an updated system, log out and back in to reload the cursor
+theme in the compositor and applications.
+
 ## AppImages
 
 The software defaults include `appimage-run` and register type 1 and type 2

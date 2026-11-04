@@ -234,8 +234,9 @@ unset. Winit/SCTK therefore selected a missing default theme. This is a separate
 failure from logical pointer coordinates during scaling; the earlier software
 cursor regression did not cover parent Wayland theme loading.
 
-The shared `cursor-theme.nix` helper packages Adwaita plus default/index.theme
-inheritance and supplies theme/size defaults and the asset path. The Cage session,
+The shared `cursor-theme.nix` helper packages Bibata Modern Classic with
+default/index.theme inheritance, retains Adwaita icon assets, and supplies
+theme/size defaults and the asset path. The Cage session,
 standalone compositor wrapper, and spatial development shell source it; the
 desktop installs its icon package. Explicit user theme/size/path settings remain
 honored. The native cursor-theme flake check loads arrow, text, hand, and crosshair
@@ -289,6 +290,17 @@ exited. No OS build, activation, reboot, or live per-window streaming was tested
 CI actions are pinned. The AppArmor exception in .github/ permits user namespaces
 only for the Nix unshare executable on disposable runners; do not replace it
 with a global security disable. CI artifacts are not public GitHub releases.
+
+Bibata default (2026-11-04): after the user tried and selected Bibata Modern
+Classic, the shared helper, Niri desktop, greeter, session environment and
+unlocked GTK defaults use Bibata-Modern-Classic at size 24. The native cursor
+check loads the default alias, Bibata and Adwaita at 24/48 px and preserves
+explicit environment preferences. Native customization and live-PC policy
+checks passed, including greeter config validation and real dconf cursor
+override/reset. The user preference and GTK settings were applied to the
+installed account with original compositor and windows preserved. A running
+compositor may retain its loaded cursor theme until login after an updated
+system is installed. No system activation or login transition was tested.
 
 ## Shine multiple monitors (2026-11-04)
 

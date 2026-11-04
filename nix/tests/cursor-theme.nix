@@ -11,15 +11,15 @@ pkgs.runCommand "ohmansy-wayland-cursor-theme"
     mkdir -p "$HOME"
     unset XCURSOR_THEME XCURSOR_SIZE XCURSOR_PATH
     . ${cursor.environment}
-    test "$XCURSOR_THEME" = Adwaita
-    test "$XCURSOR_SIZE" = 24
+    test "$XCURSOR_THEME" = ${cursor.name}
+    test "$XCURSOR_SIZE" = ${toString cursor.size}
     python3 - <<'PY'
     import ctypes
     library = ctypes.CDLL('${pkgs.libxcursor}/lib/libXcursor.so.1')
     library.XcursorLibraryLoadImage.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
     library.XcursorLibraryLoadImage.restype = ctypes.c_void_p
     library.XcursorImageDestroy.argtypes = [ctypes.c_void_p]
-    for theme in [b'default', b'Adwaita']:
+    for theme in [b'default', b'${cursor.name}', b'Adwaita']:
         for size in [24, 48]:
             for icon in [b'default', b'left_ptr', b'xterm', b'hand2', b'crosshair']:
                 image = library.XcursorLibraryLoadImage(icon, theme, size)

@@ -115,8 +115,8 @@ client decorations, popup grabs, cursor surfaces, and clipboard and primary
 selection between nested clients. It redraws when surfaces change, input arrives,
 or the viewport animates. An empty idle workspace stops rendering frames.
 
-Named Wayland cursors use the packaged Adwaita theme, including a `default`
-theme alias. The session, standalone package, and development shell supply the
+Named Wayland cursors use the packaged Bibata Modern Classic theme, including
+a `default` theme alias. The session, standalone package, and development shell supply the
 cursor assets while honoring existing `XCURSOR_THEME`, `XCURSOR_SIZE`, and
 `XCURSOR_PATH` preferences. These Xcursor settings also apply to Wayland cursor
 images; they are not limited to X11.

@@ -7,6 +7,7 @@
 let
   niri = config.programs.niri.package;
   quickshell = import ./greeter-package.nix { inherit pkgs; };
+  cursor = import ./cursor-theme.nix { inherit pkgs; };
   cfg = config.ohmansy.greeter;
   defaultSession = config.services.displayManager.defaultSession;
   sessions = lib.mapAttrs (
@@ -35,9 +36,9 @@ let
     ${niri}/bin/niri msg action quit --skip-confirmation
   '';
   compositor = pkgs.writeShellScript "ohmansy-greeter" ''
-    export XCURSOR_THEME=Adwaita
-    export XCURSOR_SIZE=24
-    export XCURSOR_PATH=${pkgs.adwaita-icon-theme}/share/icons
+    export XCURSOR_THEME=${cursor.name}
+    export XCURSOR_SIZE=${toString cursor.size}
+    export XCURSOR_PATH=${cursor.package}/share/icons
     export QT_QUICK_CONTROLS_STYLE=Basic
     export QSG_RHI_BACKEND=opengl
     # The greeter has no writable home. Keep Qt's shader cache session-local.
@@ -111,7 +112,7 @@ in
         keyboard { xkb { layout "${config.services.xserver.xkb.layout}"; }; }
         touchpad { tap; natural-scroll; }
       }
-      cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
+      cursor { xcursor-theme "${cursor.name}"; xcursor-size ${toString cursor.size}; }
       layout { background-color "#171a21"; }
       hotkey-overlay { skip-at-startup; }
       gestures { hot-corners { off; }; }

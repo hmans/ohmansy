@@ -39,16 +39,23 @@ pkgs.runCommand "ohmansy-live-pc-policy" {
       ${config.environment.etc."ohmansy/niri.kdl".source} \
       ${config.environment.etc."ohmansy/desktop.kdl".source} \
       ${../modules/desktop/shortcuts.json}
+    niri validate --config ${config.environment.etc."ohmansy/greeter.kdl".source}
   '') configs}
   # Fresh users start dark; a local preference overrides it and reset restores it.
   ${lib.concatMapStringsSep "\n" (config: ''
   export DCONF_PROFILE=${config.environment.etc.dconf.source}/profile/user
   test "$(dconf read /org/gnome/desktop/interface/color-scheme)" = "'prefer-dark'"
+  test "$(dconf read /org/gnome/desktop/interface/cursor-theme)" = "'Bibata-Modern-Classic'"
+  test "$(dconf read /org/gnome/desktop/interface/cursor-size)" = 24
   dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- bash -eu <<'CHECK'
   dconf write /org/gnome/desktop/interface/color-scheme "'prefer-light'"
   test "$(dconf read /org/gnome/desktop/interface/color-scheme)" = "'prefer-light'"
   dconf reset /org/gnome/desktop/interface/color-scheme
   test "$(dconf read /org/gnome/desktop/interface/color-scheme)" = "'prefer-dark'"
+  dconf write /org/gnome/desktop/interface/cursor-theme "'Adwaita'"
+  test "$(dconf read /org/gnome/desktop/interface/cursor-theme)" = "'Adwaita'"
+  dconf reset /org/gnome/desktop/interface/cursor-theme
+  test "$(dconf read /org/gnome/desktop/interface/cursor-theme)" = "'Bibata-Modern-Classic'"
   CHECK
   '') appearanceConfigs}
   touch "$out"

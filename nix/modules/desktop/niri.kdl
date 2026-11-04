@@ -67,7 +67,7 @@ layout {
 overview {
     workspace-shadow { off; }
 }
-cursor { xcursor-theme "Adwaita"; xcursor-size 24; }
+cursor { xcursor-theme "Bibata-Modern-Classic"; xcursor-size 24; }
 prefer-no-csd
 spawn-at-startup "mako"
 window-rule {

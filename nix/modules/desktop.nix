@@ -7,7 +7,7 @@ let
   wallpaper = import ./wallpaper-package.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
   displays = import ./display-package.nix { inherit pkgs; };
-  cursorTheme = (import ./cursor-theme.nix { inherit pkgs; }).package;
+  cursor = import ./cursor-theme.nix { inherit pkgs; };
   shortcutGroups = builtins.fromJSON (builtins.readFile ./desktop/shortcuts.json);
   shortcutBindings = lib.concatMap (group: group.bindings) shortcutGroups;
   renderBinding = binding:
@@ -25,7 +25,11 @@ in {
   # Fresh accounts start dark; a user's appearance choice still takes priority.
   programs.dconf.enable = true;
   programs.dconf.profiles.user.databases = [{
-    settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
+    settings."org/gnome/desktop/interface" = {
+      color-scheme = "prefer-dark";
+      cursor-theme = cursor.name;
+      cursor-size = lib.gvariant.mkInt32 cursor.size;
+    };
   }];
   # NixOS enables speech synthesis for graphical desktops by default, pulling
   # in the full MBROLA voice collection. Keep it opt-in for Ohmansy; a host's
@@ -48,9 +52,11 @@ in {
   environment.systemPackages = with pkgs; [
     desktop displays quickshell mako swaybg swaylock nautilus
     playerctl wireplumber
-    xwayland-satellite cursorTheme wl-clipboard
+    xwayland-satellite cursor.package wl-clipboard
   ];
   environment.sessionVariables.NIRI_CONFIG = lib.mkDefault "/etc/ohmansy/niri.kdl";
+  environment.sessionVariables.XCURSOR_THEME = lib.mkDefault cursor.name;
+  environment.sessionVariables.XCURSOR_SIZE = lib.mkDefault (toString cursor.size);
   environment.etc."xdg/mako/config".text = ''
     max-history=100
   '';
