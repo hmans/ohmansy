@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Interactive whole-disk installer for the Ohmansy installer image."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -32,8 +33,32 @@ def available_disks(devices):
 
 def list_disks():
     result = run('lsblk', '--json', '--bytes', '--output',
-                 'PATH,TYPE,SIZE,RO,MOUNTPOINTS,MODEL', capture_output=True, text=True)
+                 'PATH,TYPE,SIZE,RO,MOUNTPOINTS,MODEL,SERIAL,WWN,MAJ:MIN', capture_output=True, text=True)
     return available_disks(json.loads(result.stdout)['blockdevices'])
+
+
+def disk_token(disk):
+    identity = {key: disk.get(key) for key in ('path', 'size', 'model', 'serial', 'wwn', 'maj:min')}
+    return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+
+
+def preflight():
+    if not Path('/sys/firmware/efi').exists():
+        raise RuntimeError('Boot this installer with UEFI firmware.')
+    if not (PAYLOAD / 'init').exists():
+        raise RuntimeError('The offline system payload is missing.')
+
+
+def validate_target(device, hostname, token=None):
+    preflight()
+    if not isinstance(hostname, str) or not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', hostname):
+        raise RuntimeError('Use a computer name with lowercase letters, digits, and hyphens (up to 63 characters).')
+    disk = next((disk for disk in list_disks() if disk['path'] == device), None)
+    if disk is None or (token is not None and disk_token(disk) != token):
+        raise RuntimeError('The selected disk changed or is now in use. Refresh the disk list. No changes made.')
+    check_labels(device)
+    if TARGET.exists() and (os.path.ismount(TARGET) or any(TARGET.iterdir())):
+        raise RuntimeError(f'{TARGET} is not empty. A previous installation may need recovery. No changes made.')
 
 
 def host_config(hostname):
@@ -110,33 +135,45 @@ def install():
     confirmation = f'ERASE {device}'
     if input(f'\nAll data on {device} will be destroyed. Type {confirmation}: ') != confirmation:
         raise SystemExit('Cancelled. No changes made.')
-    # Recheck immediately before modifying the selected device.
-    if device not in [disk['path'] for disk in list_disks()]:
-        raise SystemExit('The disk is now in use. No changes made.')
-    check_labels(device)
-    TARGET.mkdir(parents=True, exist_ok=True)
-    if any(TARGET.iterdir()) or os.path.ismount(TARGET):
-        raise SystemExit(f'{TARGET} is not empty. Unmount any previous installation first.')
-    run('parted', '--script', device, 'mklabel', 'gpt',
-        'mkpart', 'ESP', 'fat32', '1MiB', '1025MiB', 'set', '1', 'esp', 'on',
-        'mkpart', 'primary', 'ext4', '1025MiB', '100%')
-    run('udevadm', 'settle')
-    separator = 'p' if device[-1].isdigit() else ''
-    efi, root = device + separator + '1', device + separator + '2'
-    run('mkfs.fat', '-F', '32', '-n', EFI_LABEL, efi)
-    run('mkfs.ext4', '-F', '-L', ROOT_LABEL, root)
-    run('mount', '-t', 'ext4', root, str(TARGET))
-    (TARGET / 'boot').mkdir()
-    run('mount', '-t', 'vfat', efi, str(TARGET / 'boot'), '-o', 'umask=0077')
-    run('nixos-generate-config', '--root', str(TARGET))
-    write_configuration(hostname)
-    run('nixos-install', '--root', str(TARGET), '--no-root-passwd', '--no-channel-copy',
-        '--system', str(PAYLOAD.resolve()), '--option', 'substituters', '')
-    run('sync')
-    run('umount', '--recursive', str(TARGET))
+    perform_install(device, hostname, token=disk_token(disks[int(selection) - 1]))
     print('\nOhmansy is installed. Shut down, remove the installation media, and boot the installed disk.')
     print('The welcome screen will help you create your account on first boot.')
     print('System configuration: /etc/nixos. No SSH access has been enabled.')
+
+
+def perform_install(device, hostname, *, token=None, progress=lambda stage: None, log=None):
+    validate_target(device, hostname, token)
+    TARGET.mkdir(parents=True, exist_ok=True)
+
+    def execute(*args):
+        if log is not None:
+            log.write('\n$ ' + ' '.join(args) + '\n')
+            log.flush()
+            return run(*args, stdout=log, stderr=subprocess.STDOUT)
+        return run(*args)
+
+    progress('partition')
+    execute('parted', '--script', device, 'mklabel', 'gpt',
+        'mkpart', 'ESP', 'fat32', '1MiB', '1025MiB', 'set', '1', 'esp', 'on',
+        'mkpart', 'primary', 'ext4', '1025MiB', '100%')
+    execute('udevadm', 'settle')
+    separator = 'p' if device[-1].isdigit() else ''
+    efi, root = device + separator + '1', device + separator + '2'
+    progress('format')
+    execute('mkfs.fat', '-F', '32', '-n', EFI_LABEL, efi)
+    execute('mkfs.ext4', '-F', '-L', ROOT_LABEL, root)
+    execute('mount', '-t', 'ext4', root, str(TARGET))
+    (TARGET / 'boot').mkdir()
+    execute('mount', '-t', 'vfat', efi, str(TARGET / 'boot'), '-o', 'umask=0077')
+    progress('configure')
+    execute('nixos-generate-config', '--root', str(TARGET))
+    write_configuration(hostname)
+    progress('install')
+    execute('nixos-install', '--root', str(TARGET), '--no-root-passwd', '--no-channel-copy',
+        '--system', str(PAYLOAD.resolve()), '--option', 'substituters', '')
+    progress('finish')
+    execute('sync')
+    execute('umount', '--recursive', str(TARGET))
 
 
 if __name__ == '__main__':
@@ -148,4 +185,7 @@ if __name__ == '__main__':
     except subprocess.CalledProcessError as error:
         print(f'\nInstallation stopped: {error}', file=sys.stderr)
         print(f'The target remains at {TARGET}; do not erase it again just to retry a build.', file=sys.stderr)
+        sys.exit(1)
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
         sys.exit(1)

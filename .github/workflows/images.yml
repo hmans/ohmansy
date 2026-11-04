@@ -24,8 +24,8 @@ jobs:
             max-jobs = 2
       - name: Check offline installer and packaging
         run: |
-          nix build --no-update-lock-file --no-link .#checks.x86_64-linux.offline-installer
-          python3 -m unittest discover -s tools/tests -p 'test_installer.py'
+          nix build --no-update-lock-file --no-link .#checks.x86_64-linux.offline-installer .#checks.x86_64-linux.installer-ui
+          python3 -m unittest discover -s tools/tests -p 'test_installer*.py'
           python3 -m unittest discover -s tools/tests -p 'test_iso_package.py'
       - name: Build the offline installer ISO
         run: nix build --no-update-lock-file .#installer-iso
@@ -88,7 +88,7 @@ jobs:
         run: nix flake check --no-update-lock-file
       - name: Check installer disk selection and source boundaries
         run: |
-          python3 -m unittest discover -s tools/tests -p 'test_installer.py'
+          python3 -m unittest discover -s tools/tests -p 'test_installer*.py'
           python3 -m unittest discover -s tools/tests -p 'test_guest_dev.py'
           python3 -m unittest discover -s tools/tests -p 'test_factory.py'
       - name: Build the persistent ARM factory disk

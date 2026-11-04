@@ -165,7 +165,7 @@ match Arch-based hosts; pass `--firmware-code` and `--firmware-vars` on other
 distributions. It refuses to create a disk in an existing state directory.
 No host directories or host disks are shared with the VM.
 
-In the live desktop, choose **Install Ohmansy**. The terminal installer offers
+In the live desktop, choose **Install Ohmansy**. The graphical installer offers
 the VM disk, asks for a computer name, and requires `ERASE /dev/vda` before
 partitioning. The ISO contains the complete prebuilt installed desktop and uses
 `nixos-install --system`; installation and graphical account setup need no
@@ -188,8 +188,17 @@ graphics and a private `vnc.sock` in the state directory instead of a window.
 The state directory also contains private QMP and serial sockets. Keep automated
 installation tests separate from a VM someone is using interactively.
 
-Only one installer can run at a time. A second invocation stops before disk
-selection, and the graphical terminal stays open to show errors or completion.
+Only one installer can run at a time. The graphical window shows real stages
+and a selectable installation log. Closing it leaves installation running;
+reopen **Install Ohmansy** to recover progress. Errors stay visible, and the
+installer refuses another erase after destructive work has started. The full
+log is `/var/log/ohmansy-install.log` in the live session; save it before shutdown
+if you need it for recovery. The command-line fallback is `sudo ohmansy-install`.
+
+Preview the graphical flow without accessing disks with
+`nix run .#installer-preview`. `nix build .#checks.x86_64-linux.installer-ui`
+renders every screen at wide and compact sizes and checks for QML errors.
+
 Speech synthesis is disabled by default, avoiding the large MBROLA voice
 collection. A host can opt in with `services.speechd.enable = true`.
 

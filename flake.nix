@@ -62,6 +62,11 @@
           exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
             --path ${./nix/modules}/first-boot/preview.qml "$@"
         '';
+        installer-preview = pkgs.writeShellScriptBin "ohmansy-installer-preview" ''
+          export OHMANSY_RIBBONS="file://${./nix/modules/greeter/scene/Ribbons.qml}"
+          exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
+            --path ${./nix/modules/installer}/preview.qml "$@"
+        '';
       };
       rejectsDevelopment = base: extra:
         let candidate = base.extendModules { modules = [ extra ]; };
@@ -81,6 +86,9 @@
         assert !(builtins.hasAttr "nixos" payload.config.users.users);
         assert builtins.elem "ohmansy-first-boot.socket" payload.config.systemd.services.greetd.requires;
         assert builtins.elem payload.config.system.build.toplevel media.config.isoImage.storeContents;
+        assert !(payload.config.systemd.services ? ohmansy-installer);
+        assert media.config.systemd.sockets.ohmansy-installer.socketConfig.SocketMode == "0600";
+        assert media.config.systemd.sockets.ohmansy-installer.socketConfig.SocketUser == "nixos";
         packages.runCommand "ohmansy-offline-installer-policy" {
           nativeBuildInputs = [ media.pkgs.squashfsTools ];
         } ''
@@ -114,6 +122,7 @@
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        installer-ui = import ./nix/tests/installer-ui.nix { pkgs = pcPkgs; };
         offline-installer = offlinePolicy pcPkgs pcInstalledBase pcInstaller;
         factory-platform = import ./nix/tests/factory-platform.nix {
           pkgs = pcPkgs;
@@ -138,6 +147,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        installer-ui = import ./nix/tests/installer-ui.nix { inherit pkgs; };
         offline-installer = offlinePolicy pkgs installedBase installer;
         factory-platform = import ./nix/tests/factory-platform.nix { inherit pkgs appliance; };
         ribbons = import ./nix/tests/ribbons.nix { inherit pkgs; };

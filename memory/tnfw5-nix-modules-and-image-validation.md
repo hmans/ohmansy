@@ -9,6 +9,48 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Graphical installer (2026-11-04): `installer.nix` provides a Quickshell window
+and a live-only root socket service. Only the live user's UID can connect;
+the service owns the shared CLI lock and installation worker. Closing the
+window must quit its process so reopening can recover service state. Never tie
+worker lifetime to the UI. Disk identity is rechecked after exact erase
+confirmation. Interrupted or failed destructive work cannot be automatically
+restarted. Logs and state persist only within the live session. Include the
+configured Nix package in the service PATH: `nixos-install` needs `nix-env`,
+which an interactive shell previously supplied implicitly. Preview with
+`nix run .#installer-preview`; `installer-ui` checks all six pages at two sizes.
+Use a short temporary runtime directory for Qt's Unix sockets and a private
+build home to avoid contaminating unsandboxed Nix Portable's empty root.
+
+Lessons from the graphical VM tests:
+
+- In `nix/modules/installer/shell.qml`, use `onClosed: Qt.quit()`. Closing a
+  Quickshell FloatingWindow alone hid it but left the process holding the UI
+  lock, preventing relaunch. Verify close/reopen during actual copying, not
+  just before starting.
+- Test through the real compositor as well as offscreen previews. Niri's
+  default half-width column overrode the requested window width. The live-only
+  installer rule in `nix/modules/installer.nix` opens it at full width; compact
+  layouts still need keyboard and scrolling checks.
+- With nested scroll views, reveal the containing log viewport, not the full
+  text area's height, and clamp the outer scroll offset. Focusing a long log
+  otherwise scrolled the whole installer beyond its content. See `reveal()` in
+  `nix/modules/installer/InstallerView.qml`. Static screenshots did not catch it.
+- Exercise the privileged service through the actual UI. Mocked backend tests
+  and successful ISO builds missed the missing `nix-env` dependency. Keep
+  playful copy away from the exact disk identity and erase confirmation;
+  preserve actionable errors and logs when the worker fails.
+
+Graphical verification (2026-11-04): an isolated x86 VM with no network adapter
+passed GUI installation, window close/reopen during copying, graphical shutdown,
+disk-only boot, first-boot owner creation, and password login. The final log
+scroll correction was then tested against that guest's real installation log.
+The rebuilt final ISO passed checksums and booted to its graphical installer;
+that exact final artifact was not run through another disk installation. Six
+native flake checks, 16 installer/backend tests, two packaging tests, and twelve
+wide/compact screen renders passed. Artifact identities and VM inventory belong
+in ignored `.local/SESSION.md`. Physical hardware and ARM runtime remain untested.
+
 Offline installer verification (2026-11-04): the final generic x86 ISO built
 locally, passed packaged checksums, installed onto a fresh 64 GiB QEMU disk with
 `--no-network`, then booted with no ISO. Graphical owner setup and password login
@@ -22,8 +64,8 @@ regression, and installer/packaging tests passed. The broader Python suite passe
 Physical hardware and ARM installer runtime remain unverified. Public binary
 distribution needs the work described in `docs/iso-redistribution.md`; the project
 source tarball is not a full dependency corresponding-source bundle.
-The user also confirmed the installer works; replacing the terminal interface
-with a graphical installer remains separate follow-up work.
+The user confirmed the earlier terminal installer works. The graphical interface
+is now implemented and has the separate verification evidence above.
 
 Local x86 installer verification (2026-11-03): the installer now composes the
 PC live profile and generates a host importing the exported `firstBoot` module.
@@ -33,8 +75,9 @@ failed immediately after formatting during the first real installation test.
 Successful completion syncs and unmounts the target.
 
 Only one installer may run at a time, guarded by an exclusive `/run` file lock
-before selection. The graphical launcher keeps the terminal open for completion
-and errors. Overlapping interactive and agent installation attempts on one VM
+before selection. The former terminal launcher kept its window open for
+completion and errors; the current GUI uses the service described above.
+Overlapping interactive and agent installation attempts on one VM
 left a partial target and a stale UEFI entry; keep automated checks in a separate
 headless VM and do not reboot a VM while someone is using its installer.
 The lock's exclusion and release were tested in Python and inside the live ISO;

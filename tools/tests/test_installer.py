@@ -32,7 +32,7 @@ class InstallerTests(unittest.TestCase):
                  patch.object(installer, 'TARGET', Path(directory) / 'target'), \
                  patch.object(installer, 'LOCK', Path(directory) / 'install.lock'), \
                  patch.object(installer.os, 'geteuid', return_value=0), \
-                 patch.object(Path, 'exists', return_value=True), \
+                 patch.object(Path, 'exists', autospec=True, side_effect=lambda path: str(path) == '/sys/firmware/efi' or path == installer.PAYLOAD / 'init' or path.is_file() or path.is_dir()), \
                  patch.object(installer, 'list_disks', return_value=[disk]), \
                  patch('builtins.input', side_effect=['1', 'test-pc', confirmation]), \
                  patch('builtins.print'), \
