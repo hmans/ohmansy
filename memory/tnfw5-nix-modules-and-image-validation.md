@@ -689,3 +689,25 @@ The stronger native VM test also passed real libinput keyboard input,
 Super+period monitor focus, Ctrl+Alt+F2, and page flips after returning to VT1.
 The VM must enable polkit just like the shared desktop: logind's SwitchTo
 request otherwise fails even though root chvt works. Keep VM waits bounded.
+
+Shine session-bus fix (2026-11-04): the normal login wrapper now explicitly
+joins the regular user bus instead of creating a second bus. After socket
+creation, its setup helper publishes WAYLAND_DISPLAY, desktop/session variables,
+a cleared DISPLAY, and SSH_AUTH_SOCK for D-Bus/systemd activation. It preserves
+an inherited agent; otherwise it reads a valid agent socket from the user
+manager, with the standard GCR socket as fallback. The login supervisor clears
+its display settings on exit only while the manager still names its display;
+it forwards termination to its own compositor child and removes its runtime
+state file. Nested previews retain their private bus and do not change manager
+activation variables.
+
+The updated `compositor-drm` VM check now boots the real session wrapper through
+greetd with a disposable keyring. It passed child bus/display/agent inheritance,
+real GCR SSH socket access, a graphical unlock of a deliberately locked fixture
+keyring, two-output rendering, real keyboard and VT round trips, and activation
+cleanup after logout with a lingering user manager. The packaged nested check
+also passed private-bus/agent inheritance, launcher/logout behavior, and parent
+activation environment preservation. This tests the wrapper in a VM and nested
+preview; no installed OS activation or live session restart was performed.
+Autologin still cannot unlock an encrypted keyring without its password; the
+fix makes normal prompts available on the correct display.

@@ -28,8 +28,16 @@ remain tied to Niri.
 
 This session is experimental: it has no screen locking, screen sharing, IME,
 X11 support, or complete desktop portal integration. Keep Niri available as the
-regular desktop. A private D-Bus session keeps app activation on the correct
-Wayland socket without changing another session's activation environment.
+regular desktop. Normal logins use the regular user D-Bus, so applications can
+reach the login keyring. Once its Wayland socket is ready, Shine publishes the
+display and desktop environment for D-Bus and systemd activation. It also
+inherits the user's SSH agent, using the user manager's agent socket or GCR
+when the login environment did not supply one. On logout, it clears its display
+settings if they still belong to that session.
+
+Nested previews use a separate private bus and preserve the parent desktop's
+activation environment. Keyring unlock dialogs can appear in a normal login;
+autologin does not provide a password to unlock an encrypted keyring.
 
 To omit it from a host configuration:
 
@@ -170,7 +178,9 @@ After building `nix build --out-link .local/compositor-session .#compositor-sess
 normal terminal, app picker, canceled and confirmed sign-out, and preservation
 of the parent desktop and its activation environment. The `compositor-drm` NixOS
 VM check exercises two virtual KMS outputs, per-monitor scaling and window moves,
-and leaving and returning to the session's VT. These checks do not establish
+and leaving and returning to the session's VT. It also verifies user-bus access,
+SSH agent inheritance, a standard graphical keyring unlock using a disposable
+fixture, and cleanup of activation settings on logout. These checks do not establish
 a successful physical DRM login or a booted system image on your hardware.
 
 For local automation or a future shell, enable the private control socket:
@@ -200,7 +210,7 @@ Test key and pointer commands are disabled in normal sessions.
 `--socket-file PATH` writes the nested Wayland socket name for launching clients
 with an explicit `WAYLAND_DISPLAY`. `-- COMMAND ARGS...` runs a custom application
 instead of the default demos. Use separate-instance options for applications
-that normally reuse a running process. Do not import the experimental display
+that normally reuse a running process. Do not import a nested preview's display
 into the global systemd or D-Bus environment.
 
 In nested mode, `--screenshot PATH.png` saves the framebuffer after startup without changing the

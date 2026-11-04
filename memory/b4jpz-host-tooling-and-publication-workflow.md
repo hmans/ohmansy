@@ -134,9 +134,10 @@ now run Shine's DRM backend directly; Cage has been removed from the wrapper.
 The installed module uses the configured terminal launcher and normal shell,
 a normal-window Wofi app picker (Super+D), and confirmed sign-out
 (Super+Shift+E). Confirmation disables Wofi config/history so Cancel remains
-the default. A dedicated D-Bus session receives the inner Wayland socket via
-dbus-update-activation-environment without importing it into the systemd user
-manager. This preserves another running desktop during previews.
+the default. Nested previews publish their Wayland socket only into a dedicated private
+D-Bus session. Normal logins use the regular user bus and import their display
+and SSH agent into D-Bus/systemd activation after the socket exists. Logout
+clears display settings only if the user manager still points at that session.
 
 Earlier Cage nested/headless trials passed normal terminal startup at
 2x, app picking, canceled/confirmed logout, and preservation of parent windows
@@ -356,5 +357,27 @@ Secret Service Unlock and Prompt calls must share a persistent D-Bus connection;
 a prompt disappears when its requesting client disconnects. Never read or print
 secrets to diagnose this, or request passwords in chat. Check collection Locked
 and service ownership instead. The GCR SSH socket existed, but SSH_AUTH_SOCK was
-absent from Shine's inherited environment. Normal-session bus/agent integration
-is still incomplete; preserve private-bus isolation for nested previews.
+absent from Shine's inherited environment. The original normal-session bus/agent integration was incomplete. The wrapper
+fix below addresses this while preserving isolation for nested previews.
+
+Shine session-bus fix (2026-11-04): the normal login wrapper now explicitly
+joins the regular user bus instead of creating a second bus. After socket
+creation, its setup helper publishes WAYLAND_DISPLAY, desktop/session variables,
+a cleared DISPLAY, and SSH_AUTH_SOCK for D-Bus/systemd activation. It preserves
+an inherited agent; otherwise it reads a valid agent socket from the user
+manager, with the standard GCR socket as fallback. The login supervisor clears
+its display settings on exit only while the manager still names its display;
+it forwards termination to its own compositor child and removes its runtime
+state file. Nested previews retain their private bus and do not change manager
+activation variables.
+
+The updated `compositor-drm` VM check now boots the real session wrapper through
+greetd with a disposable keyring. It passed child bus/display/agent inheritance,
+real GCR SSH socket access, a graphical unlock of a deliberately locked fixture
+keyring, two-output rendering, real keyboard and VT round trips, and activation
+cleanup after logout with a lingering user manager. The packaged nested check
+also passed private-bus/agent inheritance, launcher/logout behavior, and parent
+activation environment preservation. This tests the wrapper in a VM and nested
+preview; no installed OS activation or live session restart was performed.
+Autologin still cannot unlock an encrypted keyring without its password; the
+fix makes normal prompts available on the correct display.

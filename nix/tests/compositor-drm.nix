@@ -1,4 +1,49 @@
 { pkgs }:
+let
+  python = pkgs.python3.withPackages (p: [ p.dbus-next ]);
+  probe = pkgs.writeText "shine-keyring-probe.py" ''
+    import asyncio
+    import json
+    import os
+    from pathlib import Path
+    from dbus_next.aio import MessageBus
+
+    runtime = Path(os.environ['XDG_RUNTIME_DIR'])
+    keys = ['DBUS_SESSION_BUS_ADDRESS', 'WAYLAND_DISPLAY', 'SSH_AUTH_SOCK']
+    (runtime / 'shine-child-env.json').write_text(json.dumps({k: os.environ.get(k) for k in keys}))
+
+    async def main():
+        bus = await MessageBus().connect()
+        name = 'org.freedesktop.secrets'
+        root = '/org/freedesktop/secrets'
+        intro = await bus.introspect(name, root)
+        service = bus.get_proxy_object(name, root, intro).get_interface('org.freedesktop.Secret.Service')
+        path = await service.call_read_alias('default')
+        assert path != '/', 'Fixture login keyring was not created'
+        await service.call_lock([path])
+        unlocked, prompt_path = await service.call_unlock([path])
+        assert prompt_path != '/', 'Locked fixture must require a real graphical prompt'
+        intro = await bus.introspect(name, prompt_path)
+        prompt = bus.get_proxy_object(name, prompt_path, intro).get_interface('org.freedesktop.Secret.Prompt')
+        done = asyncio.get_running_loop().create_future()
+        prompt.on_completed(lambda dismissed, result: done.set_result(dismissed))
+        await prompt.call_prompt("")
+        assert not await asyncio.wait_for(done, timeout=30), 'Prompt dismissed'
+        intro = await bus.introspect(name, path)
+        props = bus.get_proxy_object(name, path, intro).get_interface('org.freedesktop.DBus.Properties')
+        assert not (await props.call_get('org.freedesktop.Secret.Collection', 'Locked')).value
+        (runtime / 'shine-keyring-unlocked').touch()
+        bus.disconnect()
+
+    asyncio.run(main())
+  '';
+  keyringTrial = pkgs.writeShellScript "shine-keyring-fixture" ''
+    set -eu
+    # Disposable VM fixture only; no real account credential or host keyring.
+    printf shinefixture | ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon --unlock >/dev/null
+    exec ${python}/bin/python3 ${probe}
+  '';
+in
 pkgs.testers.runNixOSTest {
   name = "shine-two-monitors";
   nodes.machine = { ... }: {
@@ -9,16 +54,18 @@ pkgs.testers.runNixOSTest {
     boot.kernelParams = [ "video=Virtual-2:1280x800@60e" ];
     hardware.graphics.enable = true;
     security.polkit.enable = true;
-    users.users.alice = { isNormalUser = true; uid = 1000; };
+    users.users.alice = { isNormalUser = true; uid = 1000; linger = true; };
+    services.gnome.gnome-keyring.enable = true;
+    security.pam.services.greetd.enableGnomeKeyring = true;
     fonts.packages = [ pkgs.dejavu_fonts ];
-    environment.systemPackages = [ pkgs.foot pkgs.python3 pkgs.kbd ];
+    environment.systemPackages = [ pkgs.foot pkgs.python3 pkgs.kbd pkgs.openssh ];
     services.greetd = {
       enable = true;
       settings = let
-        command = "${import ../modules/compositor-package.nix { inherit pkgs; }}/bin/ohmansy-compositor --backend drm --no-clients --mod-key super --control-socket /run/user/1000/shine.sock";
+        command = "${import ../modules/compositor-session-package.nix { inherit pkgs; }}/bin/ohmansy-compositor-session --no-clients --control-socket /run/user/1000/shine.sock";
       in {
         initial_session = { user = "alice"; inherit command; };
-        default_session = { user = "alice"; inherit command; };
+        default_session = { user = "alice"; command = "${pkgs.coreutils}/bin/sleep infinity"; };
       };
     };
   };
@@ -38,6 +85,33 @@ pkgs.testers.runNixOSTest {
     state = control()
     assert state["backend"] == "drm", state
     assert len(state["outputs"]) == 2, state
+    import shlex
+    def as_user(command):
+        return machine.succeed("runuser -u alice -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus sh -ec " + shlex.quote(command))
+    def manager_environment():
+        return dict(line.split('=', 1) for line in as_user('systemctl --user show-environment').splitlines() if '=' in line)
+    environment = manager_environment()
+    assert environment['WAYLAND_DISPLAY'] == state['wayland_display'], environment
+    assert environment['XDG_CURRENT_DESKTOP'] == 'ohmansy', environment
+    assert environment['DISPLAY'] == "", environment
+    assert environment['SSH_AUTH_SOCK'] == '/run/user/1000/gcr/ssh', environment
+    control('launch', program='${keyringTrial}', args=[])
+    machine.wait_for_file('/run/user/1000/shine-child-env.json', timeout=15)
+    child = json.loads(machine.succeed('cat /run/user/1000/shine-child-env.json'))
+    assert child['DBUS_SESSION_BUS_ADDRESS'] == 'unix:path=/run/user/1000/bus', child
+    assert child['WAYLAND_DISPLAY'] == state['wayland_display'], child
+    assert child['SSH_AUTH_SOCK'] == environment['SSH_AUTH_SOCK'], child
+    import time
+    for attempt in range(100):
+        if len(control()['windows']) == 1:
+            break
+        time.sleep(.1)
+    assert len(control()['windows']) == 1, control()
+    # Type a public fixture password into the VM's standard keyring dialog.
+    machine.send_chars('shinefixture')
+    machine.send_key('ret')
+    machine.wait_for_file('/run/user/1000/shine-keyring-unlocked', timeout=20)
+    as_user('set +e; SSH_AUTH_SOCK=/run/user/1000/gcr/ssh ssh-add -l >/dev/null; result=$?; test "$result" = 1')
     control("launch", program="foot", args=["--app-id=shine-drm-first", "sleep", "300"])
     machine.wait_until_succeeds("pgrep foot")
     import time
@@ -91,5 +165,13 @@ pkgs.testers.runNixOSTest {
     time.sleep(.5)
     machine.screenshot("shine-two-monitors")
     control("quit")
+    machine.wait_until_succeeds('test ! -e /run/user/1000/shine.sock', timeout=15)
+    for attempt in range(100):
+        environment = manager_environment()
+        if 'WAYLAND_DISPLAY' not in environment:
+            break
+        time.sleep(.1)
+    assert 'WAYLAND_DISPLAY' not in environment, environment
+    assert 'XDG_CURRENT_DESKTOP' not in environment, environment
   '';
 }

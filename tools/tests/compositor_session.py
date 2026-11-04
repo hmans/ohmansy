@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 import compositor_integration as trial
@@ -12,7 +13,7 @@ import compositor_integration as trial
 
 def manager_display_environment():
     output = subprocess.check_output(['systemctl', '--user', 'show-environment'], text=True)
-    names = {'WAYLAND_DISPLAY', 'DISPLAY', 'XDG_CURRENT_DESKTOP', 'XDG_SESSION_DESKTOP'}
+    names = {'WAYLAND_DISPLAY', 'DISPLAY', 'XDG_CURRENT_DESKTOP', 'XDG_SESSION_DESKTOP', 'XDG_SESSION_TYPE', 'SSH_AUTH_SOCK'}
     return {key: value for line in output.splitlines()
             for key, _, value in [line.partition('=')] if key in names}
 
@@ -40,6 +41,17 @@ def run():
         try:
             state = trial.wait_for(control, timeout=25, description='packaged session socket')
             pid = state['pid']
+            probe = artifacts / 'child-environment.json'
+            code = ('import json,os,pathlib; '
+                    f'pathlib.Path({str(probe)!r}).write_text(json.dumps('
+                    '{k:os.environ.get(k) for k in ["DBUS_SESSION_BUS_ADDRESS","WAYLAND_DISPLAY","SSH_AUTH_SOCK"]}))')
+            control('launch', program=sys.executable, args=['-c', code])
+            trial.wait_for(probe.exists, description='nested child environment')
+            child = json.loads(probe.read_text())
+            assert child['DBUS_SESSION_BUS_ADDRESS'] != os.environ.get('DBUS_SESSION_BUS_ADDRESS'), child
+            assert child['DBUS_SESSION_BUS_ADDRESS'] != f'unix:path={os.environ["XDG_RUNTIME_DIR"]}/bus', child
+            assert child['WAYLAND_DISPLAY'] == state['wayland_display'], child
+            assert child['SSH_AUTH_SOCK'] == os.environ.get('SSH_AUTH_SOCK'), child
             terminal = trial.wait_for(lambda: next((window for window in control()['windows'] if window['app_id'] == 'foot'), None), description='normal session terminal')
             trial.wait_for(lambda: next(window for window in control()['windows'] if window['id'] == terminal['id'])['render_density'] == 2, description='2x session terminal')
             if original_focus is not None:
@@ -77,6 +89,7 @@ def run():
         'normal_terminal': True, 'applications': True, 'cancel_logout': True,
         'confirmed_logout': True, 'original_windows_preserved': True,
         'parent_activation_environment_preserved': True,
+        'private_bus_and_inherited_agent': True,
     }, indent=2) + '\n')
     print('PASS: packaged session, 2x terminal, application picker, cancel/confirm sign-out, parent desktop preservation')
 
