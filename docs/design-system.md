@@ -48,7 +48,19 @@ while software rendering preserves the same muted color hierarchy.
 
 ## Preview and verification
 
+Keep the installer's main actions in a bottom bar outside the scrolling content.
+Reserve its height in the content viewport so it never covers the form. Put Back
+before the primary action; use a row where it fits and stack at widths below
+560 px. Disk warnings and acknowledgement remain in the form; the fixed erase
+button still requires explicit acknowledgement.
+
+The content switches from two columns to one below 900 px. Narrow windows and
+windows shorter than 650 px use smaller headings, fewer forced line breaks,
+and tighter spacing. Use available height as well as width when adapting layouts.
+
 Use `mise run installer-ui` for installer iteration. Shared UI components are
 packaged by Nix, so restart the preview after changing their implementation.
 Installer-local QML reloads on save. Run the `installer-ui` flake check to render
-all screens at wide and compact sizes and exercise confirmation safeguards.
+all screens at wide, compact, short, and narrow sizes and exercise confirmation
+safeguards. The render check also verifies that action buttons stay within the
+window, their labels fit, and the scrolling content stops above the action bar.

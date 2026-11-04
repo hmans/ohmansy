@@ -28,7 +28,38 @@ ShellRoot {
             id: view; anchors.fill: parent; controller: demo
             Component.onCompleted: Qt.callLater(() => { selected = demo.disks[0]; page = Quickshell.env("PREVIEW_PAGE") || "welcome"; })
         }
-        Timer { running: !!Quickshell.env("PREVIEW_IMAGE"); interval: 1800; onTriggered: view.grabToImage(result => { result.saveToFile(Quickshell.env("PREVIEW_IMAGE")); Qt.quit(); }) }
+        Timer {
+            running: !!Quickshell.env("PREVIEW_IMAGE")
+            interval: 1800
+            onTriggered: {
+                const bar = view.children.find(item => item.objectName === "installerActions");
+                const scroll = view.children.find(item => item.objectName === "installerScroll");
+                if (!bar || !scroll || scroll.y + scroll.height > bar.y + 1)
+                    throw new Error("Content overlaps the action bar");
+                let count = 0;
+                function checkActions(item) {
+                    if (!item.visible) return;
+                    if (item.objectName === "installerAction") {
+                        const position = item.mapToItem(view, 0, 0);
+                        if (position.x < 0 || position.y < 0 || position.x + item.width > view.width + 1 || position.y + item.height > view.height + 1)
+                            throw new Error("Action is outside the window: " + item.text);
+                        if (item.contentItem.implicitWidth > item.width - item.leftPadding - item.rightPadding + 1)
+                            throw new Error("Action label is clipped: " + item.text);
+                        count++;
+                    }
+                    for (const child of item.children || []) checkActions(child);
+                }
+                checkActions(bar);
+                if (view.page !== "progress" && count === 0) throw new Error("Missing page actions");
+                const top = bar.y;
+                const previousScroll = scroll.contentY;
+                scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height);
+                if (bar.y !== top) throw new Error("Action bar moved with scrolling");
+                checkActions(bar);
+                scroll.contentY = previousScroll;
+                view.grabToImage(result => { result.saveToFile(Quickshell.env("PREVIEW_IMAGE")); Qt.quit(); });
+            }
+        }
         Timer {
             running: Quickshell.env("INSTALLER_FLOW_TEST") === "1"
             interval: 100

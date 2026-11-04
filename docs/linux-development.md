@@ -237,7 +237,8 @@ the preview after changing those. The standalone `nix run .#installer-preview`
 uses a packaged snapshot unless `OHMANSY_INSTALLER_QML` is set by the launcher.
 
 `nix build .#checks.x86_64-linux.installer-ui`
-renders every screen at wide and compact sizes and checks for QML errors.
+renders every screen at wide, compact, short, and narrow sizes, checks for QML
+errors, and verifies that the fixed action buttons fit within the window.
 
 Speech synthesis is disabled by default, avoiding the large MBROLA voice
 collection. A host can opt in with `services.speechd.enable = true`.

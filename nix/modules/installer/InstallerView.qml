@@ -18,6 +18,8 @@ Item {
     property bool failedGraphics: false
     readonly property bool animated: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
     readonly property bool narrow: width < 900
+    readonly property bool compact: narrow || height < 650
+    readonly property int edgeMargin: compact ? 22 : 48
     readonly property var stages: ["prepare", "partition", "format", "configure", "install", "finish", "done"]
     readonly property int stageIndex: Math.max(0, stages.indexOf(controller.state.stage || "prepare"))
     readonly property var stageNames: ({prepare: "Checking the disk", partition: "Partitioning the disk", format: "Creating filesystems", configure: "Configuring the system", install: "Copying the system", finish: "Finishing installation", done: "Installation complete"})
@@ -43,7 +45,7 @@ Item {
     }
     Connections {
         target: view.Window.window
-        function onActiveFocusItemChanged() { Qt.callLater(() => view.reveal(view.Window.window.activeFocusItem)); }
+        function onActiveFocusItemChanged() { Qt.callLater(() => { if (view.Window.window) view.reveal(view.Window.window.activeFocusItem); }); }
     }
     function start() {
         if (page !== "confirm" || !transition.interactive || controller.busy || !selected || !eraseAcknowledged) return;
@@ -98,14 +100,15 @@ Item {
         property string layoutRevision: [view.width, view.height, scroll.contentY, transition.displayedPage, controller.disks.length, view.details].join(":")
     }
     RowLayout {
-        anchors { top: parent.top; left: parent.left; right: parent.right; margins: view.narrow ? 22 : 36 }
+        anchors { top: parent.top; left: parent.left; right: parent.right; margins: view.compact ? 18 : 36 }
         Text { text: "ohmansy"; color: "#f5f0ff"; font { family: Theme.fontFamily; pixelSize: 24; weight: Font.Bold; letterSpacing: -0.6 } }
         Text { visible: !view.narrow; text: " /  installer"; color: "#b9abc9"; font { pixelSize: 10; letterSpacing: 1.6 } }
         Item { Layout.fillWidth: true }
     }
     Flickable {
         id: scroll
-        anchors { fill: parent; leftMargin: view.narrow ? 22 : 48; rightMargin: view.narrow ? 22 : 48; topMargin: 100; bottomMargin: 48 }
+        objectName: "installerScroll"
+        anchors { left: parent.left; right: parent.right; top: parent.top; bottom: actionBar.top; leftMargin: view.edgeMargin; rightMargin: view.edgeMargin; topMargin: view.compact ? 68 : 100; bottomMargin: 12 }
         contentHeight: Math.max(height, content.implicitHeight + 24)
         boundsBehavior: Flickable.StopAtBounds; clip: true
         ScrollBar.vertical: ScrollBar {}
@@ -113,17 +116,17 @@ Item {
             id: content
             width: Math.min(1160, scroll.width)
             x: (scroll.width - width) / 2
-            y: Math.max(12, (scroll.height - implicitHeight) / 2)
+            y: view.compact ? 0 : Math.max(12, (scroll.height - implicitHeight) / 2)
             columns: view.narrow ? 1 : 2
-            columnSpacing: 56; rowSpacing: 28
+            columnSpacing: 56; rowSpacing: view.compact ? 20 : 28
             opacity: transition.contentOpacity
             enabled: transition.interactive
             ColumnLayout {
                 Layout.fillWidth: true; Layout.preferredWidth: 430; Layout.alignment: Qt.AlignTop
-                spacing: 24
-                Text { Layout.fillWidth: true; text: view.headings[transition.displayedPage] || ""; color: "#f5f0ff"; font { family: Theme.fontFamily; pixelSize: view.narrow ? 42 : 62; weight: Font.Bold; letterSpacing: -2.5 } lineHeight: 0.96; wrapMode: Text.WordWrap }
+                spacing: view.compact ? 12 : 24
+                Text { Layout.fillWidth: true; text: view.compact ? (view.headings[transition.displayedPage] || "").replace(/\n/g, " ") : view.headings[transition.displayedPage] || ""; color: "#f5f0ff"; font { family: Theme.fontFamily; pixelSize: view.compact ? 32 : 62; weight: Font.Bold; letterSpacing: view.compact ? -1 : -2.5 } lineHeight: 0.96; wrapMode: Text.WordWrap }
                 Text { Layout.fillWidth: true; text: view.captions[transition.displayedPage] || ""; color: "#c7bdd8"; font { family: Theme.fontFamily; pixelSize: 17 } lineHeight: 1.3; wrapMode: Text.WordWrap }
-                Rectangle { visible: !view.narrow; Layout.topMargin: 8; width: 56; height: 3; radius: 1.5; color: "#c9a0ff" }
+                Rectangle { visible: !view.compact; Layout.topMargin: 8; width: 56; height: 3; radius: 1.5; color: "#c9a0ff" }
             }
             ColumnLayout {
                 Layout.fillWidth: true; Layout.preferredWidth: 540; spacing: 16
@@ -143,7 +146,6 @@ Item {
                         }
                     }
                     Text { Layout.fillWidth: true; Layout.topMargin: 12; text: "This installer erases the disk you choose. It does not install alongside another operating system."; color: "#f2c0cd"; font.pixelSize: 14; wrapMode: Text.WordWrap }
-                    GlassButton { id: welcomeButton; Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Get started"; onClicked: { view.go("disks"); controller.request("disks"); } }
                 }
                 ColumnLayout {
                     visible: transition.displayedPage === "disks"; Layout.fillWidth: true; spacing: 12
@@ -177,8 +179,6 @@ Item {
                     Text { text: "COMPUTER NAME"; Layout.topMargin: 8; color: "#cab5e5"; font { pixelSize: 11; letterSpacing: 1.4 } }
                     GlassField { id: hostname; Layout.fillWidth: true; backdrop: blur; text: "ohmansy"; maximumLength: 63; Accessible.name: "Computer name"; onAccepted: if (view.selected && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(text)) view.go("confirm") }
                     Text { text: "Use lowercase letters, numbers, and hyphens."; Layout.fillWidth: true; color: "#b9abc9"; font.pixelSize: 12; wrapMode: Text.WordWrap }
-                    GlassButton { Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Continue"; enabled: !!view.selected && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hostname.text) && !controller.busy; onClicked: view.go("confirm") }
-                    GlassButton { actionRole: "return"; Layout.fillWidth: true; backdrop: blur; implicitHeight: 42; text: "Back"; onClicked: view.go("welcome") }
                 }
                 ColumnLayout {
                     visible: transition.displayedPage === "confirm"; Layout.fillWidth: true; spacing: 16
@@ -214,8 +214,6 @@ Item {
                         }
                         background: Rectangle { radius: 12; color: acknowledgement.hovered ? "#223b344d" : "transparent"; border.color: acknowledgement.visualFocus ? "#bda0f1" : "transparent" }
                     }
-                    GlassButton { Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Erase disk and install ohmansy"; enabled: !!view.selected && view.eraseAcknowledged && !controller.busy; onClicked: view.start() }
-                    GlassButton { actionRole: "return"; Layout.fillWidth: true; backdrop: blur; implicitHeight: 44; text: "Back"; enabled: !controller.busy; onClicked: { view.go("disks"); controller.request("disks"); } }
                 }
                 ColumnLayout {
                     visible: transition.displayedPage === "progress"; Layout.fillWidth: true; spacing: 20
@@ -241,17 +239,12 @@ Item {
                     Text { text: "✦  INSTALLATION COMPLETE"; color: "#a4efd5"; font { pixelSize: 12; letterSpacing: 1.2; weight: Font.Bold } }
                     Text { Layout.fillWidth: true; text: (controller.state.hostname || "Your computer") + " is ready."; color: "#f5f0ff"; font { pixelSize: 30; weight: Font.DemiBold } wrapMode: Text.WordWrap }
                     Text { Layout.fillWidth: true; text: "1. Shut down this computer.\n2. Remove the installation USB or ISO.\n3. Start it again and create your account."; color: "#ddd0e9"; font.pixelSize: 18; lineHeight: 1.6; wrapMode: Text.WordWrap }
-                    GlassButton { Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Shut down"; enabled: !controller.busy; onClicked: controller.request("shutdown") }
-                    GlassButton { actionRole: "return"; Layout.fillWidth: true; backdrop: blur; implicitHeight: 44; text: "Stay in the live desktop"; onClicked: Qt.quit() }
                 }
                 ColumnLayout {
                     visible: transition.displayedPage === "failed"; Layout.fillWidth: true; spacing: 16
                     Text { Layout.fillWidth: true; text: controller.state.error || "Installation could not finish."; color: "#ffd0dd"; font { pixelSize: 20; weight: Font.DemiBold } wrapMode: Text.WordWrap }
                     Text { Layout.fillWidth: true; text: controller.state.destructive ? "The selected disk may contain a partial installation. Do not erase it again just to retry. Open the log below and keep this live session running while you investigate." : "No disk changes were made. You can return to disk selection and try again."; color: "#d4c5e1"; font.pixelSize: 15; wrapMode: Text.WordWrap }
-                    GlassButton { actionRole: "return"; visible: !controller.state.destructive; Layout.fillWidth: true; backdrop: blur; text: "Back to disk selection"; onClicked: { view.go("disks"); controller.request("disks"); } }
-                    GlassButton { actionRole: "return"; Layout.fillWidth: true; backdrop: blur; text: "Return to the live desktop"; onClicked: Qt.quit() }
                 }
-                Text { visible: !!controller.error; Layout.fillWidth: true; text: controller.error; color: "#ffc5d6"; font.pixelSize: 14; wrapMode: Text.WordWrap; Accessible.role: Accessible.AlertMessage }
                 GlassButton { actionRole: "secondary"; visible: ["progress", "done", "failed"].includes(transition.displayedPage); Layout.fillWidth: true; backdrop: blur; implicitHeight: 40; font.pixelSize: 13; text: view.details ? "Hide installation log" : "Show installation log"; onClicked: view.details = !view.details }
                 ScrollView {
                     id: logPane
@@ -259,6 +252,57 @@ Item {
                     TextArea { text: controller.state.log || "Waiting for installer output…"; readOnly: true; selectByMouse: true; wrapMode: TextEdit.WrapAnywhere; color: "#ddd1ec"; font { family: "monospace"; pixelSize: 11 } background: Rectangle { color: "#b8101220"; radius: 12 } Accessible.name: "Installation log" }
                 }
                 Text { visible: view.details; Layout.fillWidth: true; text: "Full log: /var/log/ohmansy-install.log · Save it before shutting down the live session."; color: "#b9abc9"; font.pixelSize: 11; wrapMode: Text.WordWrap }
+            }
+        }
+    }
+
+    Rectangle {
+        id: actionBar
+        objectName: "installerActions"
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        height: actionStack.implicitHeight + (transition.displayedPage === "progress" && !controller.error ? 0 : 32)
+        color: "#f0181b29"
+        Rectangle { anchors { top: parent.top; left: parent.left; right: parent.right } height: 1; color: "#28685a7c"; visible: actionBar.height > 0 }
+        ColumnLayout {
+            id: actionStack
+            anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: view.edgeMargin; rightMargin: view.edgeMargin; topMargin: 16 }
+            spacing: 10
+            enabled: transition.interactive
+            opacity: transition.contentOpacity
+            Text { visible: !!controller.error; Layout.fillWidth: true; text: controller.error; color: "#ffc5d6"; font.pixelSize: 14; wrapMode: Text.WordWrap; Accessible.role: Accessible.AlertMessage }
+            GridLayout {
+                visible: transition.displayedPage === "welcome"
+                Layout.fillWidth: true; Layout.maximumWidth: 540; Layout.alignment: Qt.AlignRight
+                columns: 1; columnSpacing: 12; rowSpacing: 8
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; id: welcomeButton; Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Get started"; onClicked: { view.go("disks"); controller.request("disks"); } }
+            }
+            GridLayout {
+                visible: transition.displayedPage === "disks"
+                Layout.fillWidth: true; Layout.maximumWidth: 760; Layout.alignment: Qt.AlignRight
+                columns: view.width < 560 ? 1 : 2; columnSpacing: 12; rowSpacing: 8
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; actionRole: "return"; Layout.fillWidth: true; backdrop: blur; text: "Back"; onClicked: view.go("welcome") }
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Continue"; enabled: !!view.selected && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hostname.text) && !controller.busy; onClicked: view.go("confirm") }
+            }
+            GridLayout {
+                visible: transition.displayedPage === "confirm"
+                Layout.fillWidth: true; Layout.maximumWidth: 760; Layout.alignment: Qt.AlignRight
+                columns: view.width < 560 ? 1 : 2; columnSpacing: 12; rowSpacing: 8
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; actionRole: "return"; Layout.fillWidth: true; backdrop: blur; text: "Back"; enabled: !controller.busy; onClicked: { view.go("disks"); controller.request("disks"); } }
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Erase disk and install ohmansy"; enabled: !!view.selected && view.eraseAcknowledged && !controller.busy; onClicked: view.start() }
+            }
+            GridLayout {
+                visible: transition.displayedPage === "done"
+                Layout.fillWidth: true; Layout.maximumWidth: 760; Layout.alignment: Qt.AlignRight
+                columns: view.width < 560 ? 1 : 2; columnSpacing: 12; rowSpacing: 8
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; actionRole: "return"; Layout.fillWidth: true; backdrop: blur; text: "Stay in the live desktop"; onClicked: Qt.quit() }
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; Layout.fillWidth: true; backdrop: blur; actionRole: "primary"; text: "Shut down"; enabled: !controller.busy; onClicked: controller.request("shutdown") }
+            }
+            GridLayout {
+                visible: transition.displayedPage === "failed"
+                Layout.fillWidth: true; Layout.maximumWidth: 760; Layout.alignment: Qt.AlignRight
+                columns: view.width < 560 ? 1 : 2; columnSpacing: 12; rowSpacing: 8
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; actionRole: "return"; visible: !controller.state.destructive; Layout.fillWidth: true; backdrop: blur; text: "Back to disk selection"; onClicked: { view.go("disks"); controller.request("disks"); } }
+                GlassButton { objectName: "installerAction"; implicitHeight: 48; padding: 12; font.pixelSize: 16; actionRole: "return"; Layout.fillWidth: true; backdrop: blur; text: "Return to the live desktop"; onClicked: Qt.quit() }
             }
         }
     }

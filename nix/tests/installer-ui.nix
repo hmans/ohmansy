@@ -13,11 +13,15 @@ pkgs.runCommand "ohmansy-installer-ui" {
     exit 1
   }
   grep -q 'INSTALLER_FLOW_TEST passed' "$TMPDIR/flow.log"
-  for size in wide compact; do
+  for size in wide compact short narrow; do
     if [ "$size" = wide ]; then
       export PREVIEW_WIDTH=1180 PREVIEW_HEIGHT=800
-    else
+    elif [ "$size" = compact ]; then
       export PREVIEW_WIDTH=640 PREVIEW_HEIGHT=540
+    elif [ "$size" = short ]; then
+      export PREVIEW_WIDTH=1024 PREVIEW_HEIGHT=500
+    else
+      export PREVIEW_WIDTH=420 PREVIEW_HEIGHT=600
     fi
     for page in welcome disks confirm progress done failed; do
       export PREVIEW_PAGE="$page" PREVIEW_IMAGE="$out/$size-$page.png"

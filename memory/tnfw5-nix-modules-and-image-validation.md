@@ -38,6 +38,11 @@ build home to avoid contaminating unsandboxed Nix Portable's empty root.
 
 Lessons from the graphical VM tests:
 
+- Keep primary and back/return actions outside the installer's Flickable.
+  Its viewport ends above the bottom action bar. Compact layouts reduce heading
+  size and spacing based on width and height, rather than only stacking columns.
+  Preview render checks assert button bounds and label fit at four window sizes.
+
 - In `nix/modules/installer/shell.qml`, use `onClosed: Qt.quit()`. Closing a
   Quickshell FloatingWindow alone hid it but left the process holding the UI
   lock, preventing relaunch. Verify close/reopen during actual copying, not
