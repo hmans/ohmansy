@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise disposable native clients in a nested compositor on a Niri desktop.
+"""Exercise disposable native clients inside a Niri or ohmansy desktop.
 
 All window operations target the test compositor's private socket. Keyboard
 events use a test-only path into the compositor's normal key handler. They do
@@ -13,6 +13,7 @@ import socket
 import subprocess
 import tempfile
 import time
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 BINARY = ROOT / ".build/spatial/debug/ohmansy-compositor"
@@ -21,7 +22,7 @@ TEST_CONTROL = None
 
 def send_keys(keycodes, modifiers=()):
     assert TEST_CONTROL is not None
-    held = [{"ctrl": 29, "alt": 56, "shift": 42}[modifier] for modifier in modifiers]
+    held = [{"ctrl": 29, "alt": 56, "shift": 42, "super": 125}[modifier] for modifier in modifiers]
     for code in held:
         TEST_CONTROL("key", code=code, pressed=True)
     for code in keycodes:
@@ -49,7 +50,20 @@ def wait_for(function, timeout=15, description="condition"):
 
 
 def parent_windows():
+    path = os.environ.get('OHMANSY_COMPOSITOR_CONTROL')
+    if path:
+        state = Control(path)()
+        return [{**window, 'pid': state['pid'], 'is_focused': window['focused']}
+                for window in state['windows']]
     return json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"]))
+
+
+def focus_parent_window(ident):
+    path = os.environ.get('OHMANSY_COMPOSITOR_CONTROL')
+    if path:
+        Control(path)('focus', ident)
+    else:
+        subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(ident)], check=True, stdout=subprocess.DEVNULL)
 
 
 class Control:
@@ -107,6 +121,20 @@ def window_for(control, app):
     return next((window for window in control()["windows"] if window["app_id"] == app), None)
 
 
+def set_browser_cursor(browser, style):
+    # Keep the cursor target over the entire viewport at every scale, including
+    # empty page margins where Firefox would otherwise choose its own arrow.
+    browser.script(f'''let area=document.getElementById('cursor-test');
+        if (!area) {{area=document.createElement('div');area.id='cursor-test';document.body.append(area);}}
+        Object.assign(area.style,{{position:'fixed',inset:'0',zIndex:'2147483647',cursor:{json.dumps(style)}}});return true''')
+
+
+def cursor_hidden(control):
+    state = control()
+    return state['cursor']['kind'] == 'hidden' or (state['cursor']['kind'] == 'surface'
+                                                  and state['cursor_rendered_elements'] == 0)
+
+
 def keys(control, pid, window_id, keycodes, modifiers=(), gui_only=False):
     state = control("focus", window_id)
     assert state["pid"] == pid
@@ -137,9 +165,9 @@ def run():
         process = subprocess.Popen([str(BINARY), "--no-clients", "--test-input", "--control-socket", control.path, "--close-after", "180", "--report", str(artifacts / "state.json")], stdout=log, stderr=log)
         try:
             wait_for(control, description="compositor control socket")
-            own = wait_for(lambda: next((window for window in parent_windows() if window.get("pid") == process.pid), None), description="test window")
+            own = wait_for(lambda: next((window for window in parent_windows() if window['id'] not in original and window.get('app_id') == 'ohmansy-compositor'), None), description="test window")
             if own["is_focused"] and previous_focus in {window["id"] for window in parent_windows()}:
-                subprocess.run(["niri", "msg", "action", "focus-window", "--id", str(previous_focus)], check=True, stdout=subprocess.DEVNULL)
+                focus_parent_window(previous_focus)
             control("terminal")
             terminal = wait_for(lambda: window_for(control, "ohmansy-nested-client"), description="terminal")
             terminal_width = terminal["width"]
@@ -184,10 +212,10 @@ def run():
             control("terminal")
             wait_for(lambda: len(control()["windows"]) == 5, description="five live columns")
             assert all(next(window for window in control()["windows"] if window["id"] == ident)["width"] == width for ident, width in widths.items())
-            keys(control, process.pid, firefox["id"], [35], ("ctrl", "alt"))
-            wait_for(lambda: control()["focused"] == editor["id"], description="Ctrl+Alt+H directional focus")
-            keys(control, process.pid, editor["id"], [38], ("ctrl", "alt"))
-            wait_for(lambda: control()["focused"] == firefox["id"], description="Ctrl+Alt+L directional focus")
+            keys(control, process.pid, firefox["id"], [35], ("super", "alt"))
+            wait_for(lambda: control()["focused"] == editor["id"], description="Super+Alt+H directional focus")
+            keys(control, process.pid, editor["id"], [38], ("super", "alt"))
+            wait_for(lambda: control()["focused"] == firefox["id"], description="Super+Alt+L directional focus")
             before = control()
             control("resize", -80)
             after = control()
@@ -203,9 +231,43 @@ def run():
             assert control()["fullscreen"] == firefox["id"]
             control("fullscreen")
             assert control()["fullscreen"] is None
-            keys(control, process.pid, firefox["id"], [31], ("ctrl", "alt"))
-            assert control()["display_scale"] == 1.5, "Ctrl+Alt+S must cycle display scale"
+            control('fullscreen')
+            cursor_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path fill="#ff00ff" d="M0 0h32v8H8v24H0z"/></svg>'
+            cursor_css = 'url("data:image/svg+xml,' + quote(cursor_svg) + '") 0 0, crosshair'
+            set_browser_cursor(browser, cursor_css)
+            viewport = control()['viewport_size']
+            control('pointer', x=viewport[0]-120, y=viewport[1]*.6)
+            wait_for(lambda: control()['cursor']['kind'] == 'surface' and control()['cursor_rendered_elements'] > 0, description='custom browser cursor')
+            old = control()
+            cursor_pixels = [value * old['display_scale'] for value in old['pointer_position']]
+            keys(control, process.pid, firefox["id"], [31], ("super", "alt"))
+            assert control()["display_scale"] == 1.5, "Super+Alt+S must cycle display scale"
             wait_for(lambda: abs(control()["viewport"] - control()["viewport_target"]) < 1, description="viewport animation")
+            scaled = control()
+            control('screenshot', path=str(artifacts / 'scaled-cursor.png'))
+            wait_for(lambda: (artifacts / 'scaled-cursor.png').exists(), description='scaled cursor screenshot')
+            assert all(abs(position * scaled['display_scale'] - pixel) < 2 for position, pixel in zip(scaled['pointer_position'], cursor_pixels)), 'Scaling moved the cursor away from its physical position'
+            assert all(0 <= position < bound for position, bound in zip(scaled['pointer_position'], scaled['viewport_size'])), 'Scaling pushed the cursor offscreen'
+            assert scaled['cursor']['kind'] != 'hidden'
+            if scaled['cursor']['kind'] == 'surface':
+                assert scaled['cursor']['alive'] and scaled['cursor_rendered_elements'] > 0
+            for expected in [1.75, 2.0, 1.0, 1.25, 1.5]:
+                keys(control, process.pid, firefox['id'], [31], ('super', 'alt'))
+                wait_for(lambda: control()['display_scale'] == expected
+                         and all(abs(position * expected - pixel) < 2 for position, pixel in zip(control()['pointer_position'], cursor_pixels)),
+                         description='cursor remains at the same pixel across scale cycle')
+                wait_for(lambda: control()['cursor']['kind'] == 'surface'
+                         and control()['cursor']['alive'] and control()['cursor_rendered_elements'] > 0,
+                         description='custom cursor remains rendered')
+            set_browser_cursor(browser, 'none')
+            wait_for(lambda: cursor_hidden(control), description='intentional cursor hiding')
+            set_browser_cursor(browser, cursor_css)
+            position = control()['pointer_position']
+            control('pointer', x=position[0]-1, y=position[1])
+            wait_for(lambda: control()['cursor']['kind'] == 'surface' and control()['cursor_rendered_elements'] > 0, description='restored custom cursor')
+            checks.append('custom cursor stays visible and physically stationary through 100–200% scale cycles; intentional hiding is preserved')
+            browser.script('document.getElementById("cursor-test").remove();return true')
+            control('fullscreen')
             assert browser.script("return window.devicePixelRatio") == 2
             checks.append("workspaces, fullscreen, and 150% presentation with 2x browser content")
 
@@ -262,6 +324,16 @@ def run():
 
             control("screenshot", path=str(artifacts / "desktop.png"))
             wait_for(lambda: (artifacts / "desktop.png").exists(), description="rendered desktop image")
+            set_browser_cursor(browser, cursor_css)
+            geometry = next(window for window in control()['windows'] if window['id'] == firefox['id'])['geometry']
+            control('pointer', x=geometry[0]+geometry[2]/2, y=geometry[1]+geometry[3]/2)
+            wait_for(lambda: control()['cursor']['kind'] == 'surface' and control()['cursor_rendered_elements'] > 0, description='cursor owned by closing browser')
+            control('close')
+            wait_for(lambda: not window_for(control, 'firefox'), description='closing cursor owner')
+            wait_for(lambda: control()['cursor']['kind'] == 'named', description='default cursor after owner exits')
+            browser.connection.close()
+            browser = None
+            checks.append('default cursor recovers when the client owning its surface exits')
             control("workspace", 4)
             time.sleep(2)
             idle_frames = control()["rendered_frames"]

@@ -105,7 +105,13 @@ fn desktop_demo(socket: &std::ffi::OsStr) -> Result<()> {
             "--no-remote".into(),
             "--profile".into(),
             profile.to_string_lossy().into_owned(),
-            format!("file://{}", asset_path("demo.html").display()),
+            format!(
+                "file://{}?mod={}",
+                asset_path("demo.html").display(),
+                std::env::var("OHMANSY_COMPOSITOR_MODIFIER")
+                    .unwrap_or_else(|_| "Super+Alt".into())
+                    .replace('+', "%2B")
+            ),
         ],
     )?;
     eprintln!("Separate demo browser profile: {}", profile.display());
@@ -173,6 +179,7 @@ fn main() -> Result<()> {
     let mut no_clients = false;
     let mut desktop = false;
     let mut session_mode = false;
+    let mut shortcut_modifier = None;
     let mut test_input = false;
     let mut control_socket = None;
     let mut client = vec![];
@@ -180,7 +187,7 @@ fn main() -> Result<()> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
-                println!("ohmansy compositor\n\nUsage: mise run compositor -- [--desktop | --session] [--scale 1.25] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nCtrl+Alt+H/L or Left/Right: focus column\nCtrl+Alt+Shift+H/L: move column\nCtrl+Alt+minus/equal: resize column\nCtrl+Alt+1..4: workspace; add Shift to move the window\nCtrl+Alt+Enter: terminal; F: fullscreen; Q: close; S: display scale\nCtrl+Alt+D: applications; Ctrl+Alt+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
+                println!("ohmansy compositor\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--scale 1.25] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+minus/equal: resize column\nMod+1..4: workspace; add Shift to move the window\nMod+Enter: terminal; F: fullscreen; Q: close; S: display scale\nMod+D: applications; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
                 return Ok(());
             }
             "--scale" => scale = args.next().context("--scale needs a number")?.parse()?,
@@ -209,6 +216,14 @@ fn main() -> Result<()> {
             "--no-clients" => no_clients = true,
             "--desktop" => desktop = true,
             "--session" => session_mode = true,
+            "--mod-key" => {
+                shortcut_modifier = Some(
+                    input::ShortcutModifier::parse(
+                        &args.next().context("--mod-key needs super or super-alt")?,
+                    )
+                    .map_err(anyhow::Error::msg)?,
+                );
+            }
             "--test-input" => test_input = true,
             "--control-socket" => {
                 control_socket = Some(PathBuf::from(
@@ -241,6 +256,15 @@ fn main() -> Result<()> {
     state.ui_scale = scale;
     state.test_input = test_input;
     state.session_mode = session_mode;
+    state.shortcut_modifier = shortcut_modifier.unwrap_or(if session_mode {
+        input::ShortcutModifier::Super
+    } else {
+        input::ShortcutModifier::SuperAlt
+    });
+    std::env::set_var(
+        "OHMANSY_COMPOSITOR_MODIFIER",
+        state.shortcut_modifier.label(),
+    );
     state.screenshot = screenshot;
     let mut data = CalloopData {
         state,
@@ -259,7 +283,10 @@ fn main() -> Result<()> {
         "Nested Wayland socket: {}",
         data.state.socket_name.to_string_lossy()
     );
-    eprintln!("Client render scale: 2x; display scale: {scale}x. Ctrl+Alt+Enter terminal; H/L focus; S scale.");
+    eprintln!(
+        "Client render scale: 2x; display scale: {scale}x. {}+Enter terminal; H/L focus; S scale.",
+        data.state.shortcut_modifier.label()
+    );
     if let Some(path) = &socket_file {
         std::fs::write(path, data.state.socket_name.to_string_lossy().as_bytes())?;
     }

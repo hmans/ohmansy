@@ -112,6 +112,9 @@ pub fn init_winit(
             if state.screenshot.is_some() && state.start_time.elapsed() > Duration::from_secs(2) {
                 state.needs_redraw = true;
             }
+            if matches!(&state.cursor_image, smithay::input::pointer::CursorImageStatus::Surface(surface) if !surface.alive()) {
+                state.needs_redraw = true;
+            }
             if state.needs_redraw || !state.pending_imports.is_empty() {
                 timer_backend.borrow().window().request_redraw();
             }
@@ -138,15 +141,18 @@ pub fn init_winit(
                     state.relayout();
                 }
                 WinitEvent::Input(event) => state.process_input_event(event),
+                WinitEvent::Focus(false) if !state.test_input => {
+                    // Releases can go to another host window after focus moves.
+                    // Winit's synthetic releases are filtered by Smithay, so
+                    // clear our pressed state explicitly to avoid stuck Super.
+                    let keyboard = state.seat.get_keyboard().unwrap();
+                    let time = state.start_time.elapsed().as_millis() as u32;
+                    for key in keyboard.pressed_keys() {
+                        state.process_key(key, smithay::backend::input::KeyState::Released, time);
+                    }
+                }
                 WinitEvent::Redraw => {
                     use smithay::input::pointer::{CursorImageAttributes, CursorImageStatus};
-                    match &state.cursor_image {
-                        CursorImageStatus::Named(icon) => {
-                            backend.window().set_cursor_visible(true);
-                            backend.window().set_cursor(*icon);
-                        }
-                        _ => backend.window().set_cursor_visible(false),
-                    }
                     for (buffer, notifier) in state.pending_imports.drain(..) {
                         if backend.renderer().import_dmabuf(&buffer, None).is_ok() {
                             state.dmabuf_imports += 1;
@@ -157,6 +163,7 @@ pub fn init_winit(
                         }
                     }
                     if state.ui_scale != last_scale {
+                        let pointer_pixels = state.seat.get_pointer().unwrap().current_location().to_physical(last_scale);
                         last_scale = state.ui_scale;
                         output.change_current_state(
                             None,
@@ -168,12 +175,32 @@ pub fn init_winit(
                             None,
                         );
                         state.relayout();
+                        // Keep the pointer at the same physical pixel and
+                        // refresh its surface focus after the layout changes.
+                        if let Some(geometry) = state.space.output_geometry(&output) {
+                            let position = pointer_pixels.to_logical(last_scale);
+                            state.process_motion((
+                                position.x.clamp(0.0, (geometry.size.w as f64 - 1.0).max(0.0)),
+                                position.y.clamp(0.0, (geometry.size.h as f64 - 1.0).max(0.0)),
+                            ).into(), state.start_time.elapsed().as_millis() as u32);
+                        }
                         backend.window().set_title(&format!(
                             "ohmansy compositor · {:.0}% scale",
                             last_scale * 100.0
                         ));
                     }
                     state.space.refresh();
+                    // Clients acknowledge a scale-induced resize asynchronously.
+                    // Re-enter a surface that grows under a stationary pointer.
+                    let pointer = state.seat.get_pointer().unwrap();
+                    let position = pointer.current_location();
+                    let under = state.surface_under(position).map(|(surface, _)| surface);
+                    if !pointer.is_grabbed() && pointer.current_focus() != under {
+                        state.process_motion(position, state.start_time.elapsed().as_millis() as u32);
+                    }
+                    if matches!(&state.cursor_image, CursorImageStatus::Surface(surface) if !surface.alive()) {
+                        state.cursor_image = CursorImageStatus::default_named();
+                    }
                     state.needs_redraw = false;
                     let size = backend.window_size();
                     if size.w <= 0 || size.h <= 0 {
@@ -204,6 +231,7 @@ pub fn init_winit(
                                 Kind::Cursor,
                             ));
                         }
+                        state.cursor_rendered_elements = overlays.len();
                         if let Some(surface) = &state.drag_icon {
                             overlays.extend(render_elements_from_surface_tree(
                                 renderer,
@@ -253,6 +281,16 @@ pub fn init_winit(
                         return;
                     }
                     state.rendered_frames += 1;
+                    // A live cursor surface with no buffer is also a client's
+                    // request to hide the cursor. Only destroyed surfaces fall
+                    // back to the named default above.
+                    match &state.cursor_image {
+                        CursorImageStatus::Named(icon) => {
+                            backend.window().set_cursor(*icon);
+                            backend.window().set_cursor_visible(true);
+                        }
+                        _ => backend.window().set_cursor_visible(false),
+                    }
                     if let Some((path, mapping)) = screenshot {
                         let result = (|| -> anyhow::Result<()> {
                             // Map after swap: readback makes the EGL context surfaceless.
@@ -282,6 +320,12 @@ pub fn init_winit(
                             |_, _| Some(output.clone()),
                         );
                     });
+                    if let CursorImageStatus::Surface(surface) = &state.cursor_image {
+                        smithay::desktop::utils::send_frames_surface_tree(
+                            surface, &output, state.start_time.elapsed(),
+                            Some(Duration::ZERO), |_, _| Some(output.clone()),
+                        );
+                    }
                     state.popups.cleanup();
                     let _ = data.display_handle.flush_clients();
                 }

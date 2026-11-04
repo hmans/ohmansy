@@ -27,8 +27,10 @@ let
     set -eu
     # --nested is an explicit preview. A login must acquire displays itself,
     # even if stale display variables were inherited from the greeter.
+    mod_key=super
     if [ "''${1:-}" = --nested ]; then
       shift
+      mod_key=super-alt
     else
       unset WAYLAND_DISPLAY DISPLAY WAYLAND_SOCKET NIRI_SOCKET
     fi
@@ -44,7 +46,7 @@ let
     # Keep activation scoped to this bus, including when previewing inside Niri.
     exec ${pkgs.dbus}/bin/dbus-run-session -- \
       ${pkgs.cage}/bin/cage -s -m last -- \
-      ${compositor}/bin/ohmansy-compositor --session "$@"
+      ${compositor}/bin/ohmansy-compositor --session --mod-key "$mod_key" "$@"
   '';
 in
 pkgs.runCommand "ohmansy-compositor-session"

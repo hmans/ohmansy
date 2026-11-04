@@ -37,6 +37,7 @@ def run():
     environment['XDG_CACHE_HOME'] = str(artifacts / 'cache')
     if args.headless:
         environment.update(WLR_BACKENDS='headless', WLR_HEADLESS_OUTPUTS='1', WLR_RENDERER='pixman', LIBGL_ALWAYS_SOFTWARE='1')
+    shortcut = ('super',) if args.headless else ('super', 'alt')
     with (artifacts / 'session.log').open('w') as log:
         process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
         try:
@@ -45,19 +46,19 @@ def run():
             terminal = trial.wait_for(lambda: next((window for window in control()['windows'] if window['app_id'] == 'foot'), None), description='normal session terminal')
             trial.wait_for(lambda: next(window for window in control()['windows'] if window['id'] == terminal['id'])['render_density'] == 2, description='2x session terminal')
             if not args.headless and original_focus is not None:
-                subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(original_focus)], check=True, stdout=subprocess.DEVNULL)
-            trial.keys(control, pid, terminal['id'], [32], ('ctrl', 'alt'))
+                trial.focus_parent_window(original_focus)
+            trial.keys(control, pid, terminal['id'], [32], shortcut)
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='application picker')
             trial.send_keys([1])
             trial.wait_for(lambda: not trial.window_for(control, 'wofi'), description='picker closing')
-            trial.keys(control, pid, terminal['id'], [18], ('ctrl', 'alt', 'shift'))
+            trial.keys(control, pid, terminal['id'], [18], shortcut + ('shift',))
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='sign-out confirmation')
             trial.send_keys([28])
             trial.wait_for(lambda: not trial.window_for(control, 'wofi'), description='cancel sign-out')
             assert process.poll() is None, 'Cancel must keep the session running'
             control('screenshot', path=str(artifacts / 'session.png'))
             trial.wait_for(lambda: (artifacts / 'session.png').exists(), description='session framebuffer')
-            trial.keys(control, pid, terminal['id'], [18], ('ctrl', 'alt', 'shift'))
+            trial.keys(control, pid, terminal['id'], [18], shortcut + ('shift',))
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='second sign-out confirmation')
             trial.send_keys([108])
             # Confirming ends the server; there is no key release to deliver.

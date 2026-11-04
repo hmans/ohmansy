@@ -13,6 +13,41 @@ use smithay::{
 
 use crate::state::Smallvil;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ShortcutModifier {
+    Super,
+    #[default]
+    SuperAlt,
+}
+
+impl ShortcutModifier {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "super" => Ok(Self::Super),
+            "super-alt" => Ok(Self::SuperAlt),
+            _ => Err("--mod-key must be super or super-alt".into()),
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Super => "super",
+            Self::SuperAlt => "super-alt",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Super => "Super",
+            Self::SuperAlt => "Super+Alt",
+        }
+    }
+
+    fn matches(self, modifiers: &smithay::input::keyboard::ModifiersState) -> bool {
+        modifiers.logo && !modifiers.ctrl && modifiers.alt == (self == Self::SuperAlt)
+    }
+}
+
 impl Smallvil {
     pub fn process_motion(
         &mut self,
@@ -97,7 +132,9 @@ impl Smallvil {
                     if !pressed && state.shortcut_keys.remove(&code) {
                         return FilterResult::Intercept(("none", None));
                     }
-                    if !(modifiers.ctrl && modifiers.alt) {
+                    // Exact Alt matching lets a Super host forward Super+Alt
+                    // shortcuts to a nested compositor. Shift is an action modifier.
+                    if !state.shortcut_modifier.matches(modifiers) {
                         return FilterResult::Forward;
                     }
                     let sym = key.modified_sym().raw();
@@ -229,5 +266,51 @@ impl Smallvil {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use smithay::input::keyboard::ModifiersState;
+
+    #[test]
+    fn parent_and_child_shortcuts_are_disjoint_and_allow_shift() {
+        for logo in [false, true] {
+            for alt in [false, true] {
+                for ctrl in [false, true] {
+                    for shift in [false, true] {
+                        let modifiers = ModifiersState {
+                            logo,
+                            alt,
+                            ctrl,
+                            shift,
+                            ..Default::default()
+                        };
+                        assert_eq!(
+                            ShortcutModifier::Super.matches(&modifiers),
+                            logo && !alt && !ctrl
+                        );
+                        assert_eq!(
+                            ShortcutModifier::SuperAlt.matches(&modifiers),
+                            logo && alt && !ctrl
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn modifier_options_reject_unknown_profiles() {
+        assert_eq!(
+            ShortcutModifier::parse("super"),
+            Ok(ShortcutModifier::Super)
+        );
+        assert_eq!(
+            ShortcutModifier::parse("super-alt"),
+            Ok(ShortcutModifier::SuperAlt)
+        );
+        assert!(ShortcutModifier::parse("ctrl-alt").is_err());
     }
 }

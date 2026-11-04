@@ -12,7 +12,7 @@ Use `mise run os-boot` to build this checkout for the next boot, then reboot
 when ready to try the updated login screen.
 
 The experimental session opens your configured terminal and normal login shell.
-**Ctrl+Alt+D** opens the application picker. **Ctrl+Alt+Shift+E** opens a sign-out
+**Super+D** opens the application picker. **Super+Shift+E** opens a sign-out
 confirmation; Cancel keeps the desktop running, while Sign out returns to the
 login screen. Applications use their normal profiles in this session.
 
@@ -59,20 +59,25 @@ Closing the outer window ends the nested session and disconnects its clients.
 Windows form a horizontal strip with persistent widths. Focusing a window
 scrolls it into view; adding another window keeps existing widths. There are
 four workspaces, fullscreen, client maximize requests, and column resizing.
-Click a window to focus it. Keyboard shortcuts use Ctrl+Alt so ordinary browser
-keys and the parent desktop's Super shortcuts remain available.
+Click a window to focus it. **Mod** means **Super** in a login session and
+**Super+Alt** in a nested demo or packaged `--nested` preview. The host matches
+Super without Alt, so it forwards the child's Super+Alt shortcuts. Add Shift
+for the actions below. `--mod-key super|super-alt` overrides the default.
+
+When nesting under the supplied Niri configuration, use the arrow keys for
+navigation: Niri reserves Super+Alt+L for screen locking.
 
 | Shortcut | Action |
 | --- | --- |
-| Ctrl+Alt+H/L or Left/Right | Focus previous/next column |
-| Ctrl+Alt+Shift+H/L or Left/Right | Move column left/right |
-| Ctrl+Alt+minus/equal | Narrow/widen the focused column |
-| Ctrl+Alt+1–4 | Switch workspace |
-| Ctrl+Alt+Shift+1–4 | Move the focused window to a workspace |
-| Ctrl+Alt+Enter | Open a terminal |
-| Ctrl+Alt+F | Toggle fullscreen |
-| Ctrl+Alt+Q | Close the focused window |
-| Ctrl+Alt+S | Cycle display scale from 100% to 200% |
+| Mod+H/L or Left/Right | Focus previous/next column |
+| Mod+Shift+H/L or Left/Right | Move column left/right |
+| Mod+minus/equal | Narrow/widen the focused column |
+| Mod+1–4 | Switch workspace |
+| Mod+Shift+1–4 | Move the focused window to a workspace |
+| Mod+Enter | Open a terminal |
+| Mod+F | Toggle fullscreen |
+| Mod+Q | Close the focused window |
+| Mod+S | Cycle display scale from 100% to 200% |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
 
@@ -120,15 +125,18 @@ Restart the nested process to try code changes; no OS rebuild is needed.
 ```sh
 mise run compositor-check
 mise run compositor-integration
+python3 tools/tests/compositor_nesting.py
 mise run compositor -- --scale 1.5 --close-after 10
 ```
 
 The integration task creates disposable Firefox, GTK editor, and terminal clients
 and checks rendering, input, scrolling, menus, clipboard, workspaces, and idle
-frames. It requires a running Niri desktop. Test input goes through a private
+frames. It requires a running Niri or ohmansy desktop. Test input goes through a private
 control socket into the normal compositor handlers; `--test-input` enables this
 path and ignores physical input from the parent window during the trial.
 Artifacts stay in ignored `.local/compositor-tests/`.
+The nesting trial checks real Wayland key forwarding between a Super host and
+a Super+Alt child, including focus changes and independent scale shortcuts.
 
 After building `nix build --out-link .local/compositor-session .#compositor-session`,
 `python3 tools/tests/compositor_session.py` checks the packaged Cage session,

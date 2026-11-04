@@ -37,7 +37,7 @@ def main():
                     blue = int(105 + 65 * (v + 1))
                     row.append(f"\033[48;2;{red};{green};{blue}m ")
                 lines.append("".join(row) + "\033[0m")
-            lines += ["", f"Running: {time.monotonic() - started:6.1f}s   {'Paused' if paused else 'Animating'}", "Input: " + typed[-max(1, width - 10):], "", "Ctrl+Alt+Enter terminal | H/L focus | S scale"]
+            lines += ["", f"Running: {time.monotonic() - started:6.1f}s   {'Paused' if paused else 'Animating'}", "Input: " + typed[-max(1, width - 10):], "", os.environ.get("OHMANSY_COMPOSITOR_MODIFIER", "Super+Alt") + "+Enter terminal | H/L focus | S scale"]
             sys.stdout.write("\033[H" + "\033[K\r\n".join(lines) + "\033[J")
             sys.stdout.flush()
             if select.select([sys.stdin], [], [], 0.05)[0]:

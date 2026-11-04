@@ -51,11 +51,13 @@ pub struct Smallvil {
         smithay::wayland::selection::primary_selection::PrimarySelectionState,
     pub cursor_shape_state: smithay::wayland::cursor_shape::CursorShapeManagerState,
     pub cursor_image: smithay::input::pointer::CursorImageStatus,
+    pub cursor_rendered_elements: usize,
     pub drag_icon: Option<WlSurface>,
     pub popup_events: u64,
     pub popup_grabs: u64,
     pub test_input: bool,
     pub session_mode: bool,
+    pub shortcut_modifier: crate::input::ShortcutModifier,
     pub screenshot: Option<std::path::PathBuf>,
     pub commits: u64,
     pub rendered_frames: u64,
@@ -149,10 +151,12 @@ impl Smallvil {
                 ::winit::window::CursorIcon::Default,
             ),
             drag_icon: None,
+            cursor_rendered_elements: 0,
             popup_events: 0,
             popup_grabs: 0,
             test_input: false,
             session_mode: false,
+            shortcut_modifier: Default::default(),
             screenshot: None,
             commits: 0,
             rendered_frames: 0,
@@ -460,6 +464,18 @@ impl Smallvil {
             backend::renderer::utils::RendererSurfaceStateUserData,
             wayland::{compositor::with_states, shell::xdg::XdgToplevelSurfaceData},
         };
+        let cursor = match &self.cursor_image {
+            smithay::input::pointer::CursorImageStatus::Named(_) => {
+                serde_json::json!({"kind":"named"})
+            }
+            smithay::input::pointer::CursorImageStatus::Hidden => {
+                serde_json::json!({"kind":"hidden"})
+            }
+            smithay::input::pointer::CursorImageStatus::Surface(surface) => {
+                serde_json::json!({"kind":"surface","alive":surface.alive()})
+            }
+        };
+        let pointer = self.seat.get_pointer().unwrap().current_location();
         let windows: Vec<_> = self.windows.iter().map(|(id, window)| {
             // Popup lookup accesses surface state too; do it before taking
             // the surface-state lock used for client metadata.
@@ -487,7 +503,7 @@ impl Smallvil {
             .seat
             .get_keyboard()
             .map(|keyboard| keyboard.modifier_state());
-        serde_json::json!({"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+        serde_json::json!({"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }
 }
 

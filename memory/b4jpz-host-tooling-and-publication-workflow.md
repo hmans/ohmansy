@@ -125,8 +125,8 @@ than Cargo's temporary build directory.
 
 `mise run compositor-session` previews the packaged Cage-hosted session.
 The installed module uses the configured terminal launcher and normal shell,
-a normal-window Wofi app picker (Ctrl+Alt+D), and confirmed sign-out
-(Ctrl+Alt+Shift+E). Confirmation disables Wofi config/history so Cancel remains
+a normal-window Wofi app picker (Super+D), and confirmed sign-out
+(Super+Shift+E). Confirmation disables Wofi config/history so Cancel remains
 the default. A dedicated D-Bus session receives the inner Wayland socket via
 dbus-update-activation-environment without importing it into the systemd user
 manager. This preserves another running desktop during previews.
@@ -137,6 +137,20 @@ and activation variables. Native Firefox/GTK integration passed after promotion.
 Physical DRM login and reboot testing remain unverified. See the
 [session guide](../docs/compositor-development.md).
 
+Shortcut profiles (2026-11-04): login sessions use Super and nested runs use
+Super+Alt; `--mod-key super|super-alt` explicitly selects either. The session
+wrapper passes Super normally and Super+Alt for `--nested`. Host matching
+requires Alt to be absent, so child chords are forwarded. Eight Rust tests and
+strict Clippy passed; a real two-compositor Wayland trial verified independent
+terminal/scale actions, focus recovery, and original desktop preservation.
+The browser/GTK native trial also passed using Super+Alt. Winit focus loss
+releases the inner pressed keys because Smithay filters synthetic releases;
+without this, switching to a host terminal left Super stuck in the child.
+Trials now support an ohmansy host via its control socket as well as Niri.
+Under the shipped Niri bindings, Super+Alt+L is reserved for locking; use the
+arrow navigation alternatives. Existing installed processes keep their old
+bindings until restarted with the updated build.
+
 ## Spatial window lab
 
 For actual interactive Wayland clients, use `mise run compositor-desktop`, backed
@@ -144,8 +158,8 @@ by `nix/compositor/`. This Smithay 0.7 smallvil-derived nested compositor
 opens isolated Firefox and GTK editor instances plus Foot on its own socket.
 Columns retain their widths and scroll into view, with four workspaces,
 fullscreen, client maximize requests, column resizing, popup grabs, and local
-clipboard/primary selection support. Shortcuts use Ctrl+Alt: H/L focus, Enter
-starts a terminal, S cycles UI scale. Ctrl+Alt+function keys switch Linux virtual
+clipboard/primary selection support. Shortcuts use Super in login sessions and Super+Alt in nested demos/previews:
+H/L focus, Enter starts a terminal, S cycles UI scale. Ctrl+Alt+function keys switch Linux virtual
 terminals and must not be used as compositor shortcuts. Plain function keys remain application
 input. `mise run compositor` retains the smaller terminal demo. See
 [compositor development](../docs/compositor-development.md). The login session uses Cage for hardware display/input; there is no native DRM
@@ -181,6 +195,26 @@ surface state and deadlocks. Firefox HTML selects can use wl_subsurface rather
 than xdg_popup, so test open state and chosen value rather than popup counts.
 Client shadows also affect pointer coordinates; surface size and xdg geometry
 are distinct. D-Bus and portal/session integration remain unfinished.
+
+Cursor scaling (2026-11-04): preserve the pointer's physical pixel position
+when changing UI scale, then convert back to logical coordinates and refresh
+surface focus. Keeping old logical coordinates pushed the software cursor
+outside the smaller logical output; the native regression reproduced this
+before the fix. Refresh hit testing after asynchronous client resizes as well.
+
+A destroyed cursor surface must trigger repaint and fall back to the default
+named cursor. A live surface with no buffer is different: Firefox uses this
+for CSS cursor:none, so it must remain hidden. Send frame callbacks to cursor
+surfaces as well as normal windows. Status reports cursor kind/liveness,
+rendered element count, and logical pointer position for diagnosis.
+
+The real Firefox custom-cursor regression passed the full 100–200% scale cycle
+with a stationary physical pointer, explicit hide/restore, and default-cursor
+recovery when its owning browser exits. A framebuffer image confirmed the
+custom cursor remained visible near the screen edge. Existing browser/GTK,
+clipboard, and idle checks passed, preserving original host windows. Eight
+Rust tests, formatting, and strict Clippy passed. This was tested nested inside
+the running ohmansy desktop; no live desktop was replaced.
 
 GPU readback detail: Smithay's `map_texture` makes its EGL context surfaceless.
 Mapping a screenshot before `backend.submit` caused an EGL allocation/present
