@@ -8,6 +8,11 @@
         "action": "spawn \"ohmansy-terminal\""
       },
       {
+        "key": "Mod+Shift+Return",
+        "title": "Open Firefox",
+        "action": "spawn \"firefox\""
+      },
+      {
         "key": "Mod+Space",
         "title": "Application launcher",
         "action": "spawn \"ohmansy-desktop\" \"menu\" \"apps\"",

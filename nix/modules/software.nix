@@ -5,6 +5,7 @@
     type = lib.types.listOf lib.types.package;
     default = with pkgs; [
       git
+      mise
       vim
       curl
       wget

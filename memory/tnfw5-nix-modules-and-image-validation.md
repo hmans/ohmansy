@@ -334,6 +334,9 @@ Real unlock, physical media keys, and multiple monitors remain untested.
 Shortcut help uses ShortcutPanel.qml and the shared desktop glass palette.
 `desktop/shortcuts.json` is the source for both generated Niri bindings and
 the installed help data; custom bindings outside it are not displayed.
+Firefox launch (2026-11-04): shared `Mod+Shift+Return` spawns `firefox` and
+appears in shortcut help. Native x86 customization check validated the generated
+bindings and Niri configuration; no installed-system activation was performed.
 Mod+Shift+Slash opens the searchable panel. Super+T and Super+B were removed
 at the user's request; Super+Return still opens Foot. Keep JavaScript compatible
 with Qt's engine: Array.flatMap passed Node tests but failed in Quickshell 0.3.0;
@@ -374,6 +377,12 @@ black in light terminals. fish-style.nix now supplies explicit #f5f5f5 text for
 all preset segments, preserving the user's preferred dark-mode look. Defaults
 remain overridable and apply only when this preset is selected. Both actual
 light/dark terminal previews verified consistent lettering after activation.
+
+Mise packaging (2026-11-04): software.nix includes `pkgs.mise` in the optional
+utility bundle. The `mise.run` generic Linux executable failed with NixOS's
+stub loader on the installed x86 system. Use the Nix package; task execution
+does not require shell activation. The pinned package ran and the native
+customization check passed. Installed-system activation remains pending.
 
 Module layering (2026-11-02): default.nix composes desktop.nix and software.nix.
 The public flake exports default, desktop, software, and vm modules. Factory,

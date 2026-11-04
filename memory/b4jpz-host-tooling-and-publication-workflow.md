@@ -60,8 +60,9 @@ checkout build for future boots. `--dry-run` prints the command without sudo or
 Nix. Bash syntax, TOML parsing, and command execution with mocked sudo passed
 for all actions, custom paths with spaces, invocation outside the checkout,
 invalid arguments, dry runs, and child failure propagation. No OS build or
-activation was performed. Mise was unavailable in that session, so execution
-through mise itself remains unverified; direct Bash invocation is supported.
+activation was performed. Later verified `mise run os-test -- --dry-run` with
+the pinned Nix-packaged mise; argument forwarding printed the expected command
+without invoking sudo. Direct Bash invocation is also supported.
 Shared changes belong in the repo's reusable modules, packages, and defaults;
 the installed machine is their test target. Root AGENTS.md records this rule
 for every session. A runtime fix or machine-only configuration edit does not

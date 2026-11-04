@@ -56,7 +56,7 @@ add it to the host's module imports. Then rebuild:
 sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
-The optional utility bundle defaults to Git, Vim, curl, wget, jq, Python,
+The optional utility bundle defaults to Git, mise, Vim, curl, wget, jq, Python,
 fastfetch, btop, and htop. These defaults live in `nix/modules/software.nix`,
 exported by the root flake as `nixosModules.software`.
 Assigning `ohmansy.software.packages` replaces that list; ordinary
@@ -68,6 +68,9 @@ unless you select another shell. Individual accounts can set
 The shared software defaults add `~/.local/bin` to `PATH`, including in Fish.
 Set `environment.localBinInPath = false;` to disable this. Log out and back in
 after rebuilding to load the updated session environment.
+
+Mise is packaged for NixOS. Use the bundled version instead of `mise.run`'s
+generic Linux download. Repository tasks work without `mise activate`.
 
 Log out and back in after changing the default shell so the desktop receives
 the new `SHELL` environment variable. Existing shells keep running.
