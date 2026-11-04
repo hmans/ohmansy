@@ -381,6 +381,11 @@ all preset segments, preserving the user's preferred dark-mode look. Defaults
 remain overridable and apply only when this preset is selected. Both actual
 light/dark terminal previews verified consistent lettering after activation.
 
+Process utilities (2026-11-04): software.nix includes `pkgs.psmisc` in the
+optional utility bundle to provide `killall`. The evaluated x86 factory defaults
+include it; the pinned package's `killall --version` and native customization
+check passed. No image rebuild or installed-system activation was performed.
+
 Mise packaging (2026-11-04): software.nix includes `pkgs.mise` in the optional
 utility bundle. The `mise.run` generic Linux executable failed with NixOS's
 stub loader on the installed x86 system. Use the Nix package; task execution
