@@ -73,8 +73,9 @@ hardware generation. Physical GPU operation still requires a boot test;
 configuration checks and an ISO build do not prove that it works on a PC.
 Neither PC image imports the VM clipboard service, 200% VM scale, or
 software-cursor setting. Both use the same desktop and software modules as the VM.
-The PC live profile defaults to dark mode through an unlocked dconf database.
-Its `ohmansy-live-scale` user service sets all connected displays to 125% once
+The shared desktop defaults fresh accounts to dark mode through an unlocked
+dconf database, including installed systems and live images.
+The PC live profile's `ohmansy-live-scale` user service sets all connected displays to 125% once
 at session startup through Niri IPC, before the panel and wallpaper start.
 The bar can still switch to light mode. Display scale can be changed for the
 session with `niri msg output DP-1 scale 1.5` (use names from `niri msg outputs`).

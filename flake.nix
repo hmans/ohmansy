@@ -132,6 +132,7 @@
         live-pc-policy = import ./nix/tests/live-pc.nix {
           inherit nixpkgs pcLive pcNvidia;
           pkgs = pcPkgs;
+          installedSystems = [ pcInstalledBase pcAppliance ];
         };
         customization = import ./nix/tests/customization.nix {
           inherit nixpkgs;

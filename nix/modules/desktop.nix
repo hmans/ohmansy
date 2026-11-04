@@ -20,6 +20,11 @@ in {
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   programs.niri.enable = true;
+  # Fresh accounts start dark; a user's appearance choice still takes priority.
+  programs.dconf.enable = true;
+  programs.dconf.profiles.user.databases = [{
+    settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
+  }];
   # NixOS enables speech synthesis for graphical desktops by default, pulling
   # in the full MBROLA voice collection. Keep it opt-in for Ohmansy; a host's
   # ordinary services.speechd.enable = true still overrides this default.

@@ -9,6 +9,16 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Desktop appearance defaults (2026-11-04): keep the unlocked dconf dark default
+in `nix/modules/desktop.nix`, not `profiles/live-pc.nix`. The live-only setting
+made the installer look dark while freshly installed owners started light.
+The shared setting covers the installed payload and factory desktops too;
+explicit user choices still override it. The `live-pc-policy` check exercises
+the actual live, installed-base and factory dconf databases: fresh default,
+light override, then reset to dark; all passed on the native x86 builder.
+Existing ISO artifacts retain their old
+defaults until rebuilt; source changes alone do not update installed guests.
+
 Graphical installer (2026-11-04): `installer.nix` provides a Quickshell window
 and a live-only root socket service. Only the live user's UID can connect;
 the service owns the shared CLI lock and installation worker. Closing the

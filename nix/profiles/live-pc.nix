@@ -2,12 +2,6 @@
 {
   imports = [ ./live.nix ];
 
-  # A default, not a lock: the bar can still change the live user's preference.
-  programs.dconf.enable = true;
-  programs.dconf.profiles.user.databases = [{
-    settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
-  }];
-
   # Niri matches exact output names, not wildcards. Apply the live-session
   # default through IPC once outputs are ready, before starting the shell.
   systemd.user.services.ohmansy-live-scale = {
