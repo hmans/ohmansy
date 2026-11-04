@@ -1,3 +1,11 @@
 [tasks.clean]
 description = "Remove unused build artifacts; preserve VM state unless explicitly selected"
 run = "python3 tools/dev/clean.py"
+
+[tasks.installer-vm]
+description = "Boot the installer ISO in QEMU, preserving the test disk"
+run = "bash tools/dev/installer-vm.sh iso"
+
+[tasks.installed-vm]
+description = "Boot the installed QEMU disk without installation media"
+run = "bash tools/dev/installer-vm.sh disk"

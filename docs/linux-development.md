@@ -188,6 +188,22 @@ graphics and a private `vnc.sock` in the state directory instead of a window.
 The state directory also contains private QMP and serial sockets. Keep automated
 installation tests separate from a VM someone is using interactively.
 
+For repeatable launches or saved IDE actions, use `mise run installer-vm` and
+`mise run installed-vm`. Without mise, run `bash tools/dev/installer-vm.sh iso`
+or `bash tools/dev/installer-vm.sh disk`. Both use `.local/installer-actions`
+and disable networking. The ISO action creates the disk on first use and
+preserves it on later launches. Shut down the guest before switching actions.
+The disk action requires a completed installation before it can boot Ohmansy.
+
+The repository's `t3.json` declares **Run installer ISO** and **Run installed VM**
+for T3 Code. Project Actions settings also offer **Import from t3.json**.
+
+The default ISO is the existing local package at
+`dist/installer-graphical/ohmansy-0.1.0-installer-x86_64-linux.iso`.
+Set `OHMANSY_INSTALLER_ISO` to use another image and `OHMANSY_INSTALLER_STATE`
+to use another VM directory. These commands do not rebuild the ISO; source
+edits appear only after building and selecting a new image.
+
 Only one installer can run at a time. The graphical window shows real stages
 and a selectable installation log. Closing it leaves installation running;
 reopen **Install Ohmansy** to recover progress. Errors stay visible, and the

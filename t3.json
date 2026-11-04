@@ -1,0 +1,15 @@
+{
+  "$schema": "https://t3.codes/schema/t3.json",
+  "scripts": [
+    {
+      "name": "Run installer ISO",
+      "command": "bash tools/dev/installer-vm.sh iso",
+      "icon": "play"
+    },
+    {
+      "name": "Run installed VM",
+      "command": "bash tools/dev/installer-vm.sh disk",
+      "icon": "play"
+    }
+  ]
+}

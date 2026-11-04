@@ -2,7 +2,7 @@
 data:
   area: tooling
   kind: workflow
-  reviewed: "2026-11-03"
+  reviewed: "2026-11-04"
   status: current
 id: b4jpz
 title: Host tooling and publication workflow
@@ -25,6 +25,13 @@ repository root unless the tool explicitly supports another working directory.
   on these host-only tools. Update callers, CLI examples, and tests after moves.
 
 ## Guest work
+
+`tools/dev/installer-vm.sh` provides repeatable ISO and disk launches for IDE
+actions, also exposed through mise. It delegates to `linux-iso-vm.py` and uses
+rescue media when the state directory exists, preserving the virtual disk.
+See the Linux guide for defaults and overrides. `t3.json` declares the two
+actions for T3 Code; the wrapper and mise tasks are also versioned. An API
+response containing project scripts does not establish visibility in the UI.
 
 For an agent already inside Linux, use local command tools and the native
 [Linux development workflow](../docs/linux-development.md). The Mac bridge is
