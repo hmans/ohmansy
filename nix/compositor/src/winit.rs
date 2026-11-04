@@ -36,9 +36,9 @@ pub fn init_winit(
     let attributes = ::winit::window::Window::default_attributes()
         .with_name("ohmansy-compositor", "ohmansy")
         .with_title(if data.state.test_input {
-            "ohmansy compositor test"
+            "Shine test"
         } else {
-            "ohmansy compositor"
+            "Shine"
         })
         .with_inner_size(::winit::dpi::LogicalSize::new(1360.0, 850.0));
     let (mut graphics, events) = winit::init_from_attributes::<GlesRenderer>(attributes)
@@ -75,7 +75,7 @@ pub fn init_winit(
             size: (0, 0).into(),
             subpixel: Subpixel::Unknown,
             make: "ohmansy".into(),
-            model: "Nested desktop".into(),
+            model: "Shine".into(),
         },
     );
     let _global = output.create_global::<Smallvil>(&data.display_handle);
@@ -185,7 +185,7 @@ pub fn init_winit(
                             ).into(), state.start_time.elapsed().as_millis() as u32);
                         }
                         backend.window().set_title(&format!(
-                            "ohmansy compositor · {:.0}% scale",
+                            "Shine · {:.0}% scale",
                             last_scale * 100.0
                         ));
                     }

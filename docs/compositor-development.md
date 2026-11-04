@@ -1,9 +1,11 @@
-# Experimental compositor
+# Shine
+
+Shine is ohmansy's experimental scrolling Wayland compositor.
 
 ## Login session
 
 The shared ohmansy desktop includes an alternative session. At the login screen,
-choose **ohmansy (experimental)** in **Session**, then sign in normally.
+choose **Shine (experimental)** in **Session**, then sign in normally.
 **ohmansy (Niri)** remains the default. Installed systems need a rebuild to get
 the session package and updated greeter; an existing boot image stays unchanged.
 Follow [the installed-system workflow](linux-development.md) and plan a reboot
@@ -17,7 +19,7 @@ confirmation; Cancel keeps the desktop running, while Sign out returns to the
 login screen. Applications use their normal profiles in this session.
 
 Cage supplies DRM/KMS display handling, input devices, and VT switching. It hosts
-the ohmansy compositor fullscreen, which manages its own clients and layout.
+Shine fullscreen, which manages its own clients and layout.
 This adds a composition layer; it is a bridge until the compositor has its own
 hardware backend. The session currently uses one monitor (Cage's last connected
 output). Niri's panel, wallpaper, and services remain tied to Niri.
@@ -44,7 +46,7 @@ Close the preview's outer window or use its sign-out confirmation to end it.
 
 ## Nested development demo
 
-Run the live ohmansy desktop experiment inside the current Wayland desktop:
+Run the Shine desktop experiment inside the current Wayland desktop:
 
 ```sh
 mise run compositor-desktop

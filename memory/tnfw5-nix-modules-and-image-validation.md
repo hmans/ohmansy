@@ -225,8 +225,14 @@ The first greeter version booted and its normal and compact layouts were
 visually checked. Real password login, logout, and keyring unlock still need
 user verification. No new factory or ISO image was built for this change.
 
+Shine naming (2026-11-04): the experimental window manager/compositor is
+named **Shine**. The login label is **Shine (experimental)**; compositor window
+titles, demo content, CLI heading, package descriptions, and user guides use
+Shine. The distribution remains ohmansy. Existing command names, package paths,
+and session identifiers are retained for configuration compatibility.
+
 Alternative sessions (2026-11-04): the shared desktop imports
-`compositor.nix`, which offers **ohmansy (experimental)** alongside
+`compositor.nix`, which offers **Shine (experimental)** alongside
 **ohmansy (Niri)**. Niri remains the default; hosts can set
 `ohmansy.compositor.enable = false`. The session is also registered with
 `services.displayManager.sessionPackages`. It uses Cage for hardware and the

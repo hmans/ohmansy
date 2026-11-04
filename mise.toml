@@ -10,23 +10,23 @@ description = "Check the Rust spatial window experiment"
 run = "bash tools/dev/spatial.sh check"
 
 [tasks.compositor]
-description = "Run the nested Wayland compositor with live applications"
+description = "Run Shine with live applications"
 run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run"
 
 [tasks.compositor-check]
-description = "Check the nested Wayland compositor"
+description = "Check Shine"
 run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh check"
 
 [tasks.compositor-desktop]
-description = "Try the scrolling desktop with a browser, editor, and terminal"
+description = "Try Shine with a browser, editor, and terminal"
 run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run --desktop"
 
 [tasks.compositor-integration]
-description = "Test disposable browser/editor clients in the nested compositor"
+description = "Test disposable browser/editor clients in Shine"
 run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh integration"
 
 [tasks.compositor-session]
-description = "Preview the packaged experimental desktop session"
+description = "Preview the packaged Shine session"
 run = "nix run --no-update-lock-file .#compositor-session -- --nested"
 
 [tasks.clean]

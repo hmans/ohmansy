@@ -115,7 +115,13 @@ files for secrets and generated artifacts. Scan reachable history before first
 publication or a history rewrite. Use redacted secret-scanner output and keep
 reports under .local/. Do not push unless the current task authorizes it.
 
-## Experimental login session
+## Shine login session
+
+Shine naming (2026-11-04): the experimental window manager/compositor is
+named **Shine**. The login label is **Shine (experimental)**; compositor window
+titles, demo content, CLI heading, package descriptions, and user guides use
+Shine. The distribution remains ohmansy. Existing command names, package paths,
+and session identifiers are retained for configuration compatibility.
 
 The scrolling compositor is shipped from `nix/compositor/` through
 `nix/modules/compositor-package.nix`. Keeping its Cargo sources under `nix/`

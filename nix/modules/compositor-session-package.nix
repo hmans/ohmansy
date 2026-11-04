@@ -53,7 +53,7 @@ pkgs.runCommand "ohmansy-compositor-session"
   {
     passthru.providedSessions = [ "ohmansy" ];
     meta = {
-      description = "Experimental ohmansy desktop session hosted by Cage";
+      description = "Shine desktop session hosted by Cage";
       platforms = pkgs.lib.platforms.linux;
       mainProgram = "ohmansy-compositor-session";
     };
@@ -63,7 +63,7 @@ pkgs.runCommand "ohmansy-compositor-session"
     ln -s ${session} "$out/bin/ohmansy-compositor-session"
     cat > "$out/share/wayland-sessions/ohmansy.desktop" <<EOF
     [Desktop Entry]
-    Name=ohmansy (experimental)
+    Name=Shine (experimental)
     Comment=Scrolling desktop with fixed 2x client rendering
     Exec=$out/bin/ohmansy-compositor-session
     Type=Application

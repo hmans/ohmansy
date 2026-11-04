@@ -27,7 +27,7 @@ Item {
         property string message: ""
         property string user: "alex"
         property var sessions: [{ id: "niri", label: "ohmansy (Niri)" },
-            { id: "ohmansy", label: "ohmansy (experimental)" }]
+            { id: "ohmansy", label: "Shine (experimental)" }]
         property int sessionIndex: Quickshell.env("PREVIEW_SESSION") === "ohmansy" ? 1 : 0
         signal clearResponse()
         function selectSession(index) { if (!busy) { sessionIndex = index; clearResponse(); } }
@@ -53,7 +53,7 @@ Item {
                     throw new Error("Default session missing");
                 picker.currentIndex = 1;
                 picker.activated(1);
-                if (demo.sessionIndex !== 1 || picker.currentText !== "ohmansy (experimental)")
+                if (demo.sessionIndex !== 1 || picker.currentText !== "Shine (experimental)")
                     throw new Error("Session selection failed");
                 demo.busy = true;
                 if (picker.enabled) throw new Error("Session selection enabled during authentication");

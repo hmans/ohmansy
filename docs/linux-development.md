@@ -25,11 +25,11 @@ another agent installation are not assumed to exist here.
 
 For a live browser, editor, and terminal with fixed 2x rendering, run
 `mise run compositor-desktop`; see
-[nested compositor development](compositor-development.md). The separate
+[Shine development](compositor-development.md). The separate
 [spatial lab](spatial-lab.md), launched with `mise run spatial`, explores 3D
 presentation using window captures. Both run inside the current desktop without
 rebuilding or activating the OS.
-The compositor is also available as **ohmansy (experimental)** in the updated
+Shine is also available as **Shine (experimental)** in the updated
 login screen. `nix run .#compositor-session -- --nested` previews that packaged
 session, including its normal terminal, app picker, and sign-out confirmation.
 

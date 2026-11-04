@@ -126,17 +126,14 @@ pub fn spawn_terminal(socket: &std::ffi::OsStr, demo: bool) -> Result<()> {
         .env_remove("DISPLAY")
         .env_remove("NIRI_SOCKET")
         .env("XDG_CURRENT_DESKTOP", "ohmansy-lab")
-        .args([
-            "--app-id=ohmansy-nested-client",
-            "--title=ohmansy live terminal",
-        ]);
+        .args(["--app-id=ohmansy-nested-client", "--title=Shine terminal"]);
     if demo {
         command
-            .args(["--title=ohmansy live surface", "python3"])
+            .args(["--title=Shine live surface", "python3"])
             .arg(asset_path("demo.py"));
     } else {
         command
-            .env("PS1", "ohmansy> ")
+            .env("PS1", "Shine> ")
             .env_remove("PROMPT_COMMAND")
             .args(["bash", "--noprofile", "--norc", "-i"]);
     }
@@ -187,7 +184,7 @@ fn main() -> Result<()> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
-                println!("ohmansy compositor\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--scale 1.25] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+minus/equal: resize column\nMod+1..4: workspace; add Shift to move the window\nMod+Enter: terminal; F: fullscreen; Q: close; S: display scale\nMod+D: applications; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
+                println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--scale 1.25] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+minus/equal: resize column\nMod+1..4: workspace; add Shift to move the window\nMod+Enter: terminal; F: fullscreen; Q: close; S: display scale\nMod+D: applications; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|workspace INDEX|move-workspace INDEX|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
                 return Ok(());
             }
             "--scale" => scale = args.next().context("--scale needs a number")?.parse()?,

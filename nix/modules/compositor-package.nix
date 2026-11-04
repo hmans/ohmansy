@@ -25,7 +25,7 @@ pkgs.rustPlatform.buildRustPackage {
       }
   '';
   meta = {
-    description = "Experimental ohmansy scrolling Wayland compositor";
+    description = "Shine, the experimental scrolling Wayland compositor for ohmansy";
     platforms = pkgs.lib.platforms.linux;
     mainProgram = "ohmansy-compositor";
   };

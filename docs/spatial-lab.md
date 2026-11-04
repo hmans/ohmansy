@@ -5,7 +5,7 @@ perspective, and animation. It runs as an ordinary Wayland window inside the
 current Niri desktop. Existing applications remain in place.
 
 For real interactive Wayland clients, use `mise run compositor` instead. See
-[nested compositor development](compositor-development.md). The lab described
+[Shine development](compositor-development.md). The lab described
 here is the separate capture-based rendering experiment.
 
 ## Run

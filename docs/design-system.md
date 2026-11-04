@@ -9,6 +9,9 @@ Always write **ohmansy** in lowercase, including headings, window titles,
 buttons, and sentence beginnings. This is a display-name rule; preserve existing
 code identifiers, QML module names such as `Ohmansy.Ui`, and filesystem paths.
 
+The experimental window manager and Wayland compositor is named **Shine**.
+Use that capitalization for its titles, session label, and documentation.
+
 Use short, direct headings and action labels. Avoid decorative step captions
 such as “01 / WELCOME,” slogans, and repeated branding. The installer has one
 brand label at the top and no branded footer. Numbered lists are fine when they

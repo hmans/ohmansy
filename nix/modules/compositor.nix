@@ -16,7 +16,7 @@ in
   options.ohmansy.compositor.enable = lib.mkOption {
     type = lib.types.bool;
     default = true;
-    description = "Offer the experimental ohmansy compositor alongside Niri at login.";
+    description = "Offer Shine alongside Niri at login.";
   };
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [
@@ -25,7 +25,7 @@ in
     ];
     services.displayManager.sessionPackages = [ session ];
     ohmansy.greeter.sessions.ohmansy = {
-      label = "ohmansy (experimental)";
+      label = "Shine (experimental)";
       command = "${session}/bin/ohmansy-compositor-session";
       desktop = "ohmansy";
     };

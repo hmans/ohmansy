@@ -24,7 +24,7 @@ def main():
             canvas_width = max(8, min(width - 4, 90))
             canvas_height = max(3, min(height - 11, 35))
             lines = [
-                "\033[1;38;2;220;205;240mohmansy live surface\033[0m",
+                "\033[1;38;2;220;205;240mShine live surface\033[0m",
                 "", "A real Wayland client, updating 20 times per second.",
                 "Space: pause    Type: see keyboard input    Esc: quit", "",
             ]

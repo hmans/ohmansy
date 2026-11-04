@@ -19,7 +19,7 @@ ShellRoot {
     Component.onCompleted: {
         authentication.configureSessions({default: "niri", sessions: [
             {id: "niri", label: "ohmansy (Niri)", command: "/test/niri-session", desktop: "niri"},
-            {id: "ohmansy", label: "ohmansy (experimental)", command: "/test/ohmansy-session", desktop: "ohmansy"}
+            {id: "ohmansy", label: "Shine (experimental)", command: "/test/ohmansy-session", desktop: "ohmansy"}
         ]});
         authentication.selectUser("test-user");
     }
