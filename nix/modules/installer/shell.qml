@@ -57,7 +57,7 @@ ShellRoot {
     Timer { interval: 1500; running: true; repeat: true; onTriggered: if (!root.inFlight && !root.queued) root.request("status") }
     FloatingWindow {
         onClosed: Qt.quit()
-        title: "Install Ohmansy"
+        title: "Install ohmansy"
         visible: true
         implicitWidth: 1180
         implicitHeight: 800

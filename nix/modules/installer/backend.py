@@ -50,7 +50,7 @@ class Installer:
     def work(self, device, hostname, token, lock):
         try:
             with LOG.open('w') as log:
-                log.write(f'Ohmansy installation: {device}\nComputer name: {hostname}\n')
+                log.write(f'ohmansy installation: {device}\nComputer name: {hostname}\n')
                 log.flush()
                 install.perform_install(device, hostname, token=token, progress=self.progress, log=log)
             with self.mutex:

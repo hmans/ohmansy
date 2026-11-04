@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive whole-disk installer for the Ohmansy installer image."""
+"""Interactive whole-disk installer for the ohmansy installer image."""
 import fcntl
 import hashlib
 import json
@@ -106,14 +106,14 @@ def main():
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise SystemExit('An Ohmansy installation is already running. Return to its window or console.')
+            raise SystemExit('An ohmansy installation is already running. Return to its window or console.')
         install()
 
 
 def install():
     if not Path('/sys/firmware/efi').exists():
         raise SystemExit('Boot this installer with UEFI firmware.')
-    print('\nInstall Ohmansy\n')
+    print('\nInstall ohmansy\n')
     print('This installer erases ONE entire disk. It does not support dual boot.')
     if not (PAYLOAD / 'init').exists():
         raise SystemExit('The offline system payload is missing. No changes made.')
@@ -136,7 +136,7 @@ def install():
     if input(f'\nAll data on {device} will be destroyed. Type {confirmation}: ') != confirmation:
         raise SystemExit('Cancelled. No changes made.')
     perform_install(device, hostname, token=disk_token(disks[int(selection) - 1]))
-    print('\nOhmansy is installed. Shut down, remove the installation media, and boot the installed disk.')
+    print('\nohmansy is installed. Shut down, remove the installation media, and boot the installed disk.')
     print('The welcome screen will help you create your account on first boot.')
     print('System configuration: /etc/nixos. No SSH access has been enabled.')
 

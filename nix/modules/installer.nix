@@ -17,8 +17,8 @@ let
   '';
   launcher = pkgs.makeDesktopItem {
     name = "ohmansy-install";
-    desktopName = "Install Ohmansy";
-    comment = "Install Ohmansy by erasing a selected disk";
+    desktopName = "Install ohmansy";
+    comment = "Install ohmansy by erasing a selected disk";
     exec = "${graphicalInstaller}/bin/ohmansy-installer";
     terminal = false;
     icon = "system-software-install";
@@ -31,7 +31,7 @@ in {
   environment.systemPackages = [ installer graphicalInstaller launcher ];
   environment.etc."ohmansy/desktop.kdl".text = lib.mkAfter ''
     window-rule {
-      match title="^Install Ohmansy$"
+      match title="^Install ohmansy$"
       default-column-width { proportion 1.0; }
     }
   '';
@@ -45,7 +45,7 @@ in {
     };
   };
   systemd.services.ohmansy-installer = {
-    description = "Install Ohmansy from the live image";
+    description = "Install ohmansy from the live image";
     serviceConfig = {
       ExecStart = "${backend}/bin/ohmansy-installer-service";
       RuntimeDirectory = "ohmansy-installer";

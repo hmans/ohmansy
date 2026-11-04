@@ -250,7 +250,16 @@ earlier scene. The harmless full-screen preview accepts PREVIEW_KEYBOARD=1
 for interaction checks; pair it with an automatic capture/exit deadline.
 
 The shared Ohmansy.Ui module in nix/modules/ui supplies glass surfaces, controls,
-icons, theme values, and transitions. quickshell-ui.nix packages it; both shell
+icons, theme values, and transitions. Copy and button-role rules live in
+`docs/design-system.md`. The display name is
+always lowercase **ohmansy**; preserve case-sensitive code identifiers.
+`GlassButton.actionRole` selects primary (muted purple glass), secondary (slate
+glass), or return (subtle slate glass). Bright lavender fills and nearly invisible
+return buttons were rejected; preserve the existing glass treatment.
+Explicit fallback tints preserve
+these roles under software rendering; previously all buttons fell back to
+the same surface color. The legacy `primary` property remains compatible.
+quickshell-ui.nix packages it; both shell
 wrappers set QML_IMPORT_PATH. Greeter wrappers preserve local control names.
 The desktop menu bar uses the same glass with no QML backdrop; Niri 26.04
 provides cached wallpaper blur through its layer rules (xray true). Bar, launcher,

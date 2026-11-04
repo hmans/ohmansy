@@ -168,6 +168,8 @@ values, GlassSurface, GlassButton, GlassField, IconButton, FadeSwitch, and
 StaggeredEntrance. Keep authentication, power commands, and desktop service
 state in their consumers. The small greeter wrappers preserve local control
 names while using the shared implementations.
+See the [design system](design-system.md) for lowercase branding, copy rules,
+and primary, secondary, and return button roles.
 
 `quickshell-ui.nix` packages the module. Both `greeter-package.nix` and
 `desktop-package.nix` add it to `QML_IMPORT_PATH`; use their wrappers when

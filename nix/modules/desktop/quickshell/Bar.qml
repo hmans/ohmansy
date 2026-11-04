@@ -78,7 +78,7 @@ PanelWindow {
             }
             BarButton {
                 visible: bar.installerCommand !== ""
-                text: "Install Ohmansy"
+                text: "Install ohmansy"
                 onClicked: Quickshell.execDetached([bar.installerCommand])
             }
             Row {

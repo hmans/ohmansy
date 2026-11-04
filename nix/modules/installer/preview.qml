@@ -20,7 +20,7 @@ ShellRoot {
     Timer { id: complete; interval: 5000; onTriggered: demo.state = Object.assign({}, demo.state, {status: "done", stage: "done"}) }
     FloatingWindow {
         onClosed: Qt.quit()
-        visible: true; title: "Ohmansy installer preview · no disk access"
+        visible: true; title: "ohmansy installer preview · no disk access"
         implicitWidth: Number(Quickshell.env("PREVIEW_WIDTH")) || 1180
         implicitHeight: Number(Quickshell.env("PREVIEW_HEIGHT")) || 800
         color: "#171a21"

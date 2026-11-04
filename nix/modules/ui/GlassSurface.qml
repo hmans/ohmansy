@@ -10,6 +10,7 @@ Item {
     property bool focused: false
     property bool primary: false
     property color tint: primary ? Theme.primaryGlass : Theme.glass
+    property color fallbackTint: colors ? colors.surfaceBase : Theme.solidSurface
     property bool sheen: true
     property real radius: Theme.radius
     readonly property bool accelerated: GraphicsInfo.api !== GraphicsInfo.Software
@@ -46,7 +47,7 @@ Item {
         anchors.fill: parent
         radius: glass.radius
         color: glass.accelerated
-            ? glass.tint : (glass.colors ? glass.colors.surfaceBase : Theme.solidSurface)
+            ? glass.tint : glass.fallbackTint
     }
     Rectangle {
         anchors.fill: parent
