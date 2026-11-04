@@ -146,6 +146,11 @@ test results separately. See [image packaging](ohmansy-development.md) for CI ar
 
 ### Test the installer locally
 
+The `Ohmansy images` CI workflow also builds the generic x86-64 offline installer.
+Download `ohmansy-x86_64-installer-preview` from its completed `installer` job;
+the artifact includes the ISO, source archive, manifest, lock file, and checksums.
+CI verifies assembly and packaging; the VM procedure below verifies installation.
+
 Build the installer on this host, then boot it with a new, isolated 64 GiB VM
 disk. No CI job, USB stick, or host reboot is involved:
 

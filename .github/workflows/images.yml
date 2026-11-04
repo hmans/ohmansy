@@ -10,6 +10,39 @@ permissions:
   contents: read
 
 jobs:
+  installer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Allow the image builder's user namespace
+        run: sudo apparmor_parser -r .github/nix-userns.apparmor
+      - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            max-jobs = 2
+      - name: Check offline installer and packaging
+        run: |
+          nix build --no-update-lock-file --no-link .#checks.x86_64-linux.offline-installer
+          python3 -m unittest discover -s tools/tests -p 'test_installer.py'
+          python3 -m unittest discover -s tools/tests -p 'test_iso_package.py'
+      - name: Build the offline installer ISO
+        run: nix build --no-update-lock-file .#installer-iso
+      - name: Package installer preview artifacts
+        run: >-
+          python3 tools/release/package-iso.py --iso result/iso/*.iso
+          --output dist/installer-pc --architecture x86_64-linux --kind installer --graphics generic
+      - name: Verify packaged checksums
+        working-directory: dist/installer-pc
+        run: sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ohmansy-x86_64-installer-preview
+          path: dist/installer-pc/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
   pc-live:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
