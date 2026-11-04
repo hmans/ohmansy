@@ -39,6 +39,13 @@ See the Linux guide for defaults and overrides. `t3.json` declares the two
 actions for T3 Code; the wrapper and mise tasks are also versioned. An API
 response containing project scripts does not establish visibility in the UI.
 
+`mise run installer-vm` depends on `installer-iso`. Mise sources/outputs freshness
+checks cover the flake, lock, all of nix/, and tools/build/installer-iso.sh; the
+output is a real host-readable dist/installer/ohmansy-installer.iso, not a Nix
+store symlink with epoch timestamps. The builder supports native and portable
+Nix, retains a store output link, and atomically replaces the copied ISO so
+running VMs retain their open file. The direct shell launcher does not build.
+
 For an agent already inside Linux, use local command tools and the native
 [Linux development workflow](../docs/linux-development.md). The Mac bridge is
 not needed. Keep live USB work on persistent storage. Mac bundle commands remain

@@ -165,9 +165,9 @@ match Arch-based hosts; pass `--firmware-code` and `--firmware-vars` on other
 distributions. It refuses to create a disk in an existing state directory.
 No host directories or host disks are shared with the VM.
 
-In the live desktop, choose **Install Ohmansy**. The graphical installer offers
+In the live desktop, choose **Install ohmansy**. The graphical installer offers
 the VM disk and asks for a computer name. Review the disk, tick the erasure
-acknowledgement, then choose **Erase disk and install Ohmansy**. The ISO contains
+acknowledgement, then choose **Erase disk and install ohmansy**. The ISO contains
 the complete prebuilt installed desktop and uses
 `nixos-install --system`; installation and graphical account setup need no
 network connection. `--no-network` removes the VM's network adapter entirely.
@@ -190,8 +190,16 @@ The state directory also contains private QMP and serial sockets. Keep automated
 installation tests separate from a VM someone is using interactively.
 
 For repeatable launches or saved IDE actions, use `mise run installer-vm` and
-`mise run installed-vm`. Without mise, run `bash tools/dev/installer-vm.sh iso`
-or `bash tools/dev/installer-vm.sh disk`. Both use `.local/installer-actions`
+`mise run installed-vm`. The installer VM task first runs `installer-iso`, which
+builds `dist/installer/ohmansy-installer.iso`. Run `mise run installer-iso` to
+build without launching QEMU. Mise checks the flake, lock file, `nix/` sources,
+and build script against the ISO output and skips unchanged builds. Missing
+outputs or changed sources trigger a build; Nix reuses its own cached outputs.
+Use `mise run --force installer-iso` to force the task to run.
+
+Without mise, first run `bash tools/build/installer-iso.sh`, then
+`bash tools/dev/installer-vm.sh iso` (or `disk` for the installed system).
+Both launch modes use `.local/installer-actions`
 and disable networking. The ISO action creates the disk on first use and
 preserves it on later launches. Shut down the guest before switching actions.
 The disk action requires a completed installation before it can boot Ohmansy.
@@ -199,15 +207,16 @@ The disk action requires a completed installation before it can boot Ohmansy.
 The repository's `t3.json` declares **Run installer ISO** and **Run installed VM**
 for T3 Code. Project Actions settings also offer **Import from t3.json**.
 
-The default ISO is the existing local package at
-`dist/installer-graphical/ohmansy-0.1.0-installer-x86_64-linux.iso`.
+The default ISO is `dist/installer/ohmansy-installer.iso`.
 Set `OHMANSY_INSTALLER_ISO` to use another image and `OHMANSY_INSTALLER_STATE`
-to use another VM directory. These commands do not rebuild the ISO; source
-edits appear only after building and selecting a new image.
+to use another VM directory. To launch an alternate image without building the
+default one, use the shell launcher directly. The build publishes the ISO by
+atomic replacement, so an already running QEMU keeps its open image. Restart
+the VM to boot the new ISO. Existing VM disks are preserved.
 
 Only one installer can run at a time. The graphical window shows real stages
 and a selectable installation log. Closing it leaves installation running;
-reopen **Install Ohmansy** to recover progress. Errors stay visible, and the
+reopen **Install ohmansy** to recover progress. Errors stay visible, and the
 installer refuses another erase after destructive work has started. The full
 log is `/var/log/ohmansy-install.log` in the live session; save it before shutdown
 if you need it for recovery. The command-line fallback is `sudo ohmansy-install`.

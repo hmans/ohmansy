@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 state="${OHMANSY_INSTALLER_STATE:-.local/installer-actions}"
-iso="${OHMANSY_INSTALLER_ISO:-dist/installer-graphical/ohmansy-0.1.0-installer-x86_64-linux.iso}"
+iso="${OHMANSY_INSTALLER_ISO:-dist/installer/ohmansy-installer.iso}"
 args=(--state "$state" --no-network)
 
 case "${1:-}" in

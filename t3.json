@@ -3,17 +3,22 @@
   "scripts": [
     {
       "name": "Preview installer UI",
-      "command": "bash tools/dev/installer-ui.sh",
+      "command": "mise run installer-ui",
       "icon": "play"
     },
     {
+      "name": "Build installer ISO",
+      "command": "mise run installer-iso",
+      "icon": "build"
+    },
+    {
       "name": "Run installer ISO",
-      "command": "bash tools/dev/installer-vm.sh iso",
+      "command": "mise run installer-vm",
       "icon": "play"
     },
     {
       "name": "Run installed VM",
-      "command": "bash tools/dev/installer-vm.sh disk",
+      "command": "mise run installed-vm",
       "icon": "play"
     }
   ]

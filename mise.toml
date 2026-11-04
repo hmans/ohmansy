@@ -2,8 +2,15 @@
 description = "Remove unused build artifacts; preserve VM state unless explicitly selected"
 run = "python3 tools/dev/clean.py"
 
+[tasks.installer-iso]
+description = "Build the installer ISO when its sources change"
+sources = ["flake.nix", "flake.lock", "nix/**/*", "tools/build/installer-iso.sh"]
+outputs = ["dist/installer/ohmansy-installer.iso"]
+run = "bash tools/build/installer-iso.sh"
+
 [tasks.installer-vm]
 description = "Boot the installer ISO in QEMU, preserving the test disk"
+depends = ["installer-iso"]
 run = "bash tools/dev/installer-vm.sh iso"
 
 [tasks.installer-ui]
