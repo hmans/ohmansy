@@ -31,6 +31,10 @@
     programs.firefox.enable = lib.mkDefault true;
     programs.fish.enable = lib.mkDefault true;
     programs.nix-ld.enable = true;
+    programs.appimage = {
+      enable = lib.mkDefault true;
+      binfmt = lib.mkDefault true;
+    };
     environment.localBinInPath = lib.mkDefault true;
     # Bash already defines a priority-1000 default. A normal host definition
     # still wins over this preference. Disabling Fish restores NixOS's default.

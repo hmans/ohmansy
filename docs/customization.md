@@ -87,6 +87,26 @@ retain store paths; removing a default does not immediately erase its files.
 Nautilus and the sound, network, Bluetooth, clipboard, and lock tools remain
 part of the desktop integration in this version.
 
+## AppImages
+
+The software defaults include `appimage-run` and register type 1 and type 2
+AppImages for direct execution. Download an AppImage for your machine's CPU
+architecture, make it executable, and run it:
+
+```sh
+chmod +x Example.AppImage
+./Example.AppImage
+```
+
+You can also run it explicitly with `appimage-run ./Example.AppImage`.
+Existing installations need a rebuild to receive this support. The runner
+extracts applications into your user cache and supplies a conventional Linux
+filesystem environment.
+
+Set `programs.appimage.enable = false;` to omit the runner and registration.
+To keep the runner but require explicit invocation, set
+`programs.appimage.binfmt = false;`.
+
 ## Fish appearance
 
 Fish uses Starship's Pastel Powerline preset, with connected colored segments

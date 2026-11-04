@@ -658,3 +658,20 @@ stronger active rim and softer inactive rim.
 Portable ribbons (2026-11-03): physical NVIDIA live-USB logs showed OpenGL ES 3.2 with hardware rendering. The original QOpenGLFunctions_3_3_Core initialization failed before shader compilation, producing empty shader logs and the static fallback. RibbonScene now uses QOpenGLExtraFunctions, context-specific GLSL headers, glClearDepthf, and guards desktop-only FRAMEBUFFER_SRGB state. Shared shader bodies are unchanged. The ribbons flake check renders through desktop GL and ES in an isolated Xvfb display with llvmpipe, checking context type, dark/light frames, motion, and GL errors. Both passed on ARM Linux; NVIDIA runtime validation and a new ISO remain pending.
 
 PC live defaults (2026-11-03): profiles/live-pc.nix composes the generic live image; both x86 ISO variants import it. An unlocked dconf user-profile database defaults color-scheme to prefer-dark. The oneshot ohmansy-live-scale user service follows niri.service and precedes panel/wallpaper startup; it discovers output names through Niri IPC and sets all connected displays to 1.25. Niri 26.04 has no wildcard output matching. Later hotplugged displays retain automatic scaling unless the helper is restarted. Installed defaults and ARM VM 2x scaling are unchanged. All-system evaluation passed. The PC policy check was executed with native ARM packages: Niri configs, scale-script syntax, and real dconf dark default, light override, and reset passed. No new ISO or physical PC boot yet.
+
+AppImage defaults (2026-11-04): `nix/modules/software.nix` enables the
+standard `programs.appimage.enable` and `programs.appimage.binfmt` options
+with mkDefault, installing appimage-run and registering type 1/type 2 executable
+signatures. This ships through the default and software modules; desktop-only
+imports do not enable it. Hosts can disable support with
+`programs.appimage.enable = false`, or keep explicit appimage-run invocation
+by disabling only `programs.appimage.binfmt`. See
+[AppImage usage](../docs/customization.md#appimages).
+
+The native customization check verifies default scope, package inclusion,
+both registrations, and opt-out. All-system flake evaluation passed. The exact
+x86 runner package built and successfully extracted/executed a locally compiled
+type-2 AppImage containing an AppRun script; an argument with spaces arrived
+intact. Test cache/artifacts stayed under ignored .local/. No live binfmt
+registration or OS activation was performed, and ARM runtime was not tested.
+Apps must match the machine architecture; this does not add CPU emulation.

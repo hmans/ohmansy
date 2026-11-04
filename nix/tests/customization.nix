@@ -13,6 +13,7 @@ let
   desktopOnly = evaluate [ ohmansyModules.desktop ];
   withoutCompositor = evaluate [ ohmansyModules.desktop { ohmansy.compositor.enable = false; } ];
   softwareOnly = evaluate [ ohmansyModules.software ];
+  noAppImages = evaluate [ ohmansyModules.software { programs.appimage.enable = false; } ];
   noFish = evaluate [ ohmansyModules.default { programs.fish.enable = false; } ];
   noFishStyle = evaluate [ ohmansyModules.software { ohmansy.fishStyle.enable = false; } ];
   customPrompt = evaluate [ ohmansyModules.software {
@@ -51,6 +52,12 @@ assert defaults.environment.etc."xdg/xdg-terminals.list".text == "foot.desktop\n
 assert defaults.environment.etc ? "xdg/foot/foot.ini";
 assert !desktopOnly.programs.firefox.enable && !desktopOnly.programs.fish.enable;
 assert !softwareOnly.programs.niri.enable;
+assert defaults.programs.appimage.enable && defaults.programs.appimage.binfmt;
+assert softwareOnly.programs.appimage.enable && !desktopOnly.programs.appimage.enable;
+assert builtins.elem defaults.programs.appimage.package defaults.environment.systemPackages;
+assert defaults.boot.binfmt.registrations ? appimage_type_1;
+assert defaults.boot.binfmt.registrations ? appimage_type_2;
+assert !(noAppImages.boot.binfmt.registrations ? appimage_type_2);
 assert builtins.elem herdrPackage defaults.environment.systemPackages;
 assert builtins.elem herdrPackage softwareOnly.environment.systemPackages;
 assert !(builtins.any (package: lib.getName package == "herdr") desktopOnly.environment.systemPackages);
