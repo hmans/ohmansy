@@ -48,7 +48,7 @@ Lessons from the graphical VM tests:
   `nix/modules/installer/InstallerView.qml`. Static screenshots did not catch it.
 - Exercise the privileged service through the actual UI. Mocked backend tests
   and successful ISO builds missed the missing `nix-env` dependency. Keep
-  playful copy away from the exact disk identity and erase confirmation;
+  installer copy plain and direct, including headings, buttons, and stages;
   preserve actionable errors and logs when the worker fails.
 
 Graphical verification (2026-11-04): an isolated x86 VM with no network adapter
