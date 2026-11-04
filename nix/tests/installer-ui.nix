@@ -8,6 +8,11 @@ pkgs.runCommand "ohmansy-installer-ui" {
   export XDG_RUNTIME_DIR=$(mktemp -d /tmp/ohmansy-ui.XXXXXX)
   trap 'rm -rf "$XDG_RUNTIME_DIR"' EXIT
   mkdir "$out"
+  INSTALLER_FLOW_TEST=1 timeout 20s quickshell --path ${../modules/installer}/preview.qml > "$TMPDIR/flow.log" 2>&1 || {
+    cat "$TMPDIR/flow.log"
+    exit 1
+  }
+  grep -q 'INSTALLER_FLOW_TEST passed' "$TMPDIR/flow.log"
   for size in wide compact; do
     if [ "$size" = wide ]; then
       export PREVIEW_WIDTH=1180 PREVIEW_HEIGHT=800

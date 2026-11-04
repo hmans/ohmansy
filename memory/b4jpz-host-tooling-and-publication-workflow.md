@@ -26,6 +26,12 @@ repository root unless the tool explicitly supports another working directory.
 
 ## Guest work
 
+For installer UI iteration, use `tools/dev/installer-ui.sh` (also a mise task
+and T3 action). It runs the mock preview from working-tree QML, allowing live
+reload without rebuilding the ISO. Nix Portable on this host could not create
+an OpenGL context, so that launcher branch defaults to software rendering.
+The packaged preview still uses immutable QML unless its source override is set.
+
 `tools/dev/installer-vm.sh` provides repeatable ISO and disk launches for IDE
 actions, also exposed through mise. It delegates to `linux-iso-vm.py` and uses
 rescue media when the state directory exists, preserving the virtual disk.

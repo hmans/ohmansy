@@ -63,9 +63,9 @@
             --path ${./nix/modules}/first-boot/preview.qml "$@"
         '';
         installer-preview = pkgs.writeShellScriptBin "ohmansy-installer-preview" ''
-          export OHMANSY_RIBBONS="file://${./nix/modules/greeter/scene/Ribbons.qml}"
+          export OHMANSY_RIBBONS="''${OHMANSY_RIBBONS:-file://${./nix/modules/greeter/scene/Ribbons.qml}}"
           exec ${import ./nix/modules/greeter-package.nix { inherit pkgs; }}/bin/quickshell \
-            --path ${./nix/modules/installer}/preview.qml "$@"
+            --path "''${OHMANSY_INSTALLER_QML:-${./nix/modules/installer}/preview.qml}" "$@"
         '';
       };
       rejectsDevelopment = base: extra:

@@ -11,6 +11,9 @@ Item {
     required property var controller
     property string page: "welcome"
     property var selected: null
+    property bool eraseAcknowledged: false
+    onPageChanged: eraseAcknowledged = false
+    onSelectedChanged: eraseAcknowledged = false
     property bool details: false
     property bool failedGraphics: false
     readonly property bool animated: Quickshell.env("OHMANSY_GREETER_STATIC") !== "1"
@@ -21,7 +24,7 @@ Item {
     readonly property var headings: ({welcome: "Welcome to\nOhmansy.", disks: "Choose\na disk.", confirm: "Ready to\ninstall?", progress: "Installing\nOhmansy.", done: "All done.", failed: "Installation\nfailed."})
     readonly property var captions: ({welcome: "Let’s install your new desktop.\nNo internet connection needed.", disks: "Everything on the selected disk will be erased.", confirm: "Check that you’ve selected the right disk before continuing.", progress: "This may take a few minutes.", done: "Restart from the installed disk to set up your account.", failed: "Check the error and installation log below."})
     function go(next) { controller.error = ""; page = next; details = false; }
-    function choose(disk) { selected = disk; confirmation.clear(); }
+    function choose(disk) { selected = disk; eraseAcknowledged = false; }
     function reveal(item) {
         if (!item || !item.activeFocus) return;
         let ancestor = item;
@@ -43,8 +46,9 @@ Item {
         function onActiveFocusItemChanged() { Qt.callLater(() => view.reveal(view.Window.window.activeFocusItem)); }
     }
     function start() {
-        if (!selected || confirmation.text !== "ERASE " + selected.path) return;
-        controller.request("start", {device: selected.path, token: selected.token, hostname: hostname.text.trim(), confirmation: confirmation.text});
+        if (page !== "confirm" || !transition.interactive || controller.busy || !selected || !eraseAcknowledged) return;
+        eraseAcknowledged = false;
+        controller.request("start", {device: selected.path, token: selected.token, hostname: hostname.text.trim(), confirmation: "ERASE " + selected.path});
     }
     Connections {
         target: controller
@@ -57,7 +61,7 @@ Item {
         function onDisksChanged() {
             if (view.selected && !controller.disks.some(d => d.token === view.selected.token)) {
                 view.selected = null;
-                confirmation.clear();
+                view.eraseAcknowledged = false;
             }
         }
     }
@@ -68,7 +72,7 @@ Item {
         animated: view.animated
         onSettled: {
             scroll.contentY = 0;
-            if (displayedPage === "confirm") confirmation.forceActiveFocus();
+            if (displayedPage === "confirm") acknowledgement.forceActiveFocus();
             else if (displayedPage === "welcome") welcomeButton.forceActiveFocus();
         }
     }
@@ -187,10 +191,32 @@ Item {
                             Text { Layout.fillWidth: true; text: "Files, partitions, and existing operating systems will be deleted. This cannot be undone. Back up anything you need before continuing."; color: "#f0c3d1"; font.pixelSize: 14; wrapMode: Text.WordWrap }
                         }
                     }
-                    Text { Layout.fillWidth: true; text: "To confirm, type " + (view.selected ? "ERASE " + view.selected.path : "the disk confirmation") + " below."; color: "#e8dcf4"; font.pixelSize: 15; wrapMode: Text.WordWrap }
-                    GlassField { id: confirmation; Layout.fillWidth: true; backdrop: blur; placeholderText: "Type the confirmation exactly"; Accessible.name: "Erase confirmation"; maximumLength: 200; onAccepted: view.start() }
-                    GlassButton { Layout.fillWidth: true; backdrop: blur; primary: true; text: "Erase disk and install Ohmansy"; enabled: !!view.selected && confirmation.text === "ERASE " + view.selected.path && !controller.busy; onClicked: view.start() }
-                    GlassButton { Layout.fillWidth: true; backdrop: blur; implicitHeight: 44; text: "Back"; enabled: !controller.busy; onClicked: { confirmation.clear(); view.go("disks"); controller.request("disks"); } }
+                    CheckBox {
+                        id: acknowledgement
+                        Layout.fillWidth: true
+                        text: "I understand that all data on this disk will be erased."
+                        checked: view.eraseAcknowledged
+                        enabled: !!view.selected && !controller.busy
+                        onToggled: view.eraseAcknowledged = checked
+                        padding: 12; spacing: 12
+                        indicator: Rectangle {
+                            x: acknowledgement.leftPadding
+                            y: (acknowledgement.height - height) / 2
+                            width: 24; height: 24; radius: 6
+                            color: acknowledgement.checked ? "#bda0f1" : "#223b344d"
+                            border.color: acknowledgement.visualFocus ? "#ffffff" : "#bda0f1"
+                            border.width: acknowledgement.visualFocus ? 2 : 1
+                            Text { anchors.centerIn: parent; text: "✓"; visible: acknowledgement.checked; color: "#20172e"; font.pixelSize: 18 }
+                        }
+                        contentItem: Text {
+                            text: acknowledgement.text
+                            leftPadding: acknowledgement.indicator.width + acknowledgement.spacing
+                            color: "#e8dcf4"; font.pixelSize: 15; wrapMode: Text.WordWrap
+                        }
+                        background: Rectangle { radius: 12; color: acknowledgement.hovered ? "#223b344d" : "transparent"; border.color: acknowledgement.visualFocus ? "#bda0f1" : "transparent" }
+                    }
+                    GlassButton { Layout.fillWidth: true; backdrop: blur; primary: true; text: "Erase disk and install Ohmansy"; enabled: !!view.selected && view.eraseAcknowledged && !controller.busy; onClicked: view.start() }
+                    GlassButton { Layout.fillWidth: true; backdrop: blur; implicitHeight: 44; text: "Back"; enabled: !controller.busy; onClicked: { view.go("disks"); controller.request("disks"); } }
                 }
                 ColumnLayout {
                     visible: transition.displayedPage === "progress"; Layout.fillWidth: true; spacing: 20

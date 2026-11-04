@@ -2,6 +2,11 @@
   "$schema": "https://t3.codes/schema/t3.json",
   "scripts": [
     {
+      "name": "Preview installer UI",
+      "command": "bash tools/dev/installer-ui.sh",
+      "icon": "play"
+    },
+    {
       "name": "Run installer ISO",
       "command": "bash tools/dev/installer-vm.sh iso",
       "icon": "play"

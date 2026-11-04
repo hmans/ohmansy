@@ -95,7 +95,7 @@ class Installer:
             if not all(isinstance(v, str) for v in (device, hostname, token)) or not token:
                 return {'ok': False, 'error': 'Select a disk again.'}
             if request.get('confirmation') != f'ERASE {device}':
-                return {'ok': False, 'error': 'Type the exact erase confirmation. No changes made.'}
+                return {'ok': False, 'error': 'Confirm erasure of the selected disk before installing. No changes made.'}
             lock = install.LOCK.open('w')
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

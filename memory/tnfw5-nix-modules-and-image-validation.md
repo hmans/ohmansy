@@ -23,8 +23,12 @@ Graphical installer (2026-11-04): `installer.nix` provides a Quickshell window
 and a live-only root socket service. Only the live user's UID can connect;
 the service owns the shared CLI lock and installation worker. Closing the
 window must quit its process so reopening can recover service state. Never tie
-worker lifetime to the UI. Disk identity is rechecked after exact erase
-confirmation. Interrupted or failed destructive work cannot be automatically
+worker lifetime to the UI. The graphical confirmation page uses an unchecked
+erasure acknowledgement followed by an explicit install button. Acknowledgement
+resets on page changes, disk selection changes, and submission. The UI supplies
+the backend's disk-specific confirmation string; users do not type it. The CLI
+retains typed confirmation. Disk identity is rechecked before erasure.
+Interrupted or failed destructive work cannot be automatically
 restarted. Logs and state persist only within the live session. Include the
 configured Nix package in the service PATH: `nixos-install` needs `nix-env`,
 which an interactive shell previously supplied implicitly. Preview with

@@ -6,6 +6,10 @@ run = "python3 tools/dev/clean.py"
 description = "Boot the installer ISO in QEMU, preserving the test disk"
 run = "bash tools/dev/installer-vm.sh iso"
 
+[tasks.installer-ui]
+description = "Preview the installer with mock disks and live QML edits"
+run = "bash tools/dev/installer-ui.sh"
+
 [tasks.installed-vm]
 description = "Boot the installed QEMU disk without installation media"
 run = "bash tools/dev/installer-vm.sh disk"

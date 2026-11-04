@@ -6,10 +6,13 @@ ShellRoot {
     QtObject {
         id: demo
         property bool busy: false
+        property int starts: 0
+        property var lastStart: null
         property string error: ""
-        property var state: ({status: "idle", stage: "install", device: "/dev/nvme0n1", hostname: "space-potato", log: "Preview only. No disks are touched.", destructive: false})
-        property var disks: [{path: "/dev/nvme0n1", model: "Example NVMe · definitely a demo", size: 512 * 1073741824, token: "preview-a"}, {path: "/dev/sda", model: "Example external SSD", size: 256 * 1073741824, token: "preview-b"}]
+        property var state: ({status: "idle", stage: "install", device: "/example/demo-disk-1", hostname: "space-potato", log: "Preview only. No disks are touched.", destructive: false})
+        property var disks: [{path: "/example/demo-disk-1", model: "Demo disk 1 (not a real disk)", size: 512 * 1073741824, token: "preview-a"}, {path: "/example/demo-disk-2", model: "Demo disk 2 (not a real disk)", size: 256 * 1073741824, token: "preview-b"}]
         function request(action, args) {
+            if (action === "start" && Quickshell.env("INSTALLER_FLOW_TEST") === "1") { starts++; lastStart = args; return; }
             if (action === "start") { state = Object.assign({}, state, {status: "running", hostname: args.hostname, device: args.device}); complete.restart(); }
             if (action === "shutdown") error = "Preview only. Your computer is staying right here.";
         }
@@ -25,6 +28,39 @@ ShellRoot {
             id: view; anchors.fill: parent; controller: demo
             Component.onCompleted: Qt.callLater(() => { selected = demo.disks[0]; page = Quickshell.env("PREVIEW_PAGE") || "welcome"; })
         }
-        Timer { running: Quickshell.env("PREVIEW_IMAGE") !== ""; interval: 1800; onTriggered: view.grabToImage(result => { result.saveToFile(Quickshell.env("PREVIEW_IMAGE")); Qt.quit(); }) }
+        Timer { running: !!Quickshell.env("PREVIEW_IMAGE"); interval: 1800; onTriggered: view.grabToImage(result => { result.saveToFile(Quickshell.env("PREVIEW_IMAGE")); Qt.quit(); }) }
+        Timer {
+            running: Quickshell.env("INSTALLER_FLOW_TEST") === "1"
+            interval: 100
+            onTriggered: {
+                function check(condition, message) { if (!condition) throw new Error(message); }
+                view.go("confirm");
+                view.start();
+                check(demo.starts === 0, "Unacknowledged erasure started");
+                view.eraseAcknowledged = true;
+                view.go("disks");
+                view.go("confirm");
+                check(!view.eraseAcknowledged, "Back retained acknowledgement");
+                view.eraseAcknowledged = true;
+                view.choose(demo.disks[1]);
+                check(!view.eraseAcknowledged, "Disk change retained acknowledgement");
+                view.eraseAcknowledged = true;
+                demo.busy = true;
+                view.start();
+                check(demo.starts === 0, "Busy controller accepted start");
+                demo.busy = false;
+                view.start();
+                view.start();
+                check(demo.starts === 1, "Confirmation did not start exactly once");
+                check(demo.lastStart.device === demo.disks[1].path && demo.lastStart.token === demo.disks[1].token && demo.lastStart.confirmation === "ERASE " + demo.disks[1].path, "Confirmation targeted wrong disk");
+                view.eraseAcknowledged = true;
+                demo.disks = [];
+                check(!view.selected && !view.eraseAcknowledged, "Removed disk retained acknowledgement");
+                view.start();
+                check(demo.starts === 1, "Removed disk accepted start");
+                console.log("INSTALLER_FLOW_TEST passed");
+                Qt.quit();
+            }
+        }
     }
 }

@@ -166,8 +166,9 @@ distributions. It refuses to create a disk in an existing state directory.
 No host directories or host disks are shared with the VM.
 
 In the live desktop, choose **Install Ohmansy**. The graphical installer offers
-the VM disk, asks for a computer name, and requires `ERASE /dev/vda` before
-partitioning. The ISO contains the complete prebuilt installed desktop and uses
+the VM disk and asks for a computer name. Review the disk, tick the erasure
+acknowledgement, then choose **Erase disk and install Ohmansy**. The ISO contains
+the complete prebuilt installed desktop and uses
 `nixos-install --system`; installation and graphical account setup need no
 network connection. `--no-network` removes the VM's network adapter entirely.
 The build host still needs dependencies available locally or through a cache.
@@ -211,8 +212,22 @@ installer refuses another erase after destructive work has started. The full
 log is `/var/log/ohmansy-install.log` in the live session; save it before shutdown
 if you need it for recovery. The command-line fallback is `sudo ohmansy-install`.
 
-Preview the graphical flow without accessing disks with
-`nix run .#installer-preview`. `nix build .#checks.x86_64-linux.installer-ui`
+For UI work, use the **Preview installer UI** T3 Action or `mise run installer-ui`.
+This opens a desktop window with simulated disks and installation progress;
+it cannot erase disks or shut down the host. It reads installer QML directly
+from the checkout so Quickshell can reload edits without an ISO build or VM.
+The launcher supports native Nix and the existing local Nix Portable runtime.
+The portable runtime defaults to software rendering for host-driver compatibility;
+the animated ribbon background is disabled in that mode.
+
+Start on a particular screen with `bash tools/dev/installer-ui.sh confirm`.
+Other screens are `welcome`, `disks`, `progress`, `done`, and `failed`.
+For a compact window, set `PREVIEW_WIDTH=640 PREVIEW_HEIGHT=540` before the command.
+Shared UI components and compiled assets still come from Nix packages; restart
+the preview after changing those. The standalone `nix run .#installer-preview`
+uses a packaged snapshot unless `OHMANSY_INSTALLER_QML` is set by the launcher.
+
+`nix build .#checks.x86_64-linux.installer-ui`
 renders every screen at wide and compact sizes and checks for QML errors.
 
 Speech synthesis is disabled by default, avoiding the large MBROLA voice
