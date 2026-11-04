@@ -6,6 +6,7 @@
   },
 }:
 let
+  cursor = import ./cursor-theme.nix { inherit pkgs; };
   compositor = import ./compositor-package.nix { inherit pkgs; };
   launcher = pkgs.writeShellScript "ohmansy-compositor-applications" ''
     exec ${pkgs.wofi}/bin/wofi --normal-window --show drun --prompt Applications
@@ -25,6 +26,7 @@ let
   '';
   session = pkgs.writeShellScript "ohmansy-compositor-session" ''
     set -eu
+    . ${cursor.environment}
     # --nested is an explicit preview. A login must acquire displays itself,
     # even if stale display variables were inherited from the greeter.
     mod_key=super

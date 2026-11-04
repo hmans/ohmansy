@@ -101,6 +101,12 @@ client decorations, popup grabs, cursor surfaces, and clipboard and primary
 selection between nested clients. It redraws when surfaces change, input arrives,
 or the viewport animates. An empty idle workspace stops rendering frames.
 
+Named Wayland cursors use the packaged Adwaita theme, including a `default`
+theme alias. The session, standalone package, and development shell supply the
+cursor assets while honoring existing `XCURSOR_THEME`, `XCURSOR_SIZE`, and
+`XCURSOR_PATH` preferences. These Xcursor settings also apply to Wayland cursor
+images; they are not limited to X11.
+
 The Smithay compositor has no direct display/input backend of its own; the login
 session uses Cage for that role. The development demo runs directly inside the
 parent desktop. Clipboard exchange is local to its clients. X11 clients and

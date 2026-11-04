@@ -7,6 +7,7 @@ let
   wallpaper = import ./wallpaper-package.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
   displays = import ./display-package.nix { inherit pkgs; };
+  cursorTheme = (import ./cursor-theme.nix { inherit pkgs; }).package;
   shortcutGroups = builtins.fromJSON (builtins.readFile ./desktop/shortcuts.json);
   shortcutBindings = lib.concatMap (group: group.bindings) shortcutGroups;
   renderBinding = binding:
@@ -47,7 +48,7 @@ in {
   environment.systemPackages = with pkgs; [
     desktop displays quickshell mako swaybg swaylock nautilus
     playerctl wireplumber
-    xwayland-satellite adwaita-icon-theme wl-clipboard
+    xwayland-satellite cursorTheme wl-clipboard
   ];
   environment.sessionVariables.NIRI_CONFIG = lib.mkDefault "/etc/ohmansy/niri.kdl";
   environment.etc."xdg/mako/config".text = ''

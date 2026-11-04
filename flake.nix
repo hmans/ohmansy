@@ -142,6 +142,7 @@
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        cursor-theme = import ./nix/tests/cursor-theme.nix { pkgs = pcPkgs; };
         greeter-ui = import ./nix/tests/greeter-ui.nix { pkgs = pcPkgs; };
         greeter-auth = pcPkgs.runCommand "ohmansy-greeter-auth" {
           nativeBuildInputs = [ pcPkgs.python3 (import ./nix/modules/greeter-package.nix { pkgs = pcPkgs; }) ];
@@ -179,6 +180,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        cursor-theme = import ./nix/tests/cursor-theme.nix { inherit pkgs; };
         greeter-ui = import ./nix/tests/greeter-ui.nix { inherit pkgs; };
         displays-ui = import ./nix/tests/displays-ui.nix { inherit pkgs; };
         installer-ui = import ./nix/tests/installer-ui.nix { inherit pkgs; };
@@ -260,6 +262,7 @@
           buildInputs = with tools; [ wayland libxkbcommon libGL ];
           LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL ]);
           OHMANSY_SPATIAL_FONT = "${tools.inter}/share/fonts/truetype/Inter.ttc";
+          shellHook = ''. ${(import ./nix/modules/cursor-theme.nix { pkgs = tools; }).environment}'';
         }; default = tools.mkShell {
           packages = with tools; [ git nixfmt nil statix python3 niri ripgrep ];
         }; });

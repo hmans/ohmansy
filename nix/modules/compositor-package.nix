@@ -1,4 +1,7 @@
 { pkgs }:
+let
+  cursor = import ./cursor-theme.nix { inherit pkgs; };
+in
 pkgs.rustPlatform.buildRustPackage {
   pname = "ohmansy-compositor";
   version = "0.1.0";
@@ -16,6 +19,7 @@ pkgs.rustPlatform.buildRustPackage {
   OHMANSY_COMPOSITOR_ASSETS = "${../compositor}";
   postFixup = ''
     wrapProgram "$out/bin/ohmansy-compositor" \
+      --run '. ${cursor.environment}' \
       --prefix LD_LIBRARY_PATH : ${
         pkgs.lib.makeLibraryPath [
           pkgs.wayland

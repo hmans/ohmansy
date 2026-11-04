@@ -222,6 +222,33 @@ clipboard, and idle checks passed, preserving original host windows. Eight
 Rust tests, formatting, and strict Clippy passed. This was tested nested inside
 the running ohmansy desktop; no live desktop was replaced.
 
+Named Wayland cursor failure (2026-11-04): inspect the outer Wayland cursor
+separately from Shine's software cursor. In the live session, Shine reported a
+named cursor at a valid pointer position while Winit repeatedly logged
+"Failed to set cursor to Default". A passive wayland-cursor probe against Cage
+confirmed that cursor-shape protocol was unavailable, theme "default" could
+not load its arrow at 24/48 px, and Adwaita could load both. XCURSOR_THEME was
+unset. Winit/SCTK therefore selected a missing default theme. This is a separate
+failure from logical pointer coordinates during scaling; the earlier software
+cursor regression did not cover parent Wayland theme loading.
+
+The shared `cursor-theme.nix` helper packages Adwaita plus default/index.theme
+inheritance and supplies theme/size defaults and the asset path. The Cage session,
+standalone compositor wrapper, and spatial development shell source it; the
+desktop installs its icon package. Explicit user theme/size/path settings remain
+honored. The native cursor-theme flake check loads arrow, text, hand, and crosshair
+images under both theme names at 24/48 px and checks preference preservation.
+The session package and native customization check built successfully.
+
+A temporary missing default-theme file was supplied to the running user's icon
+path without overwriting existing settings. The exact live Wayland probe then
+loaded default images and the repeated Winit errors stopped, without restarting
+processes or moving the pointer. Private recovery details are in .local/SESSION.md.
+The user confirmed that the cursor reappeared in the same running session.
+A second live Wayland probe with a clean home and the packaged environment
+also resolved both themes at 24/48 px, independently of the live fallback. The permanent fix is in reusable Nix
+sources, not only that live repair.
+
 GPU readback detail: Smithay's `map_texture` makes its EGL context surfaceless.
 Mapping a screenshot before `backend.submit` caused an EGL allocation/present
 failure under Zink/NVK. Queue the framebuffer copy while bound, present, then
