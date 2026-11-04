@@ -20,6 +20,10 @@ in {
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   programs.niri.enable = true;
+  # NixOS enables speech synthesis for graphical desktops by default, pulling
+  # in the full MBROLA voice collection. Keep it opt-in for Ohmansy; a host's
+  # ordinary services.speechd.enable = true still overrides this default.
+  services.speechd.enable = lib.mkOverride 900 false;
   services.displayManager.defaultSession = "niri";
   security.polkit.enable = true;
   security.rtkit.enable = true;

@@ -51,7 +51,7 @@ def main():
         'requires': {'firmware': 'UEFI', 'memoryMiB': 4096},
     }
     if args.kind == 'installer':
-        manifest['installer'] = {'mode': 'whole-disk', 'networkRequired': True, 'minimumDiskGiB': 24}
+        manifest['installer'] = {'mode': 'whole-disk', 'networkRequired': False, 'minimumDiskGiB': 24}
     (args.output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (args.output / 'SHA256SUMS').write_text(f'{digest}  {image.name}\n{source_digest}  {source.name}\n')
     shutil.copyfile('flake.lock', args.output / 'flake.lock')

@@ -108,8 +108,9 @@ It contains the ISO, SHA256 checksums, source archive, lock file, and manifest.
 This is a disposable live session: changes are lost on restart. There is no
 Ohmansy installation action and no automatic internal-disk installation.
 Internal disks can still be accessed manually through ordinary Linux tools.
-Remove the USB after shutdown to return to the existing OS. Persistent PC
-installation is a separate milestone; the current installer remains ARM-only.
+Remove the USB after shutdown to return to the existing OS. The separate
+`installer-iso` output supports both architectures and installs to a selected
+whole disk. See [local installer VM testing](linux-development.md#test-the-installer-locally).
 
 The primary product follows Try Omarchy's [factory-disk model](https://github.com/omacom/try-omarchy/blob/main/docs/architecture.md):
 ship a preinstalled system and keep a private writable disk between launches.
@@ -135,7 +136,8 @@ sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
 New installations import a pinned Ohmansy release with local machine, owner,
-hardware, and preference modules, not the image builder or setup service.
+hardware, and preference modules. Installer-created hosts also retain the
+first-boot module; its account service stops being available after provisioning.
 See [Updating Ohmansy](updates.md) for release preparation and boot selection.
 For physical hardware, import the default module with the machine's
 hardware configuration and accounts; do not import the VM disk layout.
@@ -143,8 +145,13 @@ See [Customizing Ohmansy](customization.md) for package, shell, and terminal cho
 
 The live ISO has a separate disposable `nixos` account with autologin and local
 passwordless sudo. Never activate `.#live` on an installed system. The experimental
-installer asks for explicit whole-disk erase confirmation and needs networking.
-It is not yet an end-to-end verified installation product.
+installer asks for explicit whole-disk erase confirmation and copies a bundled
+prebuilt desktop with `nixos-install --system`, without needing networking.
+The x86-64 image has been built locally and tested through installation, disk-only
+UEFI boot, graphical owner creation, and desktop login in QEMU without a network
+adapter. See [redistribution requirements](iso-redistribution.md) before publishing
+the ISO. Physical hardware
+installation and the ARM installer still need runtime validation.
 
 ## Shared Quickshell components
 

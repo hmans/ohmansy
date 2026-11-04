@@ -38,3 +38,4 @@ class IsoPackageTests(unittest.TestCase):
         self.assertEqual(manifest['architecture'], 'aarch64-linux')
         self.assertTrue(manifest['persistentInstallation'])
         self.assertEqual(manifest['installer']['mode'], 'whole-disk')
+        self.assertFalse(manifest['installer']['networkRequired'])

@@ -144,6 +144,72 @@ test results separately. See [image packaging](ohmansy-development.md) for CI ar
 
 ## Boot the setup wizard in a persistent VM
 
+### Test the installer locally
+
+Build the installer on this host, then boot it with a new, isolated 64 GiB VM
+disk. No CI job, USB stick, or host reboot is involved:
+
+```sh
+nix build --no-update-lock-file --out-link .local/installer-result .#installer-iso
+python3 tools/dev/linux-iso-vm.py \
+  --iso .local/installer-result/iso/*.iso --state .local/installer-test --no-network
+```
+
+The Linux launcher needs x86-64 QEMU, KVM, and OVMF. Its default firmware paths
+match Arch-based hosts; pass `--firmware-code` and `--firmware-vars` on other
+distributions. It refuses to create a disk in an existing state directory.
+No host directories or host disks are shared with the VM.
+
+In the live desktop, choose **Install Ohmansy**. The terminal installer offers
+the VM disk, asks for a computer name, and requires `ERASE /dev/vda` before
+partitioning. The ISO contains the complete prebuilt installed desktop and uses
+`nixos-install --system`; installation and graphical account setup need no
+network connection. `--no-network` removes the VM's network adapter entirely.
+The build host still needs dependencies available locally or through a cache.
+
+Shut down the guest when installation finishes. Boot the same disk without
+the ISO:
+
+```sh
+python3 tools/dev/linux-iso-vm.py --state .local/installer-test --no-network
+```
+
+Complete the welcome wizard and log in. Later launches use this same command
+and preserve the account and files. The installed configuration keeps its own
+hardware settings, owner file, and pinned Ohmansy source under `/etc/nixos`.
+Use `--rescue-iso path/to/image.iso` to boot installation media with an existing
+VM disk without replacing it. For automated tests, `--headless` uses accelerated
+graphics and a private `vnc.sock` in the state directory instead of a window.
+The state directory also contains private QMP and serial sockets. Keep automated
+installation tests separate from a VM someone is using interactively.
+
+Only one installer can run at a time. A second invocation stops before disk
+selection, and the graphical terminal stays open to show errors or completion.
+Speech synthesis is disabled by default, avoiding the large MBROLA voice
+collection. A host can opt in with `services.speechd.enable = true`.
+
+The generic installer does not yet configure NVIDIA's proprietary userspace
+driver. Physical NVIDIA installation needs a separate driver configuration.
+
+Run `nix build .#checks.x86_64-linux.offline-installer` on the ISO builder too.
+It checks boot/account policy and preservation of store symlinks during image
+assembly. A local Nix Portable 2.20.6 sandbox dereferenced those symlinks, causing
+hash mismatches during offline installation despite a successful ISO build.
+Use a builder that passes the check; a per-command `--option sandbox false`
+worked around that local environment issue. Do not disable sandboxing globally.
+
+The initial system uses `OHMANSY_ROOT` and `OHMANSY_EFI` filesystem labels.
+Installation refuses matching labels on another connected disk. Keep other
+Ohmansy installation disks disconnected until a normal rebuild has switched
+this system to its generated UUID-based hardware configuration. The chosen
+hostname is written to `/etc/hostname` for the initial boot and to the installed
+Nix configuration for future rebuilds. Updates and additional packages may need
+internet; there is no mandatory download stage at first boot.
+
+See [ISO redistribution](iso-redistribution.md) before publishing a binary image.
+
+### Use a preinstalled VM image
+
 Use `.#vm-image` for the graphical first-boot wizard. It creates an owner on an
 already installed system; the account and files live on the writable VM disk.
 The normal live ISO uses a temporary autologin account. `.#installer-iso` instead

@@ -2,12 +2,78 @@
 data:
   area: nix
   kind: workflow
-  reviewed: "2026-11-03"
+  reviewed: "2026-11-04"
   status: current
 id: tnfw5
 title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
+
+Offline installer verification (2026-11-04): the final generic x86 ISO built
+locally, passed packaged checksums, installed onto a fresh 64 GiB QEMU disk with
+`--no-network`, then booted with no ISO. Graphical owner setup and password login
+passed, including another password login after a clean restart. No network
+adapter or host shares were attached. EFI mount permissions
+are 0077 during installation and in the prebuilt system; the generated hardware
+configuration retains the equivalent fmask/dmask options. The chosen hostname
+and UUID configuration were verified. Native flake checks, the store-symlink
+regression, and installer/packaging tests passed. The broader Python suite passed
+66/67; the existing Mac GPU-probe `cp -c` test remains unsupported on Linux.
+Physical hardware and ARM installer runtime remain unverified. Public binary
+distribution needs the work described in `docs/iso-redistribution.md`; the project
+source tarball is not a full dependency corresponding-source bundle.
+The user also confirmed the installer works; replacing the terminal interface
+with a graphical installer remains separate follow-up work.
+
+Local x86 installer verification (2026-11-03): the installer now composes the
+PC live profile and generates a host importing the exported `firstBoot` module.
+It creates no owner itself; graphical setup creates the account after disk-only
+boot. Explicit `mount -t ext4` and `mount -t vfat` are required: auto-detection
+failed immediately after formatting during the first real installation test.
+Successful completion syncs and unmounts the target.
+
+Only one installer may run at a time, guarded by an exclusive `/run` file lock
+before selection. The graphical launcher keeps the terminal open for completion
+and errors. Overlapping interactive and agent installation attempts on one VM
+left a partial target and a stale UEFI entry; keep automated checks in a separate
+headless VM and do not reboot a VM while someone is using its installer.
+The lock's exclusion and release were tested in Python and inside the live ISO;
+the retained error window was also visually verified.
+
+NixOS's graphical desktop default enables Speech Dispatcher, whose default
+eSpeak dependency brings all MBROLA voices. A binary-cache metadata audit of the
+original installation's 732.3 MiB download found 553.49 MiB of voices, 85.03 MiB
+of GCC, and 45.3 MiB of Nixpkgs source. Ohmansy now disables `services.speechd`
+at priority 900; a host's ordinary `services.speechd.enable = true` opts in.
+The earlier online installer fetched approximately 164 MiB including Nixpkgs
+source. The offline installer now bundles `profiles/installed-base.nix` through
+`isoImage.storeContents` and installs with `nixos-install --system`. It includes
+the complete default desktop and first-boot service; no mandatory download stage
+is deferred to onboarding. Future rebuilds may still fetch inputs and packages.
+
+The initial generic system boots by OHMANSY_ROOT/OHMANSY_EFI filesystem labels.
+The installer checks other disks for duplicates before erasing the selected disk.
+Keep other Ohmansy disks disconnected until a rebuild uses the generated UUID
+hardware configuration. The payload leaves networking.hostName empty so the
+installer-written /etc/hostname works immediately; configuration.nix records the
+same name declaratively. Never use the VM-specific factory layout for this payload.
+
+Offline testing exposed a local portable Nix 2.20.6 sandbox issue: a top-level
+store symlink was presented to builders as a directory. Nix's man output then
+failed its NAR hash during installation. The same regression passed outside that
+sandbox, and unmodified mksquashfs preserved source symlinks. No squashfs overlay
+or global sandbox change is needed. The offline flake check exercises a real
+store symlink through assembly and extraction to detect affected builders.
+
+The final ISO was built and packaged locally with verified checksums. A fresh
+64 GiB test disk installed successfully, booted without the ISO, completed the
+real graphical owner wizard, and logged into the desktop. After a clean restart,
+the account remained available and password login succeeded again. Native flake
+checks and five installer tests passed. The broader Python suite passed 64 of 65 tests;
+the existing Mac GPU-probe copy test uses `cp -c` and fails on Linux.
+The Linux launcher and workflow are documented in
+[Linux development](../docs/linux-development.md#test-the-installer-locally).
+Physical installation and ARM installer boot remain unverified.
 
 Persistent Linux VM setup (2026-11-03): both architectures now export `vm-image`
 and `installer-iso`. The factory selects the matching UEFI fallback loader and
@@ -19,7 +85,8 @@ including ribbons. Account creation and persistence across a reboot were not
 exercised in that check. See the persistent VM section in
 [Linux development](../docs/linux-development.md). The factory wizard provisions
 an already installed disk; the separate installer ISO installs onto a blank disk.
-The new x86 installer output evaluated but has not been built or booted.
+At that point the new x86 installer output had only evaluated; see the later
+installer build and boot verification above.
 
 The first x86 factory inherited the Mac VM's hardcoded 2x display scale, making
 setup too large. `ohmansy.vm.displayScale` now defaults to 1 on x86 and retains 2

@@ -106,7 +106,11 @@ make vm-image
 The root flake also provides `.#iso` for a disposable live desktop and
 `.#installer-iso` for the experimental installer. The primary app uses the
 persistent factory disk, with first-boot owner setup and no preset credentials.
-The installer still needs end-to-end validation.
+The x86-64 installer bundles a prebuilt desktop for offline installation. It has
+been built locally and tested through disk installation, UEFI boot, graphical
+owner setup, and desktop login in QEMU with no network adapter. See
+[local installer testing](docs/linux-development.md#test-the-installer-locally).
+Physical hardware installation remains unverified.
 
 For an Intel/AMD PC, the x86-64 outputs are `.#iso` and `.#iso-nvidia`
 (NVIDIA Turing and newer, including RTX 3060 Ti). These are disposable live

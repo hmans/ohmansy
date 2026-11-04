@@ -17,7 +17,12 @@
       };
       installer = nixpkgs.lib.nixosSystem {
         inherit system;
-        modules = [ ./nix/profiles/installer.nix ];
+        specialArgs.installedSystem = installedBase.config.system.build.toplevel;
+        modules = [ ./nix/profiles/installer.nix ./nix/profiles/live-vm.nix ];
+      };
+      installedBase = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [ ./nix/profiles/installed-base.nix ];
       };
       pcSystem = "x86_64-linux";
       pcPkgs = nixpkgs.legacyPackages.${pcSystem};
@@ -27,7 +32,12 @@
       };
       pcInstaller = nixpkgs.lib.nixosSystem {
         system = pcSystem;
-        modules = [ ./nix/profiles/installer.nix ];
+        specialArgs.installedSystem = pcInstalledBase.config.system.build.toplevel;
+        modules = [ ./nix/profiles/installer.nix ./nix/profiles/live-pc.nix ];
+      };
+      pcInstalledBase = nixpkgs.lib.nixosSystem {
+        system = pcSystem;
+        modules = [ ./nix/profiles/installed-base.nix ];
       };
       pcLive = nixpkgs.lib.nixosSystem {
         system = pcSystem;
@@ -57,11 +67,36 @@
         let candidate = base.extendModules { modules = [ extra ]; };
         in builtins.any (item: !item.assertion &&
           nixpkgs.lib.hasPrefix "Image policy:" item.message) candidate.config.assertions;
+      offlinePolicy = packages: payload: media:
+        let
+          target = packages.writeText "offline-symlink-target" "preserve this store link\n";
+          link = packages.runCommand "offline-store-symlink" {} ''ln -s ${target} "$out"'';
+        in
+        assert payload.config.fileSystems."/".device == "/dev/disk/by-label/OHMANSY_ROOT";
+        assert payload.config.fileSystems."/boot".device == "/dev/disk/by-label/OHMANSY_EFI";
+        assert payload.config.boot.loader.systemd-boot.enable;
+        assert !payload.config.services.openssh.enable;
+        assert !payload.config.services.speechd.enable;
+        assert !payload.config.services.displayManager.autoLogin.enable;
+        assert !(builtins.hasAttr "nixos" payload.config.users.users);
+        assert builtins.elem "ohmansy-first-boot.socket" payload.config.systemd.services.greetd.requires;
+        assert builtins.elem payload.config.system.build.toplevel media.config.isoImage.storeContents;
+        packages.runCommand "ohmansy-offline-installer-policy" {
+          nativeBuildInputs = [ media.pkgs.squashfsTools ];
+        } ''
+          touch registration
+          mksquashfs registration ${link} test.squashfs -noappend -processors 1
+          unsquashfs -d extracted test.squashfs
+          test -L extracted/${builtins.baseNameOf link}
+          test "$(readlink extracted/${builtins.baseNameOf link})" = ${target}
+          touch "$out"
+        '';
     in {
       nixosModules.default = import ./nix/modules/default.nix;
       nixosModules.desktop = import ./nix/modules/desktop.nix;
       nixosModules.software = import ./nix/modules/software.nix;
       nixosModules.vm = import ./nix/modules/vm.nix;
+      nixosModules.firstBoot = import ./nix/modules/first-boot.nix;
       nixosModules.updates = import ./nix/modules/updates.nix;
       nixosModules.development = import ./nix/modules/development.nix;
       nixosConfigurations.live = live;
@@ -79,6 +114,7 @@
         default = self.packages.${pcSystem}.iso;
       };
       checks.${pcSystem} = {
+        offline-installer = offlinePolicy pcPkgs pcInstalledBase pcInstaller;
         factory-platform = import ./nix/tests/factory-platform.nix {
           pkgs = pcPkgs;
           appliance = pcAppliance;
@@ -102,6 +138,7 @@
         default = self.packages.${system}.vm-image;
       };
       checks.${system} = {
+        offline-installer = offlinePolicy pkgs installedBase installer;
         factory-platform = import ./nix/tests/factory-platform.nix { inherit pkgs appliance; };
         ribbons = import ./nix/tests/ribbons.nix { inherit pkgs; };
         development-module = import ./nix/tests/development.nix { inherit nixpkgs pkgs system; };
