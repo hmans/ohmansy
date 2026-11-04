@@ -5,11 +5,12 @@ cd "$(dirname "$0")/../.."
 
 usage() {
   cat <<'EOF'
-Usage: bash tools/dev/os-rebuild.sh {build|test|switch} [--dry-run]
+Usage: bash tools/dev/os-rebuild.sh {build|test|boot|switch} [--dry-run]
 
 Build the installed configuration with this ohmansy checkout:
   build   Build only; do not activate.
   test    Activate without changing the boot default.
+  boot    Select for the next boot; leave the running system unchanged.
   switch  Activate and select for future boots.
 
 --dry-run prints the command without invoking sudo or Nix.
@@ -19,7 +20,7 @@ EOF
 }
 
 case "${1:-}" in
-  build|test|switch) action="$1"; shift ;;
+  build|test|boot|switch) action="$1"; shift ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac

@@ -8,6 +8,8 @@ choose **ohmansy (experimental)** in **Session**, then sign in normally.
 the session package and updated greeter; an existing boot image stays unchanged.
 Follow [the installed-system workflow](linux-development.md) and plan a reboot
 for login-manager updates rather than restarting greetd from a running desktop.
+Use `mise run os-boot` to build this checkout for the next boot, then reboot
+when ready to try the updated login screen.
 
 The experimental session opens your configured terminal and normal login shell.
 **Ctrl+Alt+D** opens the application picker. **Ctrl+Alt+Shift+E** opens a sign-out

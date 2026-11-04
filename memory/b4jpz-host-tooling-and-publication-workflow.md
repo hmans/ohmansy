@@ -51,18 +51,22 @@ For an agent already inside Linux, use local command tools and the native
 not needed. Keep live USB work on persistent storage. Mac bundle commands remain
 macOS-only; use native Nix checks and Python tests for the desktop.
 
-Installed OS iteration (2026-11-04): `mise run os-build`, `os-test`, and
+Installed OS iteration (2026-11-04): `mise run os-build`, `os-test`, `os-boot`, and
 `os-switch` call `tools/dev/os-rebuild.sh`. The helper rebuilds the installed
 `/etc/nixos#ohmansy` configuration with a `git+file://` override of its `ohmansy`
 input and `--no-write-lock-file`. `OHMANSY_SYSTEM_FLAKE` selects a custom machine
-configuration. It preserves the installed release pin; switch still selects the
-checkout build for future boots. `--dry-run` prints the command without sudo or
+configuration. It preserves the installed release pin; boot selects the checkout
+build for the next boot without activating running services, while switch also
+activates immediately. `--dry-run` prints the command without sudo or
 Nix. Bash syntax, TOML parsing, and command execution with mocked sudo passed
 for all actions, custom paths with spaces, invocation outside the checkout,
 invalid arguments, dry runs, and child failure propagation. No OS build or
 activation was performed. Later verified `mise run os-test -- --dry-run` with
 the pinned Nix-packaged mise; argument forwarding printed the expected command
-without invoking sudo. Direct Bash invocation is also supported.
+without invoking sudo. Direct Bash invocation is also supported. The boot action's real mise dry run
+and mocked execution passed, including custom paths with spaces, invocation
+outside the checkout, and rebuild failure propagation. No boot generation was
+built or selected during these command-routing checks.
 Shared changes belong in the repo's reusable modules, packages, and defaults;
 the installed machine is their test target. Root AGENTS.md records this rule
 for every session. A runtime fix or machine-only configuration edit does not

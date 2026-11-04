@@ -45,6 +45,10 @@ run = "bash tools/dev/os-rebuild.sh test"
 description = "Activate checkout changes and select them for future boots"
 run = "bash tools/dev/os-rebuild.sh switch"
 
+[tasks.os-boot]
+description = "Build checkout changes for the next boot without activating them now"
+run = "bash tools/dev/os-rebuild.sh boot"
+
 [tasks.display-ui]
 description = "Preview display controls with simulated monitors"
 run = "nix run --no-update-lock-file .#display-preview"

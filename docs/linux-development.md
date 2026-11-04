@@ -112,14 +112,18 @@ preferences. Build with a temporary source override from the checkout:
 ```sh
 mise run os-build
 mise run os-test
-# Once satisfied, activate and select the build for future boots:
+# Select for the next boot, keeping the current session running:
+mise run os-boot
+# Or activate immediately and select for future boots:
 mise run os-switch
 ```
 
 These tasks use `/etc/nixos#ohmansy` and override its `ohmansy` input with this
 checkout. They leave the installed release pin and lock file unchanged. `os-build`
-only builds; `os-test` activates without changing the boot default; `os-switch`
-activates and changes the boot default. Test and switch may restart services.
+only builds; `os-test` activates without changing the boot default; `os-boot`
+selects the build for the next boot without activating it now; `os-switch`
+activates and changes the boot default. Reboot when ready after `os-boot`.
+Test and switch may restart services.
 Use a planned boot activation and restart for login-manager, kernel, or
 graphics-driver changes, as described below.
 
@@ -130,7 +134,7 @@ For a custom installed configuration, set `OHMANSY_SYSTEM_FLAKE`, for example:
 OHMANSY_SYSTEM_FLAKE=/path/to/machine-config#my-host mise run os-build
 ```
 
-Mise is optional: `bash tools/dev/os-rebuild.sh build` (or `test` / `switch`)
+Mise is optional: `bash tools/dev/os-rebuild.sh build` (or `test` / `boot` / `switch`)
 runs the same helper. The equivalent build command is:
 
 ```sh
