@@ -224,6 +224,16 @@ impl Layout {
         self.reveal();
     }
 
+    pub fn cycle_workspace(&mut self, reverse: bool) {
+        let count = self.workspaces.len();
+        let next = if reverse {
+            (self.active + count - 1) % count
+        } else {
+            (self.active + 1) % count
+        };
+        self.switch_workspace(next);
+    }
+
     pub fn switch_workspace(&mut self, index: usize) {
         if index < self.workspaces.len() {
             self.active = index;

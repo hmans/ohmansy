@@ -631,3 +631,19 @@ full-width restore and separate fullscreen key handling under the German keymap,
 preserving parent desktop windows. Example configuration, CLI, demo and guide
 were updated. The native DRM fixture's presets were updated, but that VM was
 not rerun for this refinement. No installed-system activation or session restart.
+
+## Shine workspace and close shortcuts (2026-11-05)
+
+Mod+Up selects the previous workspace; Mod+Down selects the next. Both wrap
+between the four workspaces on the active monitor, including empty workspaces.
+The workspace-prev/workspace-next actions work in TOML bindings and IPC.
+Number shortcuts and per-workspace contents remain independent. Mod+W now
+sends the normal close request to the focused client; Mod+Q is no longer a
+default. Explicit user overrides still win. Nested sessions add Alt to Super.
+
+Thirty-one Rust tests, formatting, strict Clippy and a development build passed.
+The real Wayland preferences trial verified both workspace-cycle directions
+and wrapping under the German keymap, unchanged window identities, Mod+Q
+preserving a disposable window and Mod+W closing it. Parent windows were
+preserved. CLI help, example TOML, demo and compositor guide were updated.
+No installed-system activation, session restart or native DRM VM trial.

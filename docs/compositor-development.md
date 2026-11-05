@@ -102,12 +102,13 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+Ctrl+minus/equal | Narrow/widen the focused column |
 | Mod+R / Mod+Shift+R | Cycle column widths through 33⅓%, 50%, and 66⅔%, forward/backward |
 | Mod+1–4 | Switch workspace |
+| Mod+Up / Mod+Down | Cycle to the previous/next workspace, wrapping at either end |
 | Mod+Shift+1–4 | Move the focused window to a workspace |
 | Mod+Enter | Open a terminal |
 | Mod+Space | Open the application picker |
 | Mod+F | Toggle 100% working width, restoring the previous width |
 | Mod+Shift+F | Toggle fullscreen |
-| Mod+Q | Close the focused window |
+| Mod+W | Close the focused window |
 | Mod+S | Cycle the focused monitor's scale from 100% to 200% |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
@@ -245,7 +246,7 @@ same renderer in the login session and the nested desktop preview.
 "Mod+N" = { action = "launch", program = "foot", args = [] }
 "Mod+1" = { action = "workspace", value = 1 }
 "Mod+Shift+Right" = { action = "move-next" }
-"Mod+Q" = { action = "none" }
+"Mod+W" = { action = "none" }
 
 [[window_rules]]
 match = { app_id = "firefox" }
@@ -261,7 +262,7 @@ for VT switching. Key releases stay paired with intercepted presses across reloa
 
 Actions include terminal, launcher, logout, close, maximize, fullscreen, focus-prev/next,
 move-prev/next, focus-output-prev/next, move-output-prev/next, resize, cycle-width, workspace,
-move-workspace, output, scale, scale-adjust, launch, reload-config and save-config. Resize
+workspace-prev/next, move-workspace, output, scale, scale-adjust, launch, reload-config and save-config. Resize
 uses `value` in logical pixels; workspace/move-workspace use 1–4, output is
 1-based, scale uses a percentage, and scale-adjust uses a signed percentage point
 delta (for example, `{ action = "scale-adjust", value = 5 }`). Launch executes the program and argument
@@ -404,7 +405,7 @@ The socket has owner-only permissions. Status includes outputs, their scales,
 positions, active workspaces, and each window's output, plus window geometry, workspace,
 render density, and render/import counters. Commands also include `focus ID`,
 `focus-next`, `focus-prev`, `move-next`, `move-prev`, `resize DELTA`, `cycle-width [1|-1]`, `workspace N`,
-`move-workspace N`, `maximize`, `fullscreen`, `terminal`, `close`, `screenshot PNG`, and `quit`.
+`workspace-prev`, `workspace-next`, `move-workspace N`, `maximize`, `fullscreen`, `terminal`, `close`, `screenshot PNG`, and `quit`.
 Use `output N` to focus a monitor (starting at 1), `focus-output-next` or
 `focus-output-prev` to cycle, and `move-output-next` or `move-output-prev` to move
 the focused window. `scale PERCENT` affects the focused monitor.

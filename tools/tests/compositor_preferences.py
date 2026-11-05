@@ -170,6 +170,21 @@ def run():
             assert window(new['id'])['width'] == available
             trial.send_keys([33], modifier)
             assert window(new['id'])['width'] == previous, 'Mod+F restores previous width'
+            control('workspace', 1)
+            for expected in [4, 3, 2, 1]:
+                trial.send_keys([103], modifier)  # Mod+Up cycles backward, including wrap.
+                assert control()['workspace'] == expected
+            for expected in [2, 3, 4, 1]:
+                trial.send_keys([108], modifier)  # Mod+Down cycles forward, including wrap.
+                assert control()['workspace'] == expected
+            assert {w['id'] for w in control()['windows']} == identities
+            control('launch', program='foot', args=['--app-id=shine-pref-close', 'sleep', '90'])
+            closing = trial.wait_for(lambda: trial.window_for(control, 'shine-pref-close'))
+            trial.send_keys([16], modifier)  # Mod+Q no longer closes windows.
+            assert window(closing['id'])
+            trial.send_keys([17], modifier)  # Mod+W politely closes the disposable window.
+            trial.wait_for(lambda: not trial.window_for(control, 'shine-pref-close'))
+            assert {w['id'] for w in control()['windows']} == identities
             (artifacts / 'verification.json').write_text(json.dumps(control(), indent=2))
             control('quit')
             assert process.wait(timeout=10) == 0
@@ -179,7 +194,7 @@ def run():
                 process.wait(timeout=10)
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
-    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save, invalid-keymap recovery, forward/reverse width shortcuts, full-width restore and separate fullscreen keys; parent preserved')
+    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save, invalid-keymap recovery, forward/reverse width shortcuts, full-width restore, separate fullscreen keys, wrapping workspace keys and Mod+W close; parent preserved')
 
 
 if __name__ == '__main__':

@@ -196,6 +196,8 @@ pub enum Action {
     FocusOutputNext,
     MoveOutputPrev,
     MoveOutputNext,
+    WorkspacePrev,
+    WorkspaceNext,
     Resize {
         value: i64,
     },
@@ -288,6 +290,8 @@ impl Action {
                     FocusOutputNext => "focus-output-next",
                     MoveOutputPrev => "move-output-prev",
                     MoveOutputNext => "move-output-next",
+                    WorkspacePrev => "workspace-prev",
+                    WorkspaceNext => "workspace-next",
                     _ => unreachable!(),
                 },
                 Option::None,
@@ -370,6 +374,8 @@ pub fn bindings(
         ("Mod+Left".into(), FocusPrev),
         ("Mod+L".into(), FocusNext),
         ("Mod+Right".into(), FocusNext),
+        ("Mod+Up".into(), WorkspacePrev),
+        ("Mod+Down".into(), WorkspaceNext),
         ("Mod+Shift+H".into(), MovePrev),
         ("Mod+Shift+Left".into(), MovePrev),
         ("Mod+Shift+L".into(), MoveNext),
@@ -383,7 +389,7 @@ pub fn bindings(
         ("Mod+Ctrl+equal".into(), Resize { value: 80 }),
         ("Mod+F".into(), Maximize),
         ("Mod+Shift+F".into(), Fullscreen),
-        ("Mod+Q".into(), Close),
+        ("Mod+W".into(), Close),
         (
             "Mod+S".into(),
             Scale {
@@ -503,6 +509,10 @@ mod tests {
             };
             assert!(matches!(action("Mod+Space"), Some(Action::Launcher)));
             assert!(action("Mod+D").is_none());
+            assert!(action("Mod+Q").is_none());
+            assert!(matches!(action("Mod+W"), Some(Action::Close)));
+            assert!(matches!(action("Mod+Up"), Some(Action::WorkspacePrev)));
+            assert!(matches!(action("Mod+Down"), Some(Action::WorkspaceNext)));
             assert!(matches!(action("Mod+F"), Some(Action::Maximize)));
             assert!(matches!(action("Mod+Shift+F"), Some(Action::Fullscreen)));
             assert!(matches!(
@@ -518,7 +528,7 @@ mod tests {
     #[test]
     fn custom_bindings_replace_defaults_and_keep_nested_modifiers_separate() {
         let overrides = BTreeMap::from([
-            ("Mod+Q".into(), Action::None),
+            ("Mod+W".into(), Action::None),
             ("Mod+Return".into(), Action::Fullscreen),
         ]);
         let host = bindings(&overrides, ShortcutModifier::Super).unwrap();
@@ -530,7 +540,7 @@ mod tests {
         assert!(!child.iter().any(|(c, _)| *c == chord));
         assert!(!host
             .iter()
-            .any(|(c, _)| *c == Chord::parse("Mod+Q", ShortcutModifier::Super).unwrap()));
+            .any(|(c, _)| *c == Chord::parse("Mod+W", ShortcutModifier::Super).unwrap()));
         assert!(Chord::parse("Ctrl+Alt+F2", ShortcutModifier::Super).is_err());
     }
 }
