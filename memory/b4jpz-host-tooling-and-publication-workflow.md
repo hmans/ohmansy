@@ -570,6 +570,20 @@ Use /dev/vcs1 prompt checks for agreety; OCR requires a separate test dependency
 
 ## Shine rounded windows and focused ring (2026-11-05)
 
+Corner antialiasing (2026-11-05): `rounded-coverage.glsl` is injected into both
+window-mask and ring shaders. It averages a 4×4 subpixel grid at curved edges,
+with linear subpixel coverage, exact box coverage on straight edges, and a fast
+path away from edges. Ring coverage subtracts inner coverage from outer coverage.
+The previous narrow smoothstep visibly sharpened diagonal steps. A captured
+100% corner improved from about 9.4% maximum coverage error to 0.9%, measured
+against a 32×32 circle/pixel area reference. The decoration trial now checks all
+four outer corners at 100% and 200%; existing 100–200% scale, focus, input,
+fullscreen, reload, idle and parent-window preservation checks passed. The dev
+binary built; 33 Rust tests, formatting and strict Clippy passed. Visually
+inspected enlarged before/after captures in the nested desktop. Shaders are
+compiled into Shine; live TOML cannot update them. No running login compositor
+replacement, OS activation or installed-package update was performed.
+
 `decoration.rs`, `rounded.frag` and `focus-ring.frag` add shared native/nested
 window rendering. Defaults are 14 logical pixel corners and a 2 pixel lavender
 focused ring. Optional [decorations] fields corner_radius (0–128),

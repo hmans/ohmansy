@@ -19,6 +19,7 @@ varying vec2 v_coords;
 uniform float tint;
 #endif
 
+//_COVERAGE_
 void main() {
     // Recover destination pixel coordinates from the renderer's texture matrix.
     // This includes viewport crops, buffer transforms and inverted textures.
@@ -28,10 +29,7 @@ void main() {
                   -tex_matrix[0].y * uv.x + tex_matrix[0].x * uv.y) / det;
     p += draw_origin - mask_rect.xy;
     vec2 half_size = mask_rect.zw * 0.5;
-    float r = min(radius, min(half_size.x, half_size.y));
-    vec2 q = abs(p - half_size) - half_size + r;
-    float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-    float coverage = 1.0 - smoothstep(-0.5, 0.5, distance);
+    float coverage = rounded_coverage(p - half_size, half_size, radius, 1.0);
     vec4 color = texture2D(tex, v_coords);
 #if defined(NO_ALPHA)
     color.a = 1.0;

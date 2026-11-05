@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check real pixels and input at rounded windows in an isolated Shine session."""
 import json
+import math
 from pathlib import Path
 import struct
 import subprocess
@@ -97,6 +98,33 @@ enabled=false
     def near(actual, expected, tolerance=4):
         return all(abs(a - b) <= tolerance for a, b in zip(actual, expected))
 
+    def check_corner_coverage(pixel, ident):
+        # Compare actual outer-edge pixels with circle/pixel intersection area.
+        # A narrow smoothstep can pass solid-edge checks while visibly stair-stepping.
+        state = control()
+        w = window(ident)
+        output = next(o for o in state['outputs'] if o['name'] == w['output'])
+        scale = output['scale']
+        canvas = sum(o['physical_size'][0] for o in state['outputs'][:state['outputs'].index(output)])
+        gx, gy, width, height = w['geometry']
+        origin = (canvas + (gx - output['position'][0]) * scale,
+                  (gy - output['position'][1]) * scale)
+        radius, outer = 14 * scale, 16 * scale
+        errors = []
+        for y in range(-int(2 * scale), int(radius)):
+            for x in range(-int(2 * scale), int(radius)):
+                if abs(math.hypot(x + .5 - radius, y + .5 - radius) - outer) > .7:
+                    continue
+                coverage = sum((x + (sx + .5) / 32 - radius) ** 2 +
+                               (y + (sy + .5) / 32 - radius) ** 2 < outer ** 2
+                               for sx in range(32) for sy in range(32)) / 1024
+                for right, bottom in [(False, False), (True, False), (False, True), (True, True)]:
+                    px = origin[0] + (width * scale - 1 - x if right else x)
+                    py = origin[1] + (height * scale - 1 - y if bottom else y)
+                    actual = (pixel(px, py)[0] - clear[0]) / (171 - clear[0])
+                    errors.append(abs(actual - coverage))
+        assert errors and max(errors) < .03, f'Jagged corner coverage at {scale}x: {max(errors)}'
+
     def click(ident, x, y):
         geometry = window(ident)['geometry']
         control('pointer', x=geometry[0] + x, y=geometry[1] + y)
@@ -127,6 +155,7 @@ enabled=false
             assert not near(color_at(pixel, ids[0], 14, 1), clear), 'Window interior was clipped'
             assert near(color_at(pixel, ids[0], -1, 50), (171, 145, 199)), 'Missing lavender focus ring'
             assert near(color_at(pixel, ids[1], -1, 50), clear), 'Inactive window has a ring'
+            check_corner_coverage(pixel, ids[0])
             control('focus', ids[1])
             pixel = screenshot('focus-moved')
             assert near(color_at(pixel, ids[0], -1, 50), clear), 'Stale focus ring'
@@ -144,7 +173,10 @@ enabled=false
                 time.sleep(.25)
                 pixel = screenshot(f'scale-{scale}')
                 assert near(color_at(pixel, ids[0], 1, 1), clear), f'Corner failed at {scale}%'
-                assert near(color_at(pixel, ids[0], -1, 50), (171, 145, 199), tolerance=15), f'Ring failed at {scale}%'
+                # Fractional scales may place this sample on a partially covered edge.
+                assert near(color_at(pixel, ids[0], -1, 50), (171, 145, 199), tolerance=20), f'Ring failed at {scale}%'
+                if scale in [100, 200]:
+                    check_corner_coverage(pixel, ids[0])
             control('focus', ids[2])
             pixel = screenshot('second-monitor')
             assert near(color_at(pixel, ids[2], 1, 1), clear)
@@ -190,7 +222,7 @@ enabled=false
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     (artifacts / 'parent-after.json').write_text(json.dumps(remaining))
     assert all(remaining.get(ident) == pid for ident, pid in original.items()), (original, remaining)
-    print('PASS: rounded pixels, focused ring transfer, corner input, 100–200% scaling, '
+    print('PASS: rounded pixels, corner area coverage, focused ring transfer, corner input, 100–200% scaling, '
           'second output, square fullscreen, live reload/disable/save, idle and parent preservation')
 
 

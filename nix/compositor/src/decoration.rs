@@ -36,7 +36,8 @@ impl Renderer {
     pub fn new(renderer: &mut GlesRenderer) -> Result<Self, GlesError> {
         Ok(Self {
             rounded: renderer.compile_custom_texture_shader(
-                include_str!("rounded.frag"),
+                include_str!("rounded.frag")
+                    .replace("//_COVERAGE_", include_str!("rounded-coverage.glsl")),
                 &[
                     UniformName::new("draw_origin", UniformType::_2f),
                     UniformName::new("mask_rect", UniformType::_4f),
@@ -44,7 +45,8 @@ impl Renderer {
                 ],
             )?,
             border: renderer.compile_custom_pixel_shader(
-                include_str!("focus-ring.frag"),
+                include_str!("focus-ring.frag")
+                    .replace("//_COVERAGE_", include_str!("rounded-coverage.glsl")),
                 &[
                     UniformName::new("radius", UniformType::_1f),
                     UniformName::new("thickness", UniformType::_1f),
