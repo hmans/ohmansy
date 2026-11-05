@@ -8,3 +8,4 @@ GlassField 1.0 GlassField.qml
 IconButton 1.0 IconButton.qml
 FadeSwitch 1.0 FadeSwitch.qml
 StaggeredEntrance 1.0 StaggeredEntrance.qml
+WallpaperWindow 1.0 WallpaperWindow.qml

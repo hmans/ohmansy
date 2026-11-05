@@ -33,6 +33,10 @@ def run():
     config = artifacts / 'shine.toml'
     config.write_text('[animations]\nenabled=false\n')
     env = dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(config_dir))
+    # Pixel comparisons and idle checks require a stationary backdrop.
+    wallpaper = artifacts / 'wallpaper.png'
+    Image.new('RGB', (32, 32), (23, 26, 33)).save(wallpaper)
+    env['OHMANSY_WALLPAPER_IMAGE'] = str(wallpaper)
     helpers = artifacts / 'bin'
     helpers.mkdir()
     clipboard_failure = artifacts / 'fail-clipboard'

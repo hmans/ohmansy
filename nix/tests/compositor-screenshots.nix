@@ -21,6 +21,8 @@ pkgs.testers.runNixOSTest {
         initial_session = {
           user = "alice";
           command = "${pkgs.writeShellScript "shine-screenshots-session" ''
+            # Keep pixel comparisons independent of the ribbon animation.
+            export OHMANSY_WALLPAPER_IMAGE=${../modules/desktop/wallpapers/twilight-cat.png}
             exec ${session}/bin/ohmansy-compositor-session --no-clients \
               --control-socket /run/user/1000/shine.sock --config /run/user/1000/screenshot.toml \
               2>/run/user/1000/screenshot-session.log

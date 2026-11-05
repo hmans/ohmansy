@@ -23,8 +23,13 @@ directly through Smithay, libseat, and libinput. Cage is no longer part of the
 session. Without saved settings, connected monitors on the primary GPU are placed
 side by side in connector order, with preferred modes and a scale of 125%.
 Each monitor has four independent scrolling workspaces. Disconnecting a monitor
-moves its windows to a remaining monitor. Niri's panel, wallpaper, and services
-remain tied to Niri.
+moves its windows to a remaining monitor. Shine's Quickshell shell draws the
+shared animated ribbon wallpaper on each monitor, behind application windows.
+The background stays stationary while columns and workspaces change; Niri's
+parallax is not yet connected to Shine. Saved wallpaper images are honored,
+with a static fallback when ribbon rendering is unavailable. Foot's shared
+defaults provide a translucent background; Shine does not yet blur it.
+Niri's panel, wallpaper service, and other services remain tied to Niri.
 
 This session is experimental: it has no screen locking, screen sharing, IME,
 X11 support, or complete desktop portal integration. Keep Niri available as the
@@ -439,6 +444,11 @@ frames. It requires a running Niri or ohmansy desktop. Test input goes through a
 control socket into the normal compositor handlers; `--test-input` enables this
 path and ignores physical input from the parent window during the trial.
 Artifacts stay in ignored `.local/compositor-tests/`.
+
+The shell trial checks two-monitor ribbon animation, wallpaper image overrides,
+the software-rendered fallback, foot transparency, panel actions, scale changes,
+and clean shell shutdown. Screenshot trials use a static wallpaper so pixel
+comparisons and idle checks remain independent of the animation.
 
 The movement trial checks intermediate window/ring pixels, visible-position
 pointer input, interrupted swaps, coordinated scrolling, unchanged client sizes,

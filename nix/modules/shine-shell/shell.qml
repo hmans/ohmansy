@@ -1,4 +1,6 @@
 //@ pragma Env QS_NO_RELOAD_POPUP=1
+//@ pragma UseQApplication
+//@ pragma DefaultEnv QT_QPA_PLATFORMTHEME=xdgdesktopportal
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -55,6 +57,13 @@ ShellRoot {
     }
     Timer { interval: 250; running: true; repeat: true; triggeredOnStart: true; onTriggered: if (!control.connected) control.connected = true }
     SystemClock { id: clock; precision: SystemClock.Minutes }
+    Variants {
+        model: Quickshell.screens
+        WallpaperWindow {
+            required property var modelData
+            screen: modelData
+        }
+    }
     Variants {
         model: Quickshell.screens
         PanelWindow {

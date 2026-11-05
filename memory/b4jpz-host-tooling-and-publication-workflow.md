@@ -760,3 +760,33 @@ clean repeat captures, mixed scales, mode changes, Print, fullscreen, image
 clipboard equality and keyboard focus. No installed activation, physical session
 replacement or image rebuild. The previously recorded broad keyring-relogin
 failure was not investigated as part of this cleanup.
+
+## Shine ribbon wallpaper (2026-11-05)
+
+Shine's existing Quickshell process now creates a full-output background layer
+per monitor using `Ohmansy.Ui.WallpaperWindow`. Niri's wallpaper entrypoint uses
+the same component and retains its own IPC-driven parallax; Shine currently
+leaves both drift offsets at zero. The component uses the shared ribbon scene
+at about 15 fps, follows appearance changes, ignores input, and reserves no
+workspace area. No Rust renderer or blur changes were needed.
+
+`quickshell-ui.nix` packages the shared component, ribbon QML and fallback image.
+Both wallpaper launchers supply the native ribbon plugin in QML_IMPORT_PATH.
+Shine also reads the existing saved wallpaper image state. The image fallback
+uses the system wallpaper when available, otherwise the packaged image, so
+standalone sessions and software rendering retain a background.
+
+Both session and Niri wallpaper packages built. The expanded two-output
+`tools/tests/compositor_shell.py` passed on a real nested Wayland session:
+animated pixels, full-output geometry, image override with spaces in its path,
+85% foot alpha blending, software fallback, panel actions, scale changes,
+keyboard focus and clean shutdown. Screenshots were visually inspected.
+Packaged-session and screenshot regression trials passed. Screenshot tests use
+a static fixture for deterministic comparisons and idle checks. No installed
+OS activation, physical session replacement, image rebuild, commit or push.
+
+The focused `compositor-screenshots` native DRM VM check also booted and passed
+with its static wallpaper fixture, covering capture, popup pixels, clipboard,
+monitor modes/scales, fullscreen and focus. This verifies the packaged shell
+on DRM; animated ribbon rendering and foot alpha were checked in the nested
+hardware-accelerated trial, not on physical DRM outputs.
