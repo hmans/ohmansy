@@ -495,6 +495,24 @@ scripts or parent activation environment are used. The shell resolves relative
 control-socket paths against the launcher's PWD. Its request queue removes
 requests when sent, so an in-flight status poll cannot discard a button click.
 
+Bar styling (2026-11-05): Shine's panel background is transparent. Both Shine
+and Niri use shared Inter with semibold bar text (`Font.DemiBold`). The nested
+`tools/tests/compositor_shell.py` trial passed, including a pixel comparison
+against a uniform wallpaper through an empty area of the panel, workspace and
+terminal clicks, focus preservation, scaling and parent window preservation.
+This verified the packaged shell in a disposable preview; no installed-system
+activation or running panel replacement was performed.
+
+The focus ring default is now muted lavender `[0.55, 0.50, 0.62, 0.75]`.
+Formatting, 33 Rust tests and strict Clippy passed. The same ring setting was
+applied to the installed session's local configuration and confirmed through
+live status. Its installed Quickshell had been reading immutable store QML;
+gracefully replacing only that process with the checkout QML applied the bar
+changes on all outputs while preserving the compositor and application window
+IDs. Checkout QML then reloads on save. This runtime preview does not update
+the installed session wrapper; a future login uses its packaged shell again
+until the system is updated. Machine-specific launch details stay in local notes.
+
 `shine-shell.nix` packages the QML and shared UI. Both the packaged Shine session
 and `mise run compositor-desktop` start it; the plain compositor demo remains
 minimal. The development helper points OHMANSY_SHINE_QML at the checkout for

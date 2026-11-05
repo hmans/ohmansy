@@ -129,7 +129,7 @@ impl Default for Decorations {
         Self {
             corner_radius: 14,
             focus_ring_width: 2,
-            focus_ring_color: [0.67, 0.57, 0.78, 1.0],
+            focus_ring_color: [0.55, 0.50, 0.62, 0.75],
             shadow: Shadow::default(),
         }
     }

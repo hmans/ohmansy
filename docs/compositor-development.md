@@ -294,7 +294,7 @@ pending reorder animations.
 
 ### Rounded corners, focus ring and shadows
 
-Windows have 14 px rounded corners, soft drop shadows, and a 2 px lavender ring
+Windows have 14 px rounded corners, soft drop shadows, and a muted 2 px lavender ring
 around the focused window. Fullscreen windows have square corners, no shadow,
 and no ring. Menus and tooltips
 remain free to extend beyond the window. Transparent corners do not receive
@@ -304,7 +304,7 @@ pointer input.
 [decorations]
 corner_radius = 14
 focus_ring_width = 2
-focus_ring_color = [0.67, 0.57, 0.78, 1.0]
+focus_ring_color = [0.55, 0.50, 0.62, 0.75]
 
 [decorations.shadow]
 enabled = true

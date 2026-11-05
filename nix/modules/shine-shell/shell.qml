@@ -74,7 +74,7 @@ ShellRoot {
             anchors { top: true; left: true; right: true }
             implicitHeight: 44
             exclusiveZone: 44
-            color: Theme.buttonSecondarySolid
+            color: "transparent"
             WlrLayershell.namespace: "ohmansy-shine-bar"
             WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
@@ -82,12 +82,13 @@ ShellRoot {
                 implicitHeight: 32
                 padding: 9
                 font.pixelSize: 13
+                font.weight: Font.DemiBold
                 actionRole: "secondary"
             }
             RowLayout {
                 anchors { left: parent.left; verticalCenter: parent.verticalCenter; leftMargin: 10 }
                 spacing: 6
-                Text { text: "ohmansy"; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: 14; font.weight: Font.Medium; Layout.rightMargin: 12 }
+                Text { text: "ohmansy"; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.rightMargin: 12 }
                 Repeater {
                     model: 4
                     BarButton {
@@ -106,6 +107,7 @@ ShellRoot {
                 color: Theme.secondary
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
+                font.weight: Font.DemiBold
             }
             Text {
                 anchors { right: parent.right; verticalCenter: parent.verticalCenter; rightMargin: 14 }
@@ -113,6 +115,7 @@ ShellRoot {
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
+                font.weight: Font.DemiBold
             }
         }
     }

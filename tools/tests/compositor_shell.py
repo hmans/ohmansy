@@ -114,6 +114,12 @@ def run():
             shell = subprocess.Popen([os.environ['OHMANSY_COMPOSITOR_SHELL']],
                                      env=environment, stdout=log, stderr=log)
             trial.wait_for(layers_ready, description='panels and wallpapers restart')
+            # An empty part of the bar must show the wallpaper without a tint.
+            scale = control()['outputs'][0]['scale']
+            bar_pixel = (round(360 * scale), round(22 * scale))
+            trial.wait_for(lambda: all(abs(a - b) <= 2 for a, b in zip(
+                capture('transparent-bar').getpixel(bar_pixel), background)),
+                description='transparent panel background')
             control('launch', program='foot', args=['--app-id=shine-alpha-test',
                     '--override=main.initial-color-theme=dark',
                     '--override=colors-dark.alpha=0.85',

@@ -34,7 +34,7 @@ QtObject {
     readonly property int rowHeight: 42
     readonly property int barHeight: 38
     readonly property int barFontSize: 14
-    readonly property int barFontWeight: Font.Medium
+    readonly property int barFontWeight: Font.DemiBold
     readonly property color barBackground: "transparent"
     readonly property color shellGlassTint: colors.surface
     readonly property real traySaturation: -1
