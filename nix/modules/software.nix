@@ -45,6 +45,8 @@
       ${lib.getExe pkgs.mise} activate fish | source
     '';
     programs.nix-ld.enable = true;
+    # libxkbcommon also provides libxkbcommon-x11.
+    programs.nix-ld.libraries = with pkgs; [ libxcb libxkbcommon ];
     programs.appimage = {
       enable = lib.mkDefault true;
       binfmt = lib.mkDefault true;

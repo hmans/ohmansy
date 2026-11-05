@@ -9,6 +9,14 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+XCB and keyboard runtime libraries (2026-11-05): the shared nix-ld library
+list includes `libxcb` and `libxkbcommon`. The latter package provides both
+`libxkbcommon.so.0` and `libxkbcommon-x11.so.0`; there is no separate
+libxkbcommon-x11 package in the pinned Nixpkgs. Native customization passed.
+The native library environment built, and all three shared libraries loaded
+successfully with Python ctypes using only a command-local library path.
+No installed-system activation, image build, or boot was performed.
+
 Code editors (2026-11-05): the optional software bundle now includes
 `pkgs.neovim`, `pkgs.vscodium`, and `pkgs.zed-editor`. Commands are `nvim`,
 `codium`, and `zeditor`; settings and extensions remain user-owned. The existing

@@ -114,6 +114,12 @@ wrappers also honor `XCURSOR_THEME`, `XCURSOR_SIZE`, and `XCURSOR_PATH`.
 After installing an updated system, log out and back in to reload the cursor
 theme in the compositor and applications.
 
+## Downloaded Linux binaries
+
+The shared nix-ld environment includes libxcb, libxkbcommon, and
+libxkbcommon-x11 (the latter two share one Nix package). Rebuild an existing
+installation to receive these libraries for downloaded Linux apps.
+
 ## Flatpak apps
 
 ohmansy includes Flatpak and sets up Flathub for each user at login. After
