@@ -21,6 +21,20 @@ connection or remapping was verified. K2 HE configuration uses Keychron
 Launcher over USB; edit Mac Layer 0 to replace Screenshot with Print Screen.
 See `docs/linux-development.md`.
 
+Shine relative workspace moves (2026-11-05): `Mod+Shift+Up/Down` moves the
+focused window to the previous/next workspace on its monitor, wrapping between
+1 and 4 and retaining the current workspace. Configurable/IPC actions are
+`move-workspace-prev/next`; they reuse `Layout::move_to_workspace` to preserve
+column width and destination focus. Formatting, 33 Rust tests (including wrap,
+empty workspace, width/focus and both shortcut profiles) and strict Clippy
+passed. No installed activation or live shortcut verification was performed.
+
+Shine scale reset (2026-11-05): `Mod+0` restores the focused monitor to 100%
+using the existing `scale` action. Nested previews use Super+Alt+0. The default
+binding lives in `preferences.rs`; custom bindings can override it. Formatting,
+all 32 Rust tests and strict Clippy passed. No installed activation or live
+shortcut verification was performed.
+
 Chrome web apps (2026-11-05): `software.nix` includes Chatto, WhatsApp, and
 Bluesky desktop entries in `ohmansy.software.packages`. They run
 `google-chrome --app=https://…/` and use `TryExec=google-chrome`; Chrome is

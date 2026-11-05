@@ -326,6 +326,16 @@ impl Layout {
         }
     }
 
+    pub fn move_to_adjacent_workspace(&mut self, reverse: bool) {
+        let count = self.workspaces.len();
+        let next = if reverse {
+            (self.active + count - 1) % count
+        } else {
+            (self.active + 1) % count
+        };
+        self.move_to_workspace(next);
+    }
+
     pub fn move_to_workspace(&mut self, index: usize) {
         if index >= self.workspaces.len() || index == self.active {
             return;
@@ -869,5 +879,32 @@ mod tests {
         assert_eq!(layout.geometries(), vec![(2, 0, 0, 1000, 700)]);
         layout.switch_workspace(0);
         assert_eq!(layout.workspace().fullscreen, None);
+    }
+
+    #[test]
+    fn adjacent_workspace_moves_wrap_and_keep_the_current_workspace() {
+        let mut layout = Layout::default();
+        layout.insert(1);
+        layout.insert(2);
+        let width = layout.workspace().columns[1].width;
+        layout.move_to_adjacent_workspace(true);
+        assert_eq!(layout.active, 0);
+        assert_eq!(layout.focused(), Some(1));
+        layout.switch_workspace(3);
+        assert_eq!(layout.focused(), Some(2));
+        assert_eq!(layout.workspace().columns[0].width, width);
+        layout.move_to_adjacent_workspace(false);
+        assert_eq!(layout.active, 3);
+        assert!(layout.workspace().columns.is_empty());
+        layout.move_to_adjacent_workspace(false); // Empty workspace is a no-op.
+        layout.switch_workspace(0);
+        assert_eq!(layout.focused(), Some(2));
+        layout.move_to_adjacent_workspace(false);
+        layout.switch_workspace(1);
+        assert_eq!(layout.focused(), Some(2));
+        layout.move_to_adjacent_workspace(true);
+        layout.switch_workspace(0);
+        assert_eq!(layout.focused(), Some(2));
+        assert_eq!(layout.workspace().columns[1].width, width);
     }
 }

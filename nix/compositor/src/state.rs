@@ -583,6 +583,8 @@ impl Smallvil {
             }
             "workspace-prev" => self.layout.cycle_workspace(true),
             "workspace-next" => self.layout.cycle_workspace(false),
+            "move-workspace-prev" => self.layout.move_to_adjacent_workspace(true),
+            "move-workspace-next" => self.layout.move_to_adjacent_workspace(false),
             "workspace" => {
                 let index = value.ok_or("workspace needs an index from 1 to 4")?;
                 if !(1..=4).contains(&index) {

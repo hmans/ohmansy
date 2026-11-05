@@ -46,11 +46,14 @@ color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
 "Mod+1" = { action = "workspace", value = 1 }
 "Mod+Up" = { action = "workspace-prev" }
 "Mod+Down" = { action = "workspace-next" }
+"Mod+Shift+Up" = { action = "move-workspace-prev" }
+"Mod+Shift+Down" = { action = "move-workspace-next" }
 "Mod+W" = { action = "close" }
 "Mod+F" = { action = "maximize" }
 "Mod+Shift+F" = { action = "fullscreen" }
 "Mod+minus" = { action = "scale-adjust", value = -5 }
 "Mod+equal" = { action = "scale-adjust", value = 5 }
+"Mod+0" = { action = "scale", value = 100 }
 
 # Exact app_id matches. Last matching rule wins. Defaults affect new windows.
 [[window_rules]]

@@ -104,10 +104,12 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+comma/period | Focus previous/next monitor |
 | Mod+Shift+comma/period | Move window to previous/next monitor |
 | Mod+minus/plus (or equal) | Decrease/increase the focused monitor's scale by 5 percentage points (50–200%) |
+| Mod+0 | Restore the focused monitor's scale to 100% |
 | Mod+Ctrl+minus/equal | Narrow/widen the focused column |
 | Mod+R / Mod+Shift+R | Cycle column widths through 33⅓%, 50%, and 66⅔%, forward/backward |
 | Mod+1–4 | Switch workspace |
 | Mod+Up / Mod+Down | Cycle to the previous/next workspace, wrapping at either end |
+| Mod+Shift+Up / Mod+Shift+Down | Move the focused window to the previous/next workspace, wrapping at either end |
 | Mod+Enter | Open a terminal |
 | Mod+Space | Open the application picker |
 | Mod+F | Toggle 100% working width, restoring the previous width |
@@ -119,6 +121,9 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Shift+Print | Capture the focused monitor and open Satty for annotation |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
+
+Moving a window between workspaces keeps you on the current workspace. These
+moves stay on the current monitor and wrap between workspaces 1 and 4.
 
 Width presets use the focused monitor's working width minus the outer gaps.
 From a custom width, forward selects the next larger preset and reverse selects
@@ -350,7 +355,7 @@ for VT switching. Key releases stay paired with intercepted presses across reloa
 
 Actions include terminal, launcher, logout, close, maximize, fullscreen, focus-prev/next,
 move-prev/next, focus-output-prev/next, move-output-prev/next, resize, cycle-width, workspace,
-workspace-prev/next, move-workspace, output, scale, scale-adjust, launch, reload-config and save-config. Resize
+workspace-prev/next, move-workspace, move-workspace-prev/next, output, scale, scale-adjust, launch, reload-config and save-config. Resize
 uses `value` in logical pixels; workspace/move-workspace use 1–4, output is
 1-based, scale uses a percentage, and scale-adjust uses a signed percentage point
 delta (for example, `{ action = "scale-adjust", value = 5 }`). Launch executes the program and argument

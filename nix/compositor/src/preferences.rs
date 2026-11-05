@@ -246,6 +246,8 @@ pub enum Action {
     MoveOutputNext,
     WorkspacePrev,
     WorkspaceNext,
+    MoveWorkspacePrev,
+    MoveWorkspaceNext,
     Resize {
         value: i64,
     },
@@ -341,6 +343,8 @@ impl Action {
                     MoveOutputNext => "move-output-next",
                     WorkspacePrev => "workspace-prev",
                     WorkspaceNext => "workspace-next",
+                    MoveWorkspacePrev => "move-workspace-prev",
+                    MoveWorkspaceNext => "move-workspace-next",
                     _ => unreachable!(),
                 },
                 Option::None,
@@ -429,11 +433,14 @@ pub fn bindings(
         ("Mod+Right".into(), FocusNext),
         ("Mod+Up".into(), WorkspacePrev),
         ("Mod+Down".into(), WorkspaceNext),
+        ("Mod+Shift+Up".into(), MoveWorkspacePrev),
+        ("Mod+Shift+Down".into(), MoveWorkspaceNext),
         ("Mod+Shift+H".into(), MovePrev),
         ("Mod+Shift+Left".into(), MovePrev),
         ("Mod+Shift+L".into(), MoveNext),
         ("Mod+Shift+Right".into(), MoveNext),
         ("Mod+minus".into(), ScaleAdjust { value: -5 }),
+        ("Mod+0".into(), Scale { value: Some(100) }),
         ("Mod+equal".into(), ScaleAdjust { value: 5 }),
         ("Mod+plus".into(), ScaleAdjust { value: 5 }),
         ("Mod+Shift+plus".into(), ScaleAdjust { value: 5 }),
@@ -571,6 +578,14 @@ mod tests {
             assert!(matches!(action("Mod+W"), Some(Action::Close)));
             assert!(matches!(action("Mod+Up"), Some(Action::WorkspacePrev)));
             assert!(matches!(action("Mod+Down"), Some(Action::WorkspaceNext)));
+            assert!(matches!(
+                action("Mod+Shift+Up"),
+                Some(Action::MoveWorkspacePrev)
+            ));
+            assert!(matches!(
+                action("Mod+Shift+Down"),
+                Some(Action::MoveWorkspaceNext)
+            ));
             assert!(matches!(action("Mod+F"), Some(Action::Maximize)));
             assert!(matches!(action("Mod+Shift+F"), Some(Action::Fullscreen)));
             assert!(matches!(
