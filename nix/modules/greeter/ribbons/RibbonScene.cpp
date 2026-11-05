@@ -28,6 +28,10 @@ public:
         QOpenGLFramebufferObjectFormat format;
         format.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
         format.setInternalTextureFormat(GL_RGBA8);
+        // Smooth silhouettes and depth-tested folds without supersampling the
+        // shaders. Qt resolves this FBO before handing its texture to Qt Quick
+        // and clamps the sample count to what the driver supports.
+        format.setSamples(4);
         return new QOpenGLFramebufferObject(size, format);
     }
     void render() override {
@@ -39,7 +43,10 @@ public:
         glDisable(GL_CULL_FACE);
         glDisable(GL_STENCIL_TEST);
         // ES has no core FRAMEBUFFER_SRGB switch; this target is linear RGBA8.
-        if (!openGLES) glDisable(GL_FRAMEBUFFER_SRGB);
+        if (!openGLES) {
+            glDisable(GL_FRAMEBUFFER_SRGB);
+            glEnable(GL_MULTISAMPLE);
+        }
         glDisable(GL_POLYGON_OFFSET_FILL);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glDepthMask(GL_TRUE);

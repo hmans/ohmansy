@@ -51,10 +51,15 @@ int main(int argc, char **argv) {
             if (qGray(light.pixel(5, 5)) <= qGray(dark.pixel(5, 5)) + 60)
                 qFatal("Light palette did not brighten the backdrop");
             scene->setElapsed(20);
-        } else {
+        } else if (step == 2) {
             if (frame == light) qFatal("Animation did not change the frame");
+            // Resizing recreates the multisample target and Qt's resolve target.
+            window.resize(480, 300);
+            scene->setSize(QSizeF(480, 300));
+        } else {
+            if (frame.size() != QSize(480, 300)) qFatal("Resize did not produce a frame");
             qInfo() << (es ? "ES" : "Desktop GL")
-                    << "ribbons: dark, light, motion, and GL error checks passed";
+                    << "ribbons: dark, light, motion, resize, and GL error checks passed";
             app.quit();
         }
         ++step;

@@ -349,6 +349,14 @@ starts at 12 seconds and renders at 30 fps; motion advances at 60% of the
 launcher speed. Standard password labels are hidden, while other PAM prompts
 and the accessible field name remain available. The
 framebuffer is capped at 2400 pixels wide. Pause preserves the animation phase.
+As of 2026-11-05, the shared renderer requests 4x MSAA for ribbon silhouettes
+and depth-tested folds. Qt resolves the multisample target and clamps samples
+to driver support. Desktop GL explicitly enables multisampling; ES uses its
+implicit multisample rasterization. This also covers Niri and Shine wallpaper.
+The native x86 `ribbons` check passed desktop GL and ES through llvmpipe,
+including dark/light palettes, motion, framebuffer resize and GL error checks.
+The resolution cap and animation cadence are unchanged. GPU memory/bandwidth
+increase; hardware performance and installed activation remain unverified.
 The greeter wrapper supplies the plugin import path separately, so shader
 changes do not rebuild Quickshell. Non-OpenGL backends, missing plugins, or
 initialization failures use the static background.
