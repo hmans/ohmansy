@@ -371,6 +371,7 @@ pub fn bindings(
     use Action::*;
     let mut defaults = vec![
         ("Print".into(), Screenshot { annotate: false }),
+        ("Mod+Shift+4".into(), Screenshot { annotate: false }),
         ("Ctrl+Print".into(), Screenshot { annotate: false }),
         ("Shift+Print".into(), Screenshot { annotate: true }),
         ("Mod+Return".to_owned(), Terminal),
@@ -411,7 +412,6 @@ pub fn bindings(
     ];
     for n in 1..=4 {
         defaults.push((format!("Mod+{n}"), Workspace { value: n }));
-        defaults.push((format!("Mod+Shift+{n}"), MoveWorkspace { value: n }));
     }
     let mut result: BTreeMap<_, _> = defaults
         .into_iter()

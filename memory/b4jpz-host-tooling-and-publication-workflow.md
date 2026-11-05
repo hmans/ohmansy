@@ -790,3 +790,23 @@ with its static wallpaper fixture, covering capture, popup pixels, clipboard,
 monitor modes/scales, fullscreen and focus. This verifies the packaged shell
 on DRM; animated ribbon rendering and foot alpha were checked in the nested
 hardware-accelerated trial, not on physical DRM outputs.
+
+
+## Shift-number shortcuts reserved (2026-11-05)
+
+At the user's request, Shine no longer binds Mod+Shift+1 through Mod+Shift+4
+to window movement by default. Mod+Shift+1–3 stay unassigned while their behavior
+is reconsidered. The user then explicitly requested Mac screenshot-key support:
+Mod+Shift+4 captures the focused monitor, saves its PNG and copies it to the
+clipboard. This supports a Keychron Mac-mode Cmd+Shift+4 screenshot macro.
+Nested previews use Super+Alt+Shift+4 to preserve the separate modifier profile.
+Niri's shared defaults still omit these combinations. Plain Mod+1–4 workspace
+switching and the explicit move-workspace action remain available. Source of
+truth: preferences.rs bindings, CLI help and the compositor shortcut guide.
+
+Formatting and all 32 Rust tests passed. A focused two-profile nested trial
+injected the physical number-4 key with Super+Shift and Super+Alt+Shift through
+the normal key handler. Both saved a PNG, served identical clipboard bytes and
+preserved window workspace/focus. The broad screenshot trial hit its earlier
+popup-expiry fixture before reaching the shortcut; do not claim that whole
+trial passed. No installed activation or physical keyboard trial.

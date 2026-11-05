@@ -52,6 +52,10 @@ def run():
     original = {w['id']: w['pid'] for w in trial.parent_windows()}
     frames = 0
 
+    def completed_after(ident):
+        shot = control().get('screenshot')
+        return shot if shot and shot['id'] > ident else None
+
     def popup_matches(shot, visible):
         nonlocal frames
         frames += 1
@@ -155,9 +159,17 @@ def run():
             capture(artifacts / 'fullscreen.png')
             control('fullscreen')
             # Print uses the same action as the CLI and updates the image selection.
+            previous = control()['screenshot']['id']
             trial.send_keys([99])
-            result = trial.wait_for(lambda: control().get('screenshot'), description='Print screenshot')
+            result = trial.wait_for(lambda: completed_after(previous), description='Print screenshot')
             assert result.get('clipboard') and result['output'] == 'SHINE-2', result
+            previous = result['id']
+            focused = control()['focused']
+            trial.send_keys([5], ('super', 'alt', 'shift'))
+            result = trial.wait_for(lambda: completed_after(previous),
+                description='Mac screenshot shortcut')
+            assert result['clipboard'] and result['output'] == 'SHINE-2', result
+            assert control()['focused'] == focused and control()['workspace'] == 1
             # Refuse replacement, preserve the existing file, then recover.
             existing = artifacts / 'existing.png'
             existing.write_bytes(b'keep this file')

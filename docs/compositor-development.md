@@ -108,7 +108,6 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+R / Mod+Shift+R | Cycle column widths through 33⅓%, 50%, and 66⅔%, forward/backward |
 | Mod+1–4 | Switch workspace |
 | Mod+Up / Mod+Down | Cycle to the previous/next workspace, wrapping at either end |
-| Mod+Shift+1–4 | Move the focused window to a workspace |
 | Mod+Enter | Open a terminal |
 | Mod+Space | Open the application picker |
 | Mod+F | Toggle 100% working width, restoring the previous width |
@@ -116,6 +115,7 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+W | Close the focused window |
 | Mod+S | Cycle the focused monitor's scale from 100% to 200% |
 | Print / Ctrl+Print | Save the focused monitor and copy its PNG to the clipboard |
+| Mod+Shift+4 | Capture the focused monitor (Mac keyboard screenshot key) |
 | Shift+Print | Capture the focused monitor and open Satty for annotation |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
@@ -170,7 +170,9 @@ in the separate snapshot experiment.
 
 ## Screenshots
 
-**Print** or **Ctrl+Print** captures the focused monitor without the mouse cursor.
+**Print**, **Ctrl+Print**, or **Cmd/Super+Shift+4** captures the focused monitor
+without the mouse cursor. The last shortcut also supports the Keychron Mac-mode
+screenshot key. In nested previews it follows Mod: **Super+Alt+Shift+4**.
 The PNG includes its windows, application popups, panel and compositor decorations,
 and excludes Shine's screenshot feedback popup. Shine
 saves it under `Screenshots` in your configured Pictures directory and copies
