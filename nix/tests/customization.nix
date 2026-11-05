@@ -15,6 +15,7 @@ let
   softwareOnly = evaluate [ ohmansyModules.software ];
   noAppImages = evaluate [ ohmansyModules.software { programs.appimage.enable = false; } ];
   noFlatpak = evaluate [ ohmansyModules.software { services.flatpak.enable = false; } ];
+  noBtopStyle = evaluate [ ohmansyModules.software { ohmansy.btopStyle.enable = false; } ];
   noFish = evaluate [ ohmansyModules.default { programs.fish.enable = false; } ];
   noFishStyle = evaluate [ ohmansyModules.software { ohmansy.fishStyle.enable = false; } ];
   customPrompt = evaluate [ ohmansyModules.software {
@@ -61,6 +62,12 @@ assert !desktopOnly.programs.firefox.enable && !desktopOnly.programs.fish.enable
 assert !softwareOnly.programs.niri.enable;
 assert defaults.services.flatpak.enable && softwareOnly.services.flatpak.enable;
 assert !desktopOnly.services.flatpak.enable;
+assert defaults.systemd.user.services ? ohmansy-btop-theme;
+assert softwareOnly.systemd.user.services ? ohmansy-btop-theme;
+assert !(desktopOnly.systemd.user.services ? ohmansy-btop-theme);
+assert !(custom.systemd.user.services ? ohmansy-btop-theme);
+assert !(noBtopStyle.systemd.user.services ? ohmansy-btop-theme);
+assert builtins.elem pkgs.btop noBtopStyle.environment.systemPackages;
 assert softwareOnly.xdg.portal.enable;
 assert builtins.elem pkgs.xdg-desktop-portal-gtk softwareOnly.xdg.portal.extraPortals;
 assert builtins.elem defaults.services.flatpak.package defaults.environment.systemPackages;
@@ -109,6 +116,7 @@ pkgs.runCommand "ohmansy-customization" {
   nativeBuildInputs = [ pkgs.python3 pkgs.niri ];
 } ''
   export HOME="$TMPDIR"
+  python3 ${./btop-theme.py} ${../modules/btop-theme.py}
   export XDG_CONFIG_HOME="$TMPDIR/config"
   export XDG_CONFIG_DIRS="$TMPDIR/config"
   export XDG_DATA_HOME="$TMPDIR/data"

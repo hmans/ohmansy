@@ -9,6 +9,23 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+btop appearance (2026-11-05): the optional software bundle wraps the selected
+Nixpkgs btop package through `nix/modules/btop-package.nix`, retaining NVIDIA
+package overrides. Fresh configs select `ohmansy` and `theme_background = false`;
+existing and explicit configs are preserved. `btop-theme.py` atomically switches
+the managed user theme symlink and sends SIGUSR2 for live reload. A user service
+monitors GNOME color-scheme in both desktop sessions. Light/dark palettes follow
+Foot's colors. `ohmansy.btopStyle.enable = false` restores plain btop; replacing
+the software bundle without the wrapper omits the watcher.
+
+Native package build, four config-ownership tests and the customization check
+passed. A real btop on a PTY and private D-Bus rendered both palettes, reloaded
+live, retained terminal-default background escapes, and exited cleanly. Set
+XDG_CONFIG_HOME before starting the private bus: its dconf writer inherits the
+bus environment, not each client's environment. Applied the managed theme and
+transparent background to the existing installed user's btop and started a
+transient watcher; original process survived. No OS activation or reboot.
+
 Official NVIDIA driver (2026-11-05): `nix/modules/nvidia.nix`, exported as
 `nixosModules.nvidia`, selects the stable official driver with NVIDIA's open
 kernel module for Turing and newer GPUs, modesetting, and a package-scoped

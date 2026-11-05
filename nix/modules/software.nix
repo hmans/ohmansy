@@ -1,4 +1,7 @@
 { config, lib, pkgs, ... }:
+let
+  btop = import ./btop-package.nix { inherit pkgs; };
+in
 {
   imports = [ ./firefox-style.nix ./fish-style.nix ./flatpak.nix ];
   options.ohmansy.software.packages = lib.mkOption {
@@ -27,7 +30,7 @@
       python3
       pkg-config
       fastfetch
-      btop
+      (if config.ohmansy.btopStyle.enable then btop.package else pkgs.btop)
       htop
       psmisc
     ]) ++ map (app: pkgs.makeDesktopItem {
@@ -51,7 +54,23 @@
     '';
   };
 
+  options.ohmansy.btopStyle.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = "Give btop a transparent background and desktop light/dark colors.";
+  };
+
   config = {
+    systemd.user.services.ohmansy-btop-theme = lib.mkIf
+      (builtins.elem btop.package config.ohmansy.software.packages) {
+        description = "Follow desktop appearance in btop";
+        wantedBy = [ "default.target" ];
+        serviceConfig = {
+          ExecStart = "${btop.helper}/bin/ohmansy-btop-theme watch";
+          Restart = "on-failure";
+          RestartSec = 2;
+        };
+      };
     services.flatpak.enable = lib.mkDefault true;
     programs.firefox.enable = lib.mkDefault true;
     programs.chromium.enable = lib.mkDefault true;

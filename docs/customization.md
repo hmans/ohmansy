@@ -263,6 +263,25 @@ A user's `~/.config/xdg-terminals.list` can override the system selection if
 their preferred terminal is installed. Such a user override selects the
 launcher; it does not change system-wide terminal styling.
 
+## btop appearance
+
+btop uses the terminal's background, including its transparency, and a palette
+that follows the desktop's light/dark appearance while it runs. The default
+launcher creates `~/.config/btop/btop.conf` only when it does not exist. Existing
+configuration files and explicitly supplied `--config` files are preserved.
+
+To enable this appearance in an existing btop configuration, set:
+
+```toml
+color_theme = "ohmansy"
+theme_background = false
+```
+
+Other btop options remain yours to change. Select another theme in btop to use
+your own colors. Set `ohmansy.btopStyle.enable = false;` in your host module to
+install plain btop and omit the appearance service. Removing btop from the
+optional software bundle also omits that service.
+
 ## VM display scale
 
 The VM module uses 100% scale on x86-64 and retains 200% for the ARM Mac VM.
