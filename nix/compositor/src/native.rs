@@ -400,7 +400,7 @@ impl Native {
                 Some(&mut self.cursors),
                 &mut self.decorations,
                 (0, 0).into(),
-                true,
+                crate::scene::RenderPurpose::Display,
             );
             let result = match head.scanout.render_frame(
                 &mut self.renderer,

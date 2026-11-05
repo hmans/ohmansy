@@ -192,34 +192,6 @@ pkgs.testers.runNixOSTest {
         time.sleep(.1)
     assert len(state["windows"]) == 2, state
     assert len({w["output"] for w in state["windows"]}) == 2, state
-    def screenshot(label, shortcut=False):
-        before = control()
-        if shortcut:
-            machine.send_key('print')
-        else:
-            control('screenshot-screen', path='/home/alice/' + label + '.png')
-        for attempt in range(100):
-            state = control()
-            shot = state.get('screenshot')
-            if shot and shot != before.get('screenshot'):
-                break
-            time.sleep(.1)
-        assert shot and 'error' not in shot and shot['clipboard'], state
-        assert state['focused'] == before['focused'], state
-        assert state['keyboard_focus'] == before['keyboard_focus'], state
-        assert shot['output'] == before['active_output'], shot
-        output = next(o for o in before['outputs'] if o['name'] == shot['output'])
-        assert [shot['width'], shot['height']] == output['physical_size'], shot
-        as_user('WAYLAND_DISPLAY=' + shlex.quote(state['wayland_display']) + ' ${pkgs.wl-clipboard}/bin/wl-paste --no-newline --type image/png > /run/user/1000/screenshot-clipboard.png')
-        script = 'from pathlib import Path; import struct; p=Path(' + repr(shot['path']) + ').read_bytes(); assert p == Path("/run/user/1000/screenshot-clipboard.png").read_bytes(); assert struct.unpack(">II",p[16:24]) == ' + repr((shot['width'], shot['height']))
-        as_user('python3 -c ' + shlex.quote(script))
-        machine.copy_from_vm(shot['path'], 'screenshots')
-        return shot
-    screenshot('native-monitor-1')
-    screenshot('native-print', shortcut=True)
-    control('output', 2)
-    screenshot('native-monitor-2')
-    control('output', 1)
     machine.send_key('meta_l-b')
     for attempt in range(100):
         state = control()
@@ -227,14 +199,6 @@ pkgs.testers.runNixOSTest {
             break
         time.sleep(.1)
     assert state['fullscreen'] == state['focused'] and state['focused'] is not None, state
-    screenshot('native-fullscreen')
-    # QEMU's send_key returns before its scheduled release. Wait for release
-    # before sending the same chord again, especially during GPU readback.
-    for attempt in range(100):
-        if not any(control()['modifiers'].values()):
-            break
-        time.sleep(.1)
-    assert not any(control()['modifiers'].values()), control()
     machine.send_key('meta_l-b')
     for attempt in range(100):
         if control()['fullscreen'] is None:
@@ -273,7 +237,6 @@ pkgs.testers.runNixOSTest {
             break
         time.sleep(.1)
     assert state['outputs'][1]['physical_size'] == [1024, 768], state
-    screenshot('native-changed-mode')
     assert state['config_error'] is None, state
     width = state['outputs'][1]['logical_size'][0]
     control('configure-outputs', outputs=[{'name': first_name, 'position': [width, 0]},

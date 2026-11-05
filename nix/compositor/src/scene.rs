@@ -1,5 +1,11 @@
 //! Output-local rendering: scrolling columns cannot leak onto their neighbours.
 use crate::Smallvil;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum RenderPurpose {
+    Display,
+    Capture,
+}
 use smithay::{
     backend::{
         allocator::Fourcc,
@@ -111,7 +117,7 @@ impl Smallvil {
         mut named: Option<&mut Cursors>,
         decorations: &mut crate::decoration::Renderer,
         canvas: Point<i32, Physical>,
-        include_cursor: bool,
+        purpose: RenderPurpose,
     ) -> Vec<OutputElement> {
         let Some(index) = self
             .layout
@@ -130,7 +136,7 @@ impl Smallvil {
         if self.layout.at(pointer.x, pointer.y) == Some(index) {
             let local = pointer - origin.to_f64();
             match &self.cursor_image {
-                _ if !include_cursor => (),
+                _ if purpose == RenderPurpose::Capture => (),
                 CursorImageStatus::Surface(surface) => {
                     let hotspot = with_states(surface, |s| {
                         s.data_map
@@ -191,6 +197,10 @@ impl Smallvil {
         let layer_map = smithay::desktop::layer_map_for_output(output);
         let layers: Vec<_> = layer_map
             .layers()
+            .filter(|layer| {
+                purpose != RenderPurpose::Capture
+                    || layer.namespace() != "ohmansy-screenshot-result"
+            })
             .filter_map(|layer| {
                 layer_map
                     .layer_geometry(layer)

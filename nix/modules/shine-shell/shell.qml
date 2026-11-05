@@ -12,18 +12,19 @@ ShellRoot {
     property var requests: []
     property string screenshotMessage: ""
     property string screenshotTitle: ""
-    property string screenshotResult: ""
+    property double screenshotResult: 0
+    property string screenshotOutput: ""
     onStateChanged: {
         const shot = state.screenshot;
-        const result = shot ? JSON.stringify(shot) : "";
-        if (result && result !== screenshotResult) {
+        if (shot && shot.id !== screenshotResult) {
+            screenshotResult = shot.id;
+            screenshotOutput = shot.output;
             screenshotTitle = shot.error ? "Screenshot failed" : "Screenshot saved";
             screenshotMessage = shot.error ? shot.error
                 : shot.path + (shot.clipboard ? "\nCopied to clipboard" : "\nClipboard copy failed")
                     + (shot.annotation_error ? "\nCould not open Satty" : "");
             screenshotTimer.restart();
         }
-        screenshotResult = result;
     }
     Timer { id: screenshotTimer; interval: 8000; onTriggered: root.screenshotMessage = "" }
     function request(action, output, value) {
@@ -112,7 +113,7 @@ ShellRoot {
             id: screenshotToast
             required property var modelData
             readonly property bool showMessage: root.screenshotMessage !== "" && modelData.name ===
-                (root.state.screenshot?.output || root.state.active_output)
+                root.screenshotOutput
             // Keep the layer role alive: Smithay 0.7 validates a trailing
             // null-buffer commit against the destroyed role's reset size.
             // Hidden feedback is transparent and has an empty input region.

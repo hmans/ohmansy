@@ -700,7 +700,7 @@ See `docs/compositor-development.md` for usage and customization.
 named and client cursors. Its Flipped180 transform produces top-to-bottom PNG
 rows; map_texture's flipped flag still controls mapping inversion. PNG encoding,
 file writes, clipboard copying and annotation launch run in a worker. Destinations
-use create_new and are never overwritten. Save failures and clipboard/annotation
+are published with renameat2 NOREPLACE and are never overwritten. Save failures and clipboard/annotation
 failures are reported separately. Wlr data-control lets clipboard helpers operate
 without a temporary focus-acquiring window; normal application clipboard still works.
 
@@ -725,3 +725,38 @@ result popup were visually inspected. This is VM/native DRM plus nested GPU
 verification, not an installed-system activation or physical-session trial.
 The broader compositor-drm suite reached its screenshot checks but failed later
 in keyring password-relogin checks; do not report that whole suite as passed.
+
+
+### Screenshot cleanup (2026-11-05)
+
+Results now use typed Saved/Outcome/Completion structures. Each accepted request
+has a monotonically increasing ID; failures retain their originating output.
+The shell deduplicates by ID and keeps that output rather than comparing JSON
+or routing an error to whichever monitor became active later.
+
+The clipboard helper reads a rewound descriptor of the completed image instead
+of receiving a blocking pipe write. Its five-second deadline covers the whole
+helper run. This removes the previous unbounded write before the timer started.
+Images are written to a private temporary file in the destination directory,
+synced, then published using rustix renameat_with(NOREPLACE), already available
+through Smithay. No lock/dependency change. Publication never overwrites a file
+or symlink; failures remove the temporary file. An interrupted process may leave
+a hidden temporary file, but no partial destination PNG. RenderPurpose explicitly
+distinguishes display and capture; capture excludes the screenshot feedback layer.
+
+Screenshot-specific VM coverage is consolidated in compositor-screenshots,
+including output mode changes. The broad compositor-drm test no longer duplicates
+it. Popup visibility is checked through rendered pixels, not just the persistent
+layer's existence. The nested trial checks dismissal, eight-second expiry,
+hidden input pass-through, capture exclusion, repeated failure IDs/output routing,
+clipboard failure and a helper that never reads stdin, followed by recovery.
+Pillow in the spatial shell keeps pixel decoding faster than the popup lifetime;
+the prior pure-Python decoder could outlast it on large displays.
+
+32 Rust tests (including injected publication failure and no-clobber/symlink
+checks), fmt, strict Clippy, the expanded nested screenshot trial, and the focused
+native DRM VM suite passed. The latter booted and checked real feedback pixels,
+clean repeat captures, mixed scales, mode changes, Print, fullscreen, image
+clipboard equality and keyboard focus. No installed activation, physical session
+replacement or image rebuild. The previously recorded broad keyring-relogin
+failure was not investigated as part of this cleanup.

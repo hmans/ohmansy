@@ -165,7 +165,7 @@ pub fn init_winit(
                                         None,
                                         &mut decorations,
                                         (left, 0).into(),
-                                        true,
+                                        crate::scene::RenderPurpose::Display,
                                     )
                                     .into_iter()
                                     .map(|e| {

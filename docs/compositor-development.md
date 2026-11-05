@@ -166,12 +166,15 @@ in the separate snapshot experiment.
 ## Screenshots
 
 **Print** or **Ctrl+Print** captures the focused monitor without the mouse cursor.
-The PNG includes its windows, popups, panel and compositor decorations. Shine
+The PNG includes its windows, application popups, panel and compositor decorations,
+and excludes Shine's screenshot feedback popup. Shine
 saves it under `Screenshots` in your configured Pictures directory and copies
 the same image to the clipboard. A popup briefly shows the saved path and
 whether copying succeeded, including in fullscreen. It keeps keyboard focus
 in your application. Screenshots have unique timestamped names and never
-replace an existing file. PNG encoding, saving and clipboard transfer run off
+replace an existing file. A completed temporary file is published atomically;
+an interrupted write never appears as a partial destination PNG.
+PNG encoding, saving and clipboard transfer run off
 the compositor thread.
 Clipboard helpers use the data-control protocol, so copying does not require
 opening a temporary window or changing keyboard focus.
@@ -198,7 +201,10 @@ Capture through the CLI with either backend:
 ```
 
 The command queues a capture; poll `status` for its `screenshot` result, including
-the saved path, pixel dimensions, and any save, clipboard or annotation error.
+the completion `id`, originating `output`, saved path, pixel dimensions, and any
+save, clipboard or annotation error. Each accepted request gets a new ID,
+including repeated failures. Clipboard helpers have a five-second deadline and
+read the completed file directly, avoiding blocking pipe writes.
 The older `screenshot PNG` command remains a nested-only diagnostic capture of
 the whole preview canvas. Neither command supplies a public Wayland capture
 protocol or desktop portal; external capture apps still need those interfaces.
@@ -206,9 +212,11 @@ protocol or desktop portal; external capture apps still need those interfaces.
 Run `python3 tools/tests/compositor_screenshots.py` inside `nix develop .#spatial`
 after building the development binary. Build
 `.#checks.x86_64-linux.compositor-screenshots` for a focused native VM check
-of two monitors, mixed scaling, Print, fullscreen and PNG clipboard contents.
-It exports the captured PNGs under `screenshots/` in its result. The broader
-`compositor-drm` check also exercises capture across an output mode change.
+of two monitors, mixed scaling, mode changes, Print, fullscreen and PNG clipboard
+contents. It checks visible feedback pixels against a clean capture and exports
+the captured PNGs under `screenshots/` in its result. The nested trial also checks
+popup dismissal and expiry, repeated failures, and recovery from a stuck
+clipboard helper. Pillow is included in the development shell for pixel checks.
 
 ## Configuration
 

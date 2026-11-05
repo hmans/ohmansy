@@ -34,6 +34,7 @@ pkgs.testers.runNixOSTest {
     import json
     import shlex
     import time
+    import subprocess
 
     start_all()
     machine.wait_for_file('/run/user/1000/shine.sock', timeout=60)
@@ -74,35 +75,45 @@ pkgs.testers.runNixOSTest {
         assert shot['output'] == before['active_output'], shot
         assert state['focused'] == before['focused'], state
         assert state['keyboard_focus'] == before['keyboard_focus'], state
-        assert [shot['width'], shot['height']] == [1280, 800], shot
+        assert shot['id'] > (before.get('screenshot') or {}).get('id', 0), shot
+        output = next(o for o in before['outputs'] if o['name'] == shot['output'])
+        assert [shot['width'], shot['height']] == output['physical_size'], shot
         machine.succeed('runuser -u alice -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY='
                         + shlex.quote(state['wayland_display'])
                         + ' wl-paste --no-newline --type image/png > /tmp/copied.png')
         code = ('from pathlib import Path; from PIL import Image; '
                 + 'p=Path(' + repr(shot['path']) + '); assert p.read_bytes() == Path("/tmp/copied.png").read_bytes(); '
-                + 'im=Image.open(p); assert im.size == (1280,800); '
-                + 'assert len(im.getcolors(1280*800)) > 1')
+                + 'im=Image.open(p); assert im.size == ' + repr(tuple(output['physical_size'])) + '; '
+                + 'assert len(im.getcolors(im.width*im.height)) > 1')
         machine.succeed('python3 -c ' + shlex.quote(code))
-        try:
-            state = wait_for(lambda s: any(layer['namespace'] == 'ohmansy-screenshot-result'
-                for output in s['outputs'] if output['name'] == shot['output']
-                for layer in output['layers']))
-        except AssertionError:
-            print(machine.succeed('cat /run/user/1000/screenshot-session.log'))
-            print(machine.succeed('journalctl -b --no-pager -n 100'))
-            raise
-        assert state['keyboard_focus'] == before['keyboard_focus'], state
         machine.copy_from_vm(shot['path'], 'screenshots')
         return shot
 
     capture('empty-desktop')
-    machine.screenshot('screenshot-result')
+    def popup_visible(state):
+        machine.screenshot('screenshot-result')
+        output = state['outputs'][0]
+        x, y, width, height = next(layer['geometry'] for layer in output['layers'] if layer['namespace'] == 'ohmansy-screenshot-result')
+        point = (round((x + width - 25) * output['scale']), round((y + 25) * output['scale']))
+        code = ('from PIL import Image; import sys; '
+                + 'a=Image.open(sys.argv[1]).convert("RGB"); b=Image.open(sys.argv[2]).convert("RGB"); '
+                + 'assert max(abs(x-y) for x,y in zip(a.getpixel(' + repr(point) + '),b.getpixel(' + repr(point) + '))) > 10')
+        return subprocess.run(['${python}/bin/python3', '-c', code, str(machine.out_dir / 'screenshot-result.png'),
+                               str(machine.out_dir / 'screenshots/empty-desktop.png')], capture_output=True).returncode == 0
+    wait_for(popup_visible)
+    capture('clean-repeat')
+    code = 'from PIL import Image; a=Image.open("/home/alice/empty-desktop.png"); b=Image.open("/home/alice/clean-repeat.png"); assert a.getpixel((1230,620)) == b.getpixel((1230,620))'
+    machine.succeed('python3 -c ' + shlex.quote(code))
     for index in (1, 2):
         control('output', value=index)
         control('launch', program='foot', args=['--app-id=shot-' + str(index), '--override=colors-dark.background=226644', 'sleep', '300'])
         wait_for(lambda s: len(s['windows']) == index)
         capture('monitor-' + str(index))
     capture('print', shortcut=True)
+    mode = next(m for m in control()['outputs'][1]['modes'] if m['width'] == 1024 and m['height'] == 768)
+    control('configure-outputs', outputs=[{'name': names[1], 'mode': '1024x768@' + str(mode['refresh']/1000)}])
+    wait_for(lambda s: s['outputs'][1]['physical_size'] == [1024, 768])
+    capture('changed-mode')
     wait_for(lambda s: not any(s['modifiers'].values()))
     control('fullscreen')
     capture('fullscreen')

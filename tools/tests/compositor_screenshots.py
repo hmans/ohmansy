@@ -10,7 +10,13 @@ import tempfile
 import time
 
 import compositor_integration as trial
-from compositor_decorations import png_pixels
+from PIL import Image
+
+
+def png_pixels(path):
+    with Image.open(path) as source:
+        image = source.convert('RGB')
+    return lambda x, y: image.getpixel((int(x), int(y)))
 
 
 def run():
@@ -30,14 +36,32 @@ def run():
     helpers = artifacts / 'bin'
     helpers.mkdir()
     clipboard_failure = artifacts / 'fail-clipboard'
+    clipboard_hang = artifacts / 'hang-clipboard'
     clipboard = helpers / 'wl-copy'
-    clipboard.write_text('#!/bin/sh\nif [ -e ' + shlex.quote(str(clipboard_failure))
+    clipboard.write_text('#!/bin/sh\nif [ -e ' + shlex.quote(str(clipboard_hang))
+        + ' ]; then exec sleep 30; fi\nif [ -e ' + shlex.quote(str(clipboard_failure))
         + ' ]; then exit 1; fi\nexec ' + shlex.quote(shutil.which('wl-copy')) + ' "$@"\n')
     clipboard.chmod(0o755)
     env['PATH'] = str(helpers) + ':' + env['PATH']
     control = trial.Control(artifacts / 'control.sock')
     trial.TEST_CONTROL = control
     original = {w['id']: w['pid'] for w in trial.parent_windows()}
+    frames = 0
+
+    def popup_matches(shot, visible):
+        nonlocal frames
+        frames += 1
+        state = control()
+        output = next(o for o in state['outputs'] if o['name'] == shot['output'])
+        x, y, width, _ = next(layer['geometry'] for layer in output['layers'] if layer['namespace'] == 'ohmansy-screenshot-result')
+        px, py = int((x + width - 25) * output['scale']), int((y + 25) * output['scale'])
+        offset = sum(o['physical_size'][0] for o in state['outputs'][:state['outputs'].index(output)])
+        path = artifacts / f'popup-{frames}.png'
+        control('screenshot', path=str(path))
+        rendered = trial.wait_for(lambda: png_pixels(path))
+        clean = png_pixels(Path(shot['path']))
+        difference = max(abs(a - b) for a, b in zip(rendered(offset + px, py), clean(px, py)))
+        return difference > 10 if visible else difference <= 2
 
     def capture(path=None, **options):
         before = control()
@@ -52,9 +76,7 @@ def run():
         assert copied == destination.read_bytes(), result
         if not options.get('annotate'):
             try:
-                trial.wait_for(lambda: any(layer['namespace'] == 'ohmansy-screenshot-result'
-                    for output in control()['outputs'] if output['name'] == result['output']
-                    for layer in output['layers']), description='screenshot result popup')
+                trial.wait_for(lambda: popup_matches(result, True), description='visible screenshot result pixels')
             except AssertionError:
                 (artifacts / 'failed-state.json').write_text(json.dumps(control(), indent=2))
                 raise
@@ -71,7 +93,15 @@ def run():
             control('launch', program=os.environ['OHMANSY_COMPOSITOR_SHELL'], args=[])
             trial.wait_for(lambda: all(any(layer['namespace'] == 'ohmansy-shine-bar' for layer in o['layers'])
                 for o in control()['outputs']), description='Shine shell')
-            capture(artifacts / 'empty.png')
+            empty, _ = capture(artifacts / 'empty.png')
+            toast = next(layer['geometry'] for layer in control()['outputs'][0]['layers'] if layer['namespace'] == 'ohmansy-screenshot-result')
+            control('pointer', x=toast[0] + 55, y=toast[1] + toast[3] - 45)
+            control('button', pressed=True)
+            control('button', pressed=False)
+            trial.wait_for(lambda: popup_matches(empty, False), description='dismissed popup pixels')
+            expiring, _ = capture(artifacts / 'expiring.png')
+            assert expiring['id'] > empty['id']
+            trial.wait_for(lambda: popup_matches(expiring, False), timeout=12, description='expired popup pixels')
             time.sleep(.3)
             frames = control()['rendered_frames']
             time.sleep(.3)
@@ -130,6 +160,13 @@ def run():
             control('screenshot-screen', path=str(existing))
             error = trial.wait_for(lambda: control().get('screenshot'))
             assert 'error' in error and existing.read_bytes() == b'keep this file', error
+            previous_id = error['id']
+            control('screenshot-screen', path=str(existing))
+            control('focus-output-prev')
+            error = trial.wait_for(lambda: control().get('screenshot'))
+            assert error['id'] > previous_id and error['output'] == 'SHINE-2', error
+            control('output', 2)
+            assert not list(artifacts.glob('.ohmansy-screenshot-*.tmp'))
             capture(artifacts / 'recovered.png')
             clipboard_failure.touch()
             control('screenshot-screen', path=str(artifacts / 'clipboard-failed.png'))
@@ -138,9 +175,17 @@ def run():
             assert Path(result['path']).exists()
             clipboard_failure.unlink()
             capture(artifacts / 'clipboard-recovered.png')
+            clipboard_hang.touch()
+            started = time.monotonic()
+            control('screenshot-screen', path=str(artifacts / 'clipboard-timeout.png'))
+            result = trial.wait_for(lambda: control().get('screenshot'), timeout=10)
+            assert not result['clipboard'] and 'timed out' in result['clipboard_error'], result
+            assert time.monotonic() - started < 9
+            clipboard_hang.unlink()
+            capture(artifacts / 'timeout-recovered.png')
             capture(artifacts / 'annotate.png', annotate=True)
             trial.wait_for(lambda: any(w['app_id'] == 'com.gabm.satty' for w in control()['windows']), description='Satty annotation window')
-            print('PASS: pixels/orientation, two outputs, scaling, fullscreen, PNG clipboard, Print, no overwrite, error recovery, Satty', flush=True)
+            print('PASS: clean captures, popup pixels/dismissal/expiry, completion IDs, monitor routing, clipboard timeout/recovery, scaling, fullscreen, Print, no overwrite, Satty', flush=True)
         finally:
             if process.poll() is None:
                 control('quit')
