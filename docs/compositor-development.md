@@ -197,7 +197,9 @@ opening a temporary window or changing keyboard focus.
 
 **Shift+Print** also opens the saved image in Satty, which is included for
 annotation. Satty's own save and copy actions apply your edits; the initial
-clipboard image is the unedited screenshot. Region and window selection are
+clipboard image is the unedited screenshot. Shine launches Satty with
+`--copy-command 'wl-copy --type image/png'` so the edited image stays available
+for paste after Satty closes. Region and window selection are
 not yet available in Shine. Niri retains its built-in selection workflow.
 
 The parent desktop may intercept Print in a nested preview. Use the private
@@ -233,6 +235,9 @@ contents. It checks visible feedback pixels against a clean capture and exports
 the captured PNGs under `screenshots/` in its result. The nested trial also checks
 popup dismissal and expiry, repeated failures, and recovery from a stuck
 clipboard helper. Pillow is included in the development shell for pixel checks.
+Run `python3 tools/tests/compositor_satty.py` in the same shell for the focused
+annotation regression: Copy closes Satty, then a separate client reads and
+decodes the PNG from the clipboard after the editor has exited.
 
 ## Configuration
 

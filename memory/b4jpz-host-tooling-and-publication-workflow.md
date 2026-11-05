@@ -713,6 +713,19 @@ No installed-system activation, session restart or native DRM VM trial.
 
 ## Shine screenshots (2026-11-05)
 
+Satty copy persistence (2026-11-05): launch annotation with
+`--copy-command 'wl-copy --type image/png'`. Without that option Satty 0.20.1
+uses GTK's clipboard ownership: the nested regression reproduced "Copied to
+clipboard" followed by an empty selection after early exit. With the helper,
+Satty's Copy action exits the editor and a separate `wl-paste` client still
+receives a complete decodable PNG. `tools/tests/compositor_satty.py` exercises
+the actual screenshot annotation launcher on a private Wayland clipboard and
+preserves parent windows. The focused regression, 33 Rust tests, formatting
+and strict Clippy passed. A matching user Satty config applies the fix to the
+current installed session without restarting Shine; shared launcher defaults
+ship on rebuild. This does not introduce a general clipboard manager for other
+applications. Closing an unconfigured Satty can still lose GTK-owned content.
+
 `Print` and `Ctrl+Print` save the focused monitor as a PNG under the configured
 Pictures/Screenshots directory and copy that image to the clipboard.
 `Shift+Print` also opens Satty. Satty ships in the software defaults and the

@@ -300,7 +300,14 @@ fn save(image: image::RgbaImage, request: Request, socket: OsString) -> Result<S
         annotation_error = crate::spawn_application(
             &socket,
             "satty",
-            &["--filename".into(), path.to_string_lossy().into_owned()],
+            &[
+                "--filename".into(),
+                path.to_string_lossy().into_owned(),
+                // GTK's selection disappears when Satty closes. wl-copy owns
+                // the edited PNG independently, including after early-exit.
+                "--copy-command".into(),
+                "wl-copy --type image/png".into(),
+            ],
         )
         .err()
         .map(|error| format!("{error:#}"));
