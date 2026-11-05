@@ -52,7 +52,7 @@ desktop restarts.
 | Shortcut | Action |
 | --- | --- |
 | Mod+W or Mod+Q | Close the focused window |
-| Mod+Tab | Toggle overview |
+| Mod+Tab | Focus the next column, wrapping from the last to the first |
 | Mod+Left/Right | Focus a column, then the adjacent monitor at the edge |
 | Mod+Up/Down | Focus a window, then the adjacent workspace at the edge |
 | Mod+H/J/K/L | Focus left/down/up/right within the workspace |

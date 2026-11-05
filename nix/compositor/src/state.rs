@@ -559,6 +559,7 @@ impl Smallvil {
         }
         match action {
             "focus-next" => self.layout.focus_delta(1),
+            "focus-next-wrap" => self.layout.focus_next_wrapping(),
             "focus-prev" => self.layout.focus_delta(-1),
             "focus" => self.focus_id(value.ok_or("focus needs a window id")?)?,
             "move-next" => self.layout.reorder(1),

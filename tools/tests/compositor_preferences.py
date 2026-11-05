@@ -171,6 +171,21 @@ def run():
             trial.send_keys([33], modifier)
             assert window(new['id'])['width'] == previous, 'Mod+F restores previous width'
             control('workspace', 1)
+            state = control()
+            columns = sorted(
+                (w for w in state['windows']
+                 if w['workspace'] == state['workspace'] and w['output'] == state['active_output']),
+                key=lambda w: w['target_geometry'][0],
+            )
+            assert len(columns) >= 2
+            control('focus', columns[-1]['id'])
+            trial.send_keys([106], modifier)  # Right keeps its existing edge behavior.
+            assert control()['focused'] == columns[-1]['id']
+            for expected in columns + columns[:1]:
+                trial.send_keys([15], modifier)  # Tab cycles right and wraps to the first column.
+                assert control()['focused'] == expected['id'], 'Mod+Tab column cycle'
+                assert control()['workspace'] == state['workspace']
+                assert control()['active_output'] == state['active_output']
             for expected in [4, 3, 2, 1]:
                 trial.send_keys([103], modifier)  # Mod+Up cycles backward, including wrap.
                 assert control()['workspace'] == expected
@@ -194,7 +209,7 @@ def run():
                 process.wait(timeout=10)
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
-    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save, invalid-keymap recovery, forward/reverse width shortcuts, full-width restore, separate fullscreen keys, wrapping workspace keys and Mod+W close; parent preserved')
+    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save, invalid-keymap recovery, forward/reverse width shortcuts, full-width restore, separate fullscreen keys, wrapping column/workspace keys and Mod+W close; parent preserved')
 
 
 if __name__ == '__main__':

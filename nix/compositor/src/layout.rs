@@ -149,6 +149,18 @@ impl Layout {
         self.focus(workspace.columns[index].id);
     }
 
+    pub fn focus_next_wrapping(&mut self) {
+        let workspace = self.workspace();
+        if workspace.columns.is_empty() {
+            return;
+        }
+        let index = workspace
+            .focused
+            .and_then(|id| workspace.columns.iter().position(|column| column.id == id))
+            .map_or(0, |index| (index + 1) % workspace.columns.len());
+        self.focus(workspace.columns[index].id);
+    }
+
     pub fn resize(&mut self, delta: i32) {
         self.finish_movements();
         let focused = self.focused();
@@ -538,6 +550,29 @@ mod tests {
         layout.focus(1);
         layout.tick(1.0);
         layout
+    }
+
+    #[test]
+    fn focus_cycles_in_column_order_and_wraps_without_leaving_the_workspace() {
+        let mut layout = movement_layout(800);
+        for expected in [2, 3, 1, 2] {
+            layout.focus_next_wrapping();
+            assert_eq!(layout.focused(), Some(expected));
+            assert_eq!(layout.active, 0);
+        }
+        // Cycle the visual order after reordering, rather than window IDs.
+        layout.reorder(1);
+        layout.focus_next_wrapping();
+        assert_eq!(layout.focused(), Some(1));
+        layout.tick(1.0);
+        assert_eq!(layout.workspace().scroll, layout.workspace().target);
+
+        let mut empty = Layout::default();
+        empty.focus_next_wrapping();
+        assert_eq!(empty.focused(), None);
+        empty.insert(9);
+        empty.focus_next_wrapping();
+        assert_eq!(empty.focused(), Some(9));
     }
 
     #[test]

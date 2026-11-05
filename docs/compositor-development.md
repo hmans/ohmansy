@@ -104,6 +104,7 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Shortcut | Action |
 | --- | --- |
 | Mod+H/L or Left/Right | Focus previous/next column |
+| Mod+Tab | Focus the next column, wrapping from the last to the first |
 | Mod+Shift+H/L or Left/Right | Move column left/right |
 | Mod+comma/period | Focus previous/next monitor |
 | Mod+Shift+comma/period | Move window to previous/next monitor |
@@ -519,7 +520,7 @@ In another terminal, use the built binary:
 The socket has owner-only permissions. Status includes outputs, their scales,
 positions, active workspaces, and each window's output, plus window geometry, workspace,
 render density, and render/import counters. Commands also include `focus ID`,
-`focus-next`, `focus-prev`, `move-next`, `move-prev`, `resize DELTA`, `cycle-width [1|-1]`, `workspace N`,
+`focus-next`, `focus-next-wrap`, `focus-prev`, `move-next`, `move-prev`, `resize DELTA`, `cycle-width [1|-1]`, `workspace N`,
 `workspace-prev`, `workspace-next`, `move-workspace N`, `maximize`, `fullscreen`, `terminal`, `close`, `screenshot PNG`, and `quit`.
 Use `output N` to focus a monitor (starting at 1), `focus-output-next` or
 `focus-output-prev` to cycle, and `move-output-next` or `move-output-prev` to move

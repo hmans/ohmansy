@@ -228,6 +228,7 @@ pub enum Action {
     None,
     FocusPrev,
     FocusNext,
+    FocusNextWrap,
     MovePrev,
     MoveNext,
     Fullscreen,
@@ -329,6 +330,7 @@ impl Action {
                 match action {
                     FocusPrev => "focus-prev",
                     FocusNext => "focus-next",
+                    FocusNextWrap => "focus-next-wrap",
                     MovePrev => "move-prev",
                     MoveNext => "move-next",
                     Fullscreen => "fullscreen",
@@ -438,6 +440,7 @@ pub fn bindings(
         ("Mod+Left".into(), FocusPrev),
         ("Mod+L".into(), FocusNext),
         ("Mod+Right".into(), FocusNext),
+        ("Mod+Tab".into(), FocusNextWrap),
         ("Mod+Up".into(), WorkspacePrev),
         ("Mod+Down".into(), WorkspaceNext),
         ("Mod+Shift+Up".into(), MoveWorkspacePrev),
@@ -580,6 +583,8 @@ mod tests {
                     .map(|(_, a)| a)
             };
             assert!(matches!(action("Mod+Space"), Some(Action::Launcher)));
+            assert!(matches!(action("Mod+Tab"), Some(Action::FocusNextWrap)));
+            assert!(matches!(action("Mod+Right"), Some(Action::FocusNext)));
             assert!(matches!(
                 action("Mod+E"),
                 Some(Action::Launch { program, args }) if program == "nautilus" && args.is_empty()

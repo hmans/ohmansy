@@ -43,6 +43,7 @@ color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
 "Mod+Shift+R" = { action = "cycle-width", reverse = true }
 "Mod+Left" = { action = "focus-prev" }
 "Mod+Right" = { action = "focus-next" }
+"Mod+Tab" = { action = "focus-next-wrap" }
 "Mod+Shift+Right" = { action = "move-next" }
 "Mod+1" = { action = "workspace", value = 1 }
 "Mod+Up" = { action = "workspace-prev" }

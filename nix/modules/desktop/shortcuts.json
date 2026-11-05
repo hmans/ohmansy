@@ -36,9 +36,8 @@
     "bindings": [
       {
         "key": "Mod+Tab",
-        "title": "Overview",
-        "action": "toggle-overview",
-        "options": "repeat=false"
+        "title": "Focus next column, wrapping to the first",
+        "action": "focus-column-right-or-first"
       },
       {
         "key": "Mod+Left",

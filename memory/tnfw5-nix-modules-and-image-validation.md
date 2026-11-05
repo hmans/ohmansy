@@ -2,12 +2,28 @@
 data:
   area: nix
   kind: workflow
-  reviewed: "2026-11-04"
+  reviewed: "2026-11-05"
   status: current
 id: tnfw5
 title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
+
+Super+Tab column cycling (2026-11-05): Shine's `focus-next-wrap` action and
+default Mod+Tab binding advance in the active workspace's column order, wrapping
+from last to first. Mod+Right remains clamped. Niri's shared Mod+Tab now uses
+`focus-column-right-or-first` instead of overview. Defaults, example, guides and
+regressions are updated. 34 Rust tests, formatting and strict Clippy passed;
+the real nested preferences trial exercised repeated Tab wraps, unchanged Right
+behavior, output/workspace retention and preserved parent windows. Niri's
+generated configuration passed the native customization check.
+
+The running installed Shine predates this action. A local Launch override uses
+a private IPC compatibility helper to apply the same behavior without restarting
+the compositor; its socket follows the launching process. Effective live config
+loaded without error and retained all application window identities. The user
+confirmed the live shortcut. Remove the local override after updating the
+installed compositor to use its native default. No OS activation or restart.
 
 btop appearance (2026-11-05): the optional software bundle wraps the selected
 Nixpkgs btop package through `nix/modules/btop-package.nix`, retaining NVIDIA
