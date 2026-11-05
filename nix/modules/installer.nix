@@ -1,5 +1,7 @@
-{ config, pkgs, lib, installedSystem, ... }:
+{ config, pkgs, lib, installedSystem, specialArgs, ... }:
 let
+  installedNvidiaSystem = specialArgs.installedNvidiaSystem or null;
+  nvidiaDriver = specialArgs.nvidiaDriver or null;
   runtimeInputs = with pkgs; [ python3 util-linux parted dosfstools e2fsprogs systemd nixos-install-tools config.nix.package ];
   installer = pkgs.writeShellApplication {
     name = "ohmansy-install";
@@ -56,8 +58,21 @@ in {
       RestartSec = 2;
     };
   };
-  isoImage.storeContents = [ installedSystem ];
+  # Both closures are already built, so selecting NVIDIA needs no network or
+  # evaluation on the target. Other architectures keep the generic payload.
+  isoImage.storeContents = [ installedSystem ] ++ lib.optional (installedNvidiaSystem != null) installedNvidiaSystem;
   environment.etc."ohmansy/installed-system".source = installedSystem;
+  environment.etc."ohmansy/installed-system-nvidia" = lib.mkIf (installedNvidiaSystem != null) {
+    source = installedNvidiaSystem;
+  };
+  environment.etc."ohmansy/nvidia-supported-gpus.json" = lib.mkIf (installedNvidiaSystem != null) {
+    source = pkgs.runCommand "nvidia-supported-gpus-${nvidiaDriver.version}.json" {
+      nativeBuildInputs = [ pkgs.zstd ];
+    } ''
+      sh ${nvidiaDriver.src} --extract-only --target driver
+      cp driver/supported-gpus/supported-gpus.json "$out"
+    '';
+  };
   environment.etc."ohmansy/installation".source = import ./installation-package.nix { inherit pkgs; };
   # Live-only launcher button; installed desktops retain the normal panel.
   systemd.user.services.quickshell.environment.OHMANSY_INSTALLER = "${graphicalInstaller}/bin/ohmansy-installer";

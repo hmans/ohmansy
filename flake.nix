@@ -37,11 +37,17 @@
       pcInstaller = nixosSystem {
         system = pcSystem;
         specialArgs.installedSystem = pcInstalledBase.config.system.build.toplevel;
+        specialArgs.installedNvidiaSystem = pcInstalledNvidia.config.system.build.toplevel;
+        specialArgs.nvidiaDriver = pcInstalledNvidia.config.hardware.nvidia.package;
         modules = [ ./nix/profiles/installer.nix ./nix/profiles/live-pc.nix ];
       };
       pcInstalledBase = nixosSystem {
         system = pcSystem;
         modules = [ ./nix/profiles/installed-base.nix ];
+      };
+      pcInstalledNvidia = nixosSystem {
+        system = pcSystem;
+        modules = [ ./nix/profiles/installed-base.nix ./nix/modules/nvidia.nix ];
       };
       pcLive = nixosSystem {
         system = pcSystem;
@@ -126,6 +132,7 @@
         nixpkgs.overlays = [ self.overlays.default ];
       };
       nixosModules.vm = import ./nix/modules/vm.nix;
+      nixosModules.nvidia = import ./nix/modules/nvidia.nix;
       nixosModules.firstBoot = import ./nix/modules/first-boot.nix;
       nixosModules.updates = import ./nix/modules/updates.nix;
       nixosModules.development = import ./nix/modules/development.nix;
@@ -137,6 +144,7 @@
       nixosConfigurations.installer-x86_64 = pcInstaller;
       nixosConfigurations.live-nvidia-x86_64 = pcNvidia;
       packages.${pcSystem} = desktopPackages pcPkgs // {
+        installed-system-nvidia = pcInstalledNvidia.config.system.build.toplevel;
         iso = pcLive.config.system.build.isoImage;
         iso-nvidia = pcNvidia.config.system.build.isoImage;
         vm-image = pcAppliance.config.system.build.image;
@@ -158,6 +166,15 @@
         displays-ui = import ./nix/tests/displays-ui.nix { pkgs = pcPkgs; };
         installer-ui = import ./nix/tests/installer-ui.nix { pkgs = pcPkgs; };
         offline-installer = offlinePolicy pcPkgs pcInstalledBase pcInstaller;
+        offline-installer-nvidia =
+          assert pcInstalledNvidia.config.hardware.nvidia.open;
+          assert pcInstalledNvidia.config.hardware.nvidia.modesetting.enable;
+          assert pcInstalledNvidia.config.services.xserver.videoDrivers == [ "nvidia" ];
+          assert builtins.elem "nouveau" pcInstalledNvidia.config.boot.blacklistedKernelModules;
+          assert builtins.elem pcInstalledNvidia.pkgs.autoAddDriverRunpath pcInstalledNvidia.pkgs.btop.nativeBuildInputs;
+          assert pcInstaller.config.environment.etc."ohmansy/installed-system-nvidia".source
+            == pcInstalledNvidia.config.system.build.toplevel;
+          offlinePolicy pcPkgs pcInstalledNvidia pcInstaller;
         factory-platform = import ./nix/tests/factory-platform.nix {
           pkgs = pcPkgs;
           appliance = pcAppliance;

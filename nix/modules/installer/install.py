@@ -14,6 +14,9 @@ SOURCE = Path('/etc/ohmansy/installation')
 TARGET = Path('/mnt/ohmansy')
 LOCK = Path('/run/ohmansy-installer.lock')
 PAYLOAD = Path('/etc/ohmansy/installed-system')
+NVIDIA_PAYLOAD = Path('/etc/ohmansy/installed-system-nvidia')
+NVIDIA_SUPPORTED = Path('/etc/ohmansy/nvidia-supported-gpus.json')
+PCI_DEVICES = Path('/sys/bus/pci/devices')
 ROOT_LABEL = 'OHMANSY_ROOT'
 EFI_LABEL = 'OHMANSY_EFI'
 
@@ -42,10 +45,38 @@ def disk_token(disk):
     return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 
+def installation_profile():
+    if not NVIDIA_SUPPORTED.exists():
+        return PAYLOAD, False
+    chips = json.loads(NVIDIA_SUPPORTED.read_text())['chips']
+    nvidia_gpus = []
+    for device in sorted(PCI_DEVICES.iterdir()):
+        try:
+            if (int((device / 'class').read_text(), 16) >> 16 != 0x03
+                    or int((device / 'vendor').read_text(), 16) != 0x10de):
+                continue
+            gpu = {key: int((device / filename).read_text(), 16) for key, filename in (
+                ('devid', 'device'), ('subvendorid', 'subsystem_vendor'),
+                ('subdevid', 'subsystem_device'))}
+        except FileNotFoundError:
+            # A hot-unplugged device must not prevent installation.
+            continue
+        supported = any(
+            'kernelopen' in chip['features'] and not chip.get('legacybranch')
+            and all(int(chip[key], 16) == value for key, value in gpu.items() if key in chip)
+            for chip in chips)
+        nvidia_gpus.append(supported)
+    # A global Nouveau blacklist would also disable an older secondary GPU.
+    if nvidia_gpus and all(nvidia_gpus):
+        return NVIDIA_PAYLOAD, True
+    return PAYLOAD, False
+
+
 def preflight():
     if not Path('/sys/firmware/efi').exists():
         raise RuntimeError('Boot this installer with UEFI firmware.')
-    if not (PAYLOAD / 'init').exists():
+    payload, _ = installation_profile()
+    if not (payload / 'init').exists():
         raise RuntimeError('The offline system payload is missing.')
 
 
@@ -61,23 +92,23 @@ def validate_target(device, hostname, token=None):
         raise RuntimeError(f'{TARGET} is not empty. A previous installation may need recovery. No changes made.')
 
 
-def host_config(hostname):
+def host_config(hostname, *, nvidia=False):
     # Inputs have a restricted alphabet; JSON also produces valid Nix strings here.
     return '''{ ohmansy, ... }: {
-  imports = [ ohmansy.nixosModules.firstBoot ./hardware-configuration.nix ];
+  imports = [ ohmansy.nixosModules.firstBoot ./hardware-configuration.nix%s ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   networking.hostName = %s;
   system.stateVersion = "26.05";
   services.openssh.enable = false;
 }
-''' % json.dumps(hostname)
+''' % (' ohmansy.nixosModules.nvidia' if nvidia else '', json.dumps(hostname))
 
 
-def write_configuration(hostname):
+def write_configuration(hostname, *, nvidia=False):
     config = TARGET / 'etc/nixos'
     config.mkdir(parents=True, exist_ok=True)
-    (config / 'configuration.nix').write_text(host_config(hostname))
+    (config / 'configuration.nix').write_text(host_config(hostname, nvidia=nvidia))
     (config / 'owner.nix').write_text('{ ... }: { }\n')
     (config / 'preferences.nix').write_text('{ ... }: { }\n')
     shutil.copyfile(SOURCE / 'flake.nix', config / 'flake.nix')
@@ -115,8 +146,7 @@ def install():
         raise SystemExit('Boot this installer with UEFI firmware.')
     print('\nInstall ohmansy\n')
     print('This installer erases ONE entire disk. It does not support dual boot.')
-    if not (PAYLOAD / 'init').exists():
-        raise SystemExit('The offline system payload is missing. No changes made.')
+    preflight()
     print('Installation and account setup work without an internet connection.\n')
     disks = list_disks()
     if not disks:
@@ -143,6 +173,9 @@ def install():
 
 def perform_install(device, hostname, *, token=None, progress=lambda stage: None, log=None):
     validate_target(device, hostname, token)
+    payload, nvidia = installation_profile()
+    if not (payload / 'init').exists():
+        raise RuntimeError('The offline system payload is missing. No changes made.')
     TARGET.mkdir(parents=True, exist_ok=True)
 
     def execute(*args):
@@ -167,10 +200,10 @@ def perform_install(device, hostname, *, token=None, progress=lambda stage: None
     execute('mount', '-t', 'vfat', efi, str(TARGET / 'boot'), '-o', 'umask=0077')
     progress('configure')
     execute('nixos-generate-config', '--root', str(TARGET))
-    write_configuration(hostname)
+    write_configuration(hostname, nvidia=nvidia)
     progress('install')
     execute('nixos-install', '--root', str(TARGET), '--no-root-passwd', '--no-channel-copy',
-        '--system', str(PAYLOAD.resolve()), '--option', 'substituters', '')
+        '--system', str(payload.resolve()), '--option', 'substituters', '')
     progress('finish')
     execute('sync')
     execute('umount', '--recursive', str(TARGET))

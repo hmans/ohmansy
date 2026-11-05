@@ -1,5 +1,6 @@
 import importlib.util
 import fcntl
+import json
 from pathlib import Path
 import unittest
 import tempfile
@@ -47,7 +48,7 @@ class InstallerTests(unittest.TestCase):
                     labels.assert_not_called()
                 else:
                     installer.main()
-                    write.assert_called_once_with('test-pc')
+                    write.assert_called_once_with('test-pc', nvidia=False)
                     commands = [call.args[0] for call in run.call_args_list]
                     self.assertIn('nixos-install', commands)
                     invocation = next(call.args for call in run.call_args_list if call.args[0] == 'nixos-install')
@@ -96,9 +97,84 @@ class InstallerTests(unittest.TestCase):
              patch.object(installer, 'PAYLOAD', Path(directory)), \
              patch.object(Path, 'exists', autospec=True, side_effect=lambda path: str(path) == '/sys/firmware/efi'), \
              patch.object(installer, 'list_disks') as disks:
-            with self.assertRaisesRegex(SystemExit, 'payload is missing'):
+            with self.assertRaisesRegex(RuntimeError, 'payload is missing'):
                 installer.install()
             disks.assert_not_called()
+
+    def test_gpu_selection_uses_driver_support_data_and_display_devices(self):
+        chips = [
+            {'devid': '0x2489', 'features': ['kernelopen']},
+            {'devid': '0x1b80', 'features': [], 'legacybranch': '580.xx'},
+            {'devid': '0x2345', 'subvendorid': '0x1234', 'subdevid': '0x5678',
+             'features': ['kernelopen']},
+        ]
+        cases = [
+            ([], False),
+            ([('10de', '2489', '030000')], True),
+            ([('10de', '2489', '030200')], True),
+            ([('10de', '1b80', '030000')], False),
+            ([('10de', 'ffff', '030000')], False),
+            ([('10de', '2489', '040300')], False),
+            ([('8086', '2489', '030000')], False),
+            ([('1002', '2489', '030000')], False),
+            ([('10de', '2489', '030000'), ('10de', '1b80', '030000')], False),
+            ([('10de', '2489', '030000'), ('8086', '1234', '030000')], True),
+            ([('10de', '2345', '030000')], True),
+        ]
+        for devices, expected in cases:
+            with self.subTest(devices=devices), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                pci = root / 'pci'
+                pci.mkdir()
+                supported = root / 'supported.json'
+                supported.write_text(json.dumps({'chips': chips}))
+                for index, (vendor, device, pci_class) in enumerate(devices):
+                    gpu = pci / str(index)
+                    gpu.mkdir()
+                    for name, value in {'vendor': vendor, 'device': device, 'class': pci_class,
+                                        'subsystem_vendor': '1234', 'subsystem_device': '5678'}.items():
+                        (gpu / name).write_text('0x' + value + '\n')
+                with patch.object(installer, 'PCI_DEVICES', pci), \
+                     patch.object(installer, 'NVIDIA_SUPPORTED', supported):
+                    payload, enabled = installer.installation_profile()
+                self.assertEqual(enabled, expected)
+                self.assertEqual(payload, installer.NVIDIA_PAYLOAD if expected else installer.PAYLOAD)
+                if devices and devices[0][1] == '2345':
+                    (pci / '0/subsystem_device').write_text('0xffff')
+                    with patch.object(installer, 'PCI_DEVICES', pci), \
+                         patch.object(installer, 'NVIDIA_SUPPORTED', supported):
+                        self.assertEqual(installer.installation_profile(), (installer.PAYLOAD, False))
+
+    def test_nvidia_payload_is_installed_and_persisted_in_host_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'source'
+            source.mkdir()
+            for name in ('flake.nix', 'flake.lock'):
+                (source / name).write_text('release pin')
+            payload = root / 'nvidia-system'
+            payload.mkdir()
+            (payload / 'init').touch()
+            with patch.object(installer, 'TARGET', root / 'target'), \
+                 patch.object(installer, 'SOURCE', source), \
+                 patch.object(installer, 'validate_target'), \
+                 patch.object(installer, 'installation_profile', return_value=(payload, True)), \
+                 patch.object(installer, 'run') as run:
+                installer.perform_install('/dev/vda', 'workstation')
+            config = (root / 'target/etc/nixos/configuration.nix').read_text()
+            self.assertIn('ohmansy.nixosModules.nvidia', config)
+            invocation = next(call.args for call in run.call_args_list if call.args[0] == 'nixos-install')
+            self.assertEqual(invocation[invocation.index('--system') + 1], str(payload))
+            self.assertEqual(invocation[-3:], ('--option', 'substituters', ''))
+
+    def test_missing_selected_nvidia_payload_stops_before_erasure(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(installer, 'installation_profile', return_value=(Path(directory), True)), \
+             patch.object(installer, 'validate_target'), \
+             patch.object(installer, 'run') as run:
+            with self.assertRaisesRegex(RuntimeError, 'payload is missing'):
+                installer.perform_install('/dev/vda', 'workstation')
+            run.assert_not_called()
 
     def test_excludes_live_media_mounted_disks_readonly_and_small_disks(self):
         disk = {'path': '/dev/vda', 'type': 'disk', 'size': 32 * 1024**3,

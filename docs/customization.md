@@ -14,6 +14,7 @@ The root flake exports these NixOS modules:
 | `nixosModules.desktop` | Niri, Quickshell, login screen, desktop services, and terminal integration |
 | `nixosModules.software` | Firefox, Chromium, Fish, and optional command-line tools |
 | `nixosModules.vm` | Guest display and Virtio integration |
+| `nixosModules.nvidia` | NVIDIA's official driver for Turing and newer GPUs |
 | `nixosModules.updates` | Command-line release preparation and boot selection |
 
 The default module has no accounts or disk layout. A physical machine combines
@@ -29,6 +30,29 @@ release tag or full commit ID. See [Updating Ohmansy](updates.md).
 `configuration.nix`, `hardware-configuration.nix`, `owner.nix`, and
 `preferences.nix` belong to the installed machine. Its `system.stateVersion`
 stays in local configuration; it is not the Ohmansy release number.
+
+## NVIDIA graphics
+
+For Turing and newer NVIDIA GPUs, including the RTX 3060 Ti, import
+`ohmansy.nixosModules.nvidia` alongside the desktop module. This selects
+NVIDIA's official open kernel module and matching proprietary userspace driver,
+including the NVML library used by btop. The module allows the NVIDIA driver
+packages without allowing all unfree software. It also enables btop's NVIDIA
+library search path so GPU monitoring works without environment overrides.
+
+The x86-64 installer detects NVIDIA display devices using PCI IDs and the
+bundled driver's support list. When every NVIDIA GPU supports the official open
+kernel module, it installs the prebuilt NVIDIA system and records this module
+in the host configuration. The driver is ready on first boot without internet
+access. Intel, AMD, virtual GPUs, and unsupported NVIDIA hardware retain the
+generic system. Mixed generations of NVIDIA GPUs also retain the generic system
+so an older card is not disabled by the Nouveau blacklist. Hybrid graphics may
+still need machine-specific PRIME settings.
+
+For an existing installation, add the module to the installed configuration,
+build with `nixos-rebuild boot`, and reboot when ready. Keep the previous
+generation available in the boot menu. After reboot, check `nvidia-smi` and
+press **5** in btop for the GPU panel.
 
 ## Add or remove optional software
 

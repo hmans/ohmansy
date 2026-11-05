@@ -341,8 +341,13 @@ errors, and verifies that the fixed action buttons fit within the window.
 Speech synthesis is disabled by default, avoiding the large MBROLA voice
 collection. A host can opt in with `services.speechd.enable = true`.
 
-The generic installer does not yet configure NVIDIA's proprietary userspace
-driver. Physical NVIDIA installation needs a separate driver configuration.
+The x86-64 installer bundles generic and NVIDIA systems. It selects NVIDIA's
+official driver for GPUs listed as supporting its open kernel module in the
+bundled driver's PCI support data, and saves the choice for future rebuilds.
+No driver download or target rebuild is needed during installation. Other
+hardware uses the generic system; see [NVIDIA graphics](customization.md#nvidia-graphics).
+This selection has unit and Nix policy coverage; installation on physical
+NVIDIA hardware still needs verification with an image containing this change.
 
 Run `nix build .#checks.x86_64-linux.offline-installer` on the ISO builder too.
 It checks boot/account policy and preservation of store symlinks during image

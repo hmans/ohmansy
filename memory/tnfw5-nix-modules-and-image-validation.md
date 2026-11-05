@@ -9,6 +9,35 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Official NVIDIA driver (2026-11-05): `nix/modules/nvidia.nix`, exported as
+`nixosModules.nvidia`, selects the stable official driver with NVIDIA's open
+kernel module for Turing and newer GPUs, modesetting, and a package-scoped
+unfree allowance. The NVIDIA live profile reuses it. The x86 installer bundles
+generic and NVIDIA installed systems, selects NVIDIA using PCI display IDs and
+the pinned driver's `supported-gpus.json` (`kernelopen` feature), and persists
+the module import in the host configuration. Unsupported or mixed legacy/modern
+NVIDIA cards retain the generic payload. ARM retains only the generic payload.
+Selection checks the chosen payload before erasing and installs its prebuilt
+closure without a target evaluation or network. See `docs/customization.md`.
+
+The module also overrides btop with `cudaSupport = true`. In pinned Nixpkgs,
+this adds the driver runtime search path without a CUDA toolkit dependency.
+`BTOP_GPU=ON` alone did not let btop load NVML: the default package lacked
+`/run/opengl-driver/lib` in its RUNPATH and rendered no GPU. Both a temporary
+library-path override and the corrected package rendered RTX 3060 Ti in a
+separate terminal smoke test with a temporary config. Check GPU tools outside
+the agent sandbox: device isolation made nvidia-smi fail despite a working GPU.
+
+Installer/backend tests (19), NVIDIA support metadata build, generic/NVIDIA
+offline policy checks, and targeted ARM/x86 evaluation passed. PCI detection
+selected NVIDIA for the physical RTX 3060 Ti. The final NVIDIA installed payload
+including the corrected btop package built successfully. An all-system
+evaluation was interrupted by the owner's reboot and is not a completed check
+for these installer changes. No new ISO or physical automated installation
+was tested. After the manual driver setup and reboot, nvidia-smi confirmed
+595.71.05 with Shine and Quickshell using the GPU. This confirms the running
+driver, separately from the new installer automation.
+
 Shine Files shortcut (2026-11-05): `Mod+E` launches Nautilus through the existing
 launch action. Login sessions use Super+E; nested demos use Super+Alt+E.
 Defaults and example TOML live in `nix/compositor/`; the shortcut is documented
