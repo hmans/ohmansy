@@ -17,8 +17,8 @@ uname -sm
 nix develop
 ```
 
-`nix develop` opens Bash with Git, Python, ripgrep, Nix formatting/language tools,
-and Niri. These commands work on both `x86_64-linux` and `aarch64-linux`.
+`nix develop` opens Bash with Git, mise, Python, ripgrep, Nix formatting/language
+tools, and Niri. These commands work on both `x86_64-linux` and `aarch64-linux`.
 Read `AGENTS.md`, `README.md`, and the relevant Markdown files in `memory/`.
 Means is optional; it is not required to read the notes. Skills and tools from
 another agent installation are not assumed to exist here.

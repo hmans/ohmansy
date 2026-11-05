@@ -55,6 +55,7 @@
         compositor = import ./nix/modules/compositor-package.nix { inherit pkgs; };
         compositor-session = import ./nix/modules/compositor-session-package.nix { inherit pkgs; };
         herdr = herdr.packages.${pkgs.stdenv.hostPlatform.system}.default;
+        mise = pkgs.callPackage ./nix/modules/mise-package.nix { };
         desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
         display-preview = pkgs.writeShellScriptBin "ohmansy-display-preview" ''
           exec ${import ./nix/modules/desktop-package.nix { inherit pkgs; }}/bin/ohmansy-quickshell \
@@ -113,6 +114,7 @@
     in {
       overlays.default = final: _prev: {
         herdr = herdr.packages.${final.stdenv.hostPlatform.system}.default;
+        mise = final.callPackage ./nix/modules/mise-package.nix { };
       };
       nixosModules.default = {
         imports = [ ./nix/modules/default.nix ];
@@ -169,6 +171,7 @@
           inherit nixpkgs;
           ohmansyModules = self.nixosModules;
           herdrPackage = herdr.packages.${pcSystem}.default;
+          misePackage = self.packages.${pcSystem}.mise;
           pkgs = pcPkgs;
           system = pcSystem;
         };
@@ -193,6 +196,7 @@
           inherit nixpkgs pkgs system;
           ohmansyModules = self.nixosModules;
           herdrPackage = herdr.packages.${system}.default;
+          misePackage = self.packages.${system}.mise;
         };
         greeter-auth = pkgs.runCommand "ohmansy-greeter-auth" {
           nativeBuildInputs = [ pkgs.python3 (import ./nix/modules/greeter-package.nix { inherit pkgs; }) ];
@@ -257,15 +261,15 @@
           pkgs.runCommand "ohmansy-live-policy" { } ''touch "$out"'';
       };
       devShells = nixpkgs.lib.genAttrs [ system pcSystem ] (target:
-        let tools = nixpkgs.legacyPackages.${target};
+        let tools = import nixpkgs { system = target; overlays = [ self.overlays.default ]; };
         in { spatial = tools.mkShell {
-          packages = with tools; [ rustup pkg-config gcc mise python3 niri wl-clipboard foot firefox gnome-text-editor ];
+          packages = with tools; [ rustup pkg-config gcc tools.mise python3 niri wl-clipboard foot firefox gnome-text-editor ];
           buildInputs = with tools; [ wayland libxkbcommon libGL libgbm libdrm libinput seatd udev ];
           LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL ]);
           OHMANSY_SPATIAL_FONT = "${tools.inter}/share/fonts/truetype/Inter.ttc";
           shellHook = ''. ${(import ./nix/modules/cursor-theme.nix { pkgs = tools; }).environment}'';
         }; default = tools.mkShell {
-          packages = with tools; [ git nixfmt nil statix python3 niri ripgrep ];
+          packages = with tools; [ git nixfmt nil statix python3 niri ripgrep tools.mise ];
         }; });
     };
 }

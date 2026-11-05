@@ -30,6 +30,16 @@
   config = {
     programs.firefox.enable = lib.mkDefault true;
     programs.fish.enable = lib.mkDefault true;
+    # Keep activation with the optional bundle, including when a host replaces it.
+    programs.bash.interactiveShellInit = lib.mkIf (builtins.elem pkgs.mise config.ohmansy.software.packages) ''
+      eval "$(${lib.getExe pkgs.mise} activate bash)"
+    '';
+    programs.zsh.interactiveShellInit = lib.mkIf (builtins.elem pkgs.mise config.ohmansy.software.packages) ''
+      eval "$(${lib.getExe pkgs.mise} activate zsh)"
+    '';
+    programs.fish.interactiveShellInit = lib.mkIf (builtins.elem pkgs.mise config.ohmansy.software.packages) ''
+      ${lib.getExe pkgs.mise} activate fish | source
+    '';
     programs.nix-ld.enable = true;
     programs.appimage = {
       enable = lib.mkDefault true;

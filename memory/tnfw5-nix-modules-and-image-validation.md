@@ -433,11 +433,34 @@ NixOS image configurations evaluated with all four tools on their respective
 ARM/x86 platforms; the native x86 customization check passed. No image build,
 boot test, or installed-system activation was performed.
 
-Mise packaging (2026-11-04): software.nix includes `pkgs.mise` in the optional
-utility bundle. The `mise.run` generic Linux executable failed with NixOS's
-stub loader on the installed x86 system. Use the Nix package; task execution
-does not require shell activation. The pinned package ran and the native
-customization check passed. Installed-system activation remains pending.
+Mise packaging (2026-11-04): `nix/modules/mise-package.nix` packages upstream
+2026.11.0 musl release archives with separate SHA-256 pins for x86 and ARM.
+The shared overlay supplies the optional software bundle and both development
+shells; `.#mise` exposes the same package. Keep updates in the package's version
+and hashes, not the OS Nixpkgs pin. Self-update is disabled in the package.
+The generic glibc download previously hit NixOS's stub loader; the musl binary
+runs directly. Task execution does not require shell activation.
+
+Shell activation (2026-11-05): `software.nix` activates mise in interactive
+Fish, Bash, and Zsh when `ohmansy.software.packages` contains `pkgs.mise`.
+Replacing the bundle without mise removes these hooks. Codex is absent from
+the system defaults; users can install it with `mise use --global codex@latest`.
+The native customization check passed, including activation and omission
+assertions. Direct Fish and Bash activation checks passed; Zsh was evaluated
+only. No OS activation, image build, or boot was performed.
+
+Both archive hashes matched upstream GitHub release metadata. The native x86
+package built and returned 2026.11.0; an isolated task verified environment
+variables and shell execution. Native customization and factory metadata
+checks passed. All-system flake evaluation passed, and both architectures'
+development shells evaluate to 2026.11.0.
+ARM runtime, OS activation, and image rebuild remain untested.
+
+Avoid the v2026.11.0 upstream source flake for routine packaging: its release
+build is followed by an all-features test compilation, taking over 20 minutes
+on this builder. It then failed eight tests (3335 passed), including process
+tracking and archive tests. The binary package avoids this compilation and
+does not add another Nixpkgs input; the root lock remains unchanged.
 
 Herdr packaging (2026-11-04): the default software bundle includes terminal
 herdr from the upstream `herdrdev/herdr` flake at `v0.9.5`. Keep its upstream

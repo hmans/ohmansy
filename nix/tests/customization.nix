@@ -1,4 +1,4 @@
-{ nixpkgs, pkgs, system, ohmansyModules, herdrPackage }:
+{ nixpkgs, pkgs, system, ohmansyModules, herdrPackage, misePackage }:
 let
   lib = nixpkgs.lib;
   evaluate = modules: (lib.nixosSystem {
@@ -60,6 +60,15 @@ assert defaults.boot.binfmt.registrations ? appimage_type_2;
 assert !(noAppImages.boot.binfmt.registrations ? appimage_type_2);
 assert builtins.elem herdrPackage defaults.environment.systemPackages;
 assert builtins.elem herdrPackage softwareOnly.environment.systemPackages;
+assert builtins.elem misePackage defaults.environment.systemPackages;
+assert builtins.elem misePackage softwareOnly.environment.systemPackages;
+assert !(builtins.any (package: lib.getName package == "codex") defaults.environment.systemPackages);
+assert lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getExe misePackage} activate fish | source") defaults.programs.fish.interactiveShellInit;
+assert lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getExe misePackage} activate bash") noFish.programs.bash.interactiveShellInit;
+assert lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getExe misePackage} activate zsh") defaults.programs.zsh.interactiveShellInit;
+assert !(lib.hasInfix "activate fish" custom.programs.fish.interactiveShellInit);
+assert !(lib.hasInfix "activate bash" custom.programs.bash.interactiveShellInit);
+assert !(lib.hasInfix "activate zsh" custom.programs.zsh.interactiveShellInit);
 assert !(builtins.any (package: lib.getName package == "herdr") desktopOnly.environment.systemPackages);
 assert noFish.users.defaultUserShell == pkgs.bashInteractive;
 assert softwareOnly.programs.starship.enable;
@@ -73,6 +82,7 @@ assert custom.ohmansy.software.packages == [];
 assert builtins.elem pkgs.hello custom.environment.systemPackages;
 assert !(builtins.elem pkgs.git custom.environment.systemPackages);
 assert !(builtins.elem herdrPackage custom.environment.systemPackages);
+assert !(builtins.elem misePackage custom.environment.systemPackages);
 assert !(builtins.elem pkgs.fish custom.environment.systemPackages);
 assert !(custom.environment.etc ? "xdg/foot/foot.ini");
 assert !(lib.hasInfix "match app-id=\"^foot$\"" custom.environment.etc."ohmansy/desktop.kdl".text);

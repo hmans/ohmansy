@@ -17,6 +17,7 @@ assert config.systemd.sockets ? ohmansy-first-boot;
 assert !config.services.displayManager.autoLogin.enable;
 assert !config.services.openssh.enable;
 assert builtins.elem appliance.pkgs.herdr config.environment.systemPackages;
+assert builtins.elem appliance.pkgs.mise config.environment.systemPackages;
 pkgs.runCommand "ohmansy-factory-platform" {} ''
   grep -F 'system = "${pkgs.stdenv.hostPlatform.system}";' ${installation}/flake.nix
   if grep -F '@SYSTEM@' ${installation}/flake.nix; then

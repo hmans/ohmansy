@@ -75,8 +75,20 @@ The shared software defaults add `~/.local/bin` to `PATH`, including in Fish.
 Set `environment.localBinInPath = false;` to disable this. Log out and back in
 after rebuilding to load the updated session environment.
 
-Mise is packaged for NixOS. Use the bundled version instead of `mise.run`'s
-generic Linux download. Repository tasks work without `mise activate`.
+Mise uses upstream release binaries, pinned to `2026.11.0` with a checksum for
+each architecture. The bundled tools and development shells use this package.
+To update it when maintaining ohmansy, change the version and archive hashes in
+`nix/modules/mise-package.nix`. It updates with ohmansy through Nix.
+Use `nix run .#mise -- --version` to try it separately. When the utility bundle
+includes mise, ohmansy automatically activates it in interactive Fish, Bash,
+and Zsh shells. Open a new terminal after rebuilding. Repository tasks also
+work without shell activation.
+
+Codex is installed by the user through mise, rather than bundled with ohmansy:
+
+```sh
+mise use --global codex@latest
+```
 
 Log out and back in after changing the default shell so the desktop receives
 the new `SHELL` environment variable. Existing shells keep running.
