@@ -586,3 +586,35 @@ corner colors. Write fixture TOML atomically and wait for the requested effectiv
 preferences; a truncated but valid empty file can temporarily load defaults.
 
 The user subsequently confirmed the appearance on their desktop (2026-11-05).
+
+## Shine launcher and width-cycle shortcuts (2026-11-05)
+
+The default launcher binding is Mod+Space; Mod+D is no longer a default.
+The existing application picker remains unchanged. Mod+R cycles the focused
+column through 25%, 50% and 75%; Mod+Shift+R reverses the order. Mod is Super
+in native login and Super+Alt in nested sessions. Explicit user bindings still
+override defaults; do not rewrite personal configuration when changing defaults.
+
+`Layout::cycle_width` uses the active monitor's work-area width minus both
+outer gaps, rounding to logical pixels. From an arbitrary width it chooses the
+next strictly larger/smaller preset, wrapping at either end. It applies the
+same client minimum/maximum limits as normal positioning and the 200 pixel
+column minimum, then removes duplicate constrained presets. This prevents
+cycling from sticking at an unreachable client maximum. Like manual resize,
+cycling clears maximized restore width and preserves other columns. Empty
+workspaces do nothing; fullscreen retains its normal geometry while the column
+width changes underneath it. Widths remain stored in logical pixels.
+
+The configurable action is `{ action="cycle-width", reverse=true }`; reverse
+defaults false. IPC `cycle-width` defaults to forward, or accepts direction
+1/-1. The existing Mod+S scale cycle and fine-scale shortcuts are unchanged.
+CLI help, example TOML, demo and compositor guide describe the new shortcuts.
+
+Twenty-six Rust tests, formatting and strict Clippy passed. Real clients in the
+preferences trial exercised both width-cycle key directions under the German
+keymap, wrapping, working-area sizing and preservation of another window.
+The packaged nested session verified that Mod+D does not open Wofi and Mod+Space
+does, plus existing launcher/logout and parent isolation checks. The native DRM
+VM passed real Super+R and Shift+Super+R input and all existing monitor, VT,
+keyring and session checks. The reusable session package built. No installed
+OS activation, session replacement or reboot was performed for this change.

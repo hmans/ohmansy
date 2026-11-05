@@ -14,7 +14,7 @@ Use `mise run os-boot` to build this checkout for the next boot, then reboot
 when ready to try the updated login screen.
 
 The experimental session opens your configured terminal and normal login shell.
-**Super+D** opens the application picker. **Super+Shift+E** opens a sign-out
+**Super+Space** opens the application picker. **Super+Shift+E** opens a sign-out
 confirmation; Cancel keeps the desktop running, while Sign out returns to the
 login screen. Applications use their normal profiles in this session.
 
@@ -100,14 +100,21 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+Shift+comma/period | Move window to previous/next monitor |
 | Mod+minus/plus (or equal) | Decrease/increase the focused monitor's scale by 5 percentage points (50–200%) |
 | Mod+Ctrl+minus/equal | Narrow/widen the focused column |
+| Mod+R / Mod+Shift+R | Cycle column widths through 25%, 50%, and 75%, forward/backward |
 | Mod+1–4 | Switch workspace |
 | Mod+Shift+1–4 | Move the focused window to a workspace |
 | Mod+Enter | Open a terminal |
+| Mod+Space | Open the application picker |
 | Mod+F | Toggle fullscreen |
 | Mod+Q | Close the focused window |
 | Mod+S | Cycle the focused monitor's scale from 100% to 200% |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
+
+Width presets use the focused monitor's working width minus the outer gaps.
+From a custom width, forward selects the next larger preset and reverse selects
+the next smaller one; both wrap. Client minimum/maximum widths and the 200 px
+column minimum still apply, with duplicate constrained presets skipped.
 
 To preview multiple monitors inside one development window:
 
@@ -231,6 +238,9 @@ same renderer in the login session and the nested desktop preview.
 ```toml
 [bindings]
 "Mod+Return" = { action = "terminal" }
+"Mod+Space" = { action = "launcher" }
+"Mod+R" = { action = "cycle-width" }
+"Mod+Shift+R" = { action = "cycle-width", reverse = true }
 "Mod+N" = { action = "launch", program = "foot", args = [] }
 "Mod+1" = { action = "workspace", value = 1 }
 "Mod+Shift+Right" = { action = "move-next" }
@@ -249,12 +259,14 @@ XKB names such as Return, Left, comma, space or F6. Ctrl+Alt+F1–F12 remain res
 for VT switching. Key releases stay paired with intercepted presses across reloads.
 
 Actions include terminal, launcher, logout, close, fullscreen, focus-prev/next,
-move-prev/next, focus-output-prev/next, move-output-prev/next, resize, workspace,
+move-prev/next, focus-output-prev/next, move-output-prev/next, resize, cycle-width, workspace,
 move-workspace, output, scale, scale-adjust, launch, reload-config and save-config. Resize
 uses `value` in logical pixels; workspace/move-workspace use 1–4, output is
 1-based, scale uses a percentage, and scale-adjust uses a signed percentage point
 delta (for example, `{ action = "scale-adjust", value = 5 }`). Launch executes the program and argument
 array directly. The configured terminal action still honors the OS launcher.
+Cycle-width accepts optional `reverse = true`; its IPC direction is 1 (forward,
+the default) or -1 (reverse).
 
 Window rules match an exact, case-sensitive `app_id` from status. The last
 matching rule supplies the default width when a new window identifies itself.
@@ -390,7 +402,7 @@ In another terminal, use the built binary:
 The socket has owner-only permissions. Status includes outputs, their scales,
 positions, active workspaces, and each window's output, plus window geometry, workspace,
 render density, and render/import counters. Commands also include `focus ID`,
-`focus-next`, `focus-prev`, `move-next`, `move-prev`, `resize DELTA`, `workspace N`,
+`focus-next`, `focus-prev`, `move-next`, `move-prev`, `resize DELTA`, `cycle-width [1|-1]`, `workspace N`,
 `move-workspace N`, `fullscreen`, `terminal`, `close`, `screenshot PNG`, and `quit`.
 Use `output N` to focus a monitor (starting at 1), `focus-output-next` or
 `focus-output-prev` to cycle, and `move-output-next` or `move-output-prev` to move

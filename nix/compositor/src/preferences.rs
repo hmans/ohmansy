@@ -198,6 +198,10 @@ pub enum Action {
     Resize {
         value: i64,
     },
+    CycleWidth {
+        #[serde(default)]
+        reverse: bool,
+    },
     Workspace {
         value: u8,
     },
@@ -261,6 +265,7 @@ impl Action {
             ReloadConfig => return state.output_request("reload-config", &serde_json::Value::Null),
             SaveConfig => return state.output_request("save-config", &serde_json::Value::Null),
             Resize { value } => ("resize", Some(*value)),
+            CycleWidth { reverse } => ("cycle-width", Some(if *reverse { -1 } else { 1 })),
             Workspace { value } => ("workspace", Some(*value as i64)),
             MoveWorkspace { value } => ("move-workspace", Some(*value as i64)),
             Output { value } => ("output", Some(*value as i64)),
@@ -355,7 +360,9 @@ pub fn bindings(
     use Action::*;
     let mut defaults = vec![
         ("Mod+Return".to_owned(), Terminal),
-        ("Mod+D".into(), Launcher),
+        ("Mod+Space".into(), Launcher),
+        ("Mod+R".into(), CycleWidth { reverse: false }),
+        ("Mod+Shift+R".into(), CycleWidth { reverse: true }),
         ("Mod+Shift+E".into(), Logout),
         ("Mod+H".into(), FocusPrev),
         ("Mod+Left".into(), FocusPrev),
@@ -481,6 +488,28 @@ impl Smallvil {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn launcher_and_width_shortcuts_follow_both_modifier_profiles() {
+        for profile in [ShortcutModifier::Super, ShortcutModifier::SuperAlt] {
+            let defaults = bindings(&BTreeMap::new(), profile).unwrap();
+            let action = |key| {
+                defaults
+                    .iter()
+                    .find(|(c, _)| *c == Chord::parse(key, profile).unwrap())
+                    .map(|(_, a)| a)
+            };
+            assert!(matches!(action("Mod+Space"), Some(Action::Launcher)));
+            assert!(action("Mod+D").is_none());
+            assert!(matches!(
+                action("Mod+R"),
+                Some(Action::CycleWidth { reverse: false })
+            ));
+            assert!(matches!(
+                action("Mod+Shift+R"),
+                Some(Action::CycleWidth { reverse: true })
+            ));
+        }
+    }
     #[test]
     fn custom_bindings_replace_defaults_and_keep_nested_modifiers_separate() {
         let overrides = BTreeMap::from([

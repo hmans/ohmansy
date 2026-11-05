@@ -30,7 +30,9 @@ focus_ring_color = [0.67, 0.57, 0.78, 1.0] # RGBA, each from 0 to 1
 # Omitted bindings keep their defaults. Use action="none" to remove one.
 [bindings]
 "Mod+Return" = { action = "terminal" }
-"Mod+D" = { action = "launcher" }
+"Mod+Space" = { action = "launcher" }
+"Mod+R" = { action = "cycle-width" }
+"Mod+Shift+R" = { action = "cycle-width", reverse = true }
 "Mod+Left" = { action = "focus-prev" }
 "Mod+Right" = { action = "focus-next" }
 "Mod+Shift+Right" = { action = "move-next" }

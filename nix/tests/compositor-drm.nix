@@ -205,6 +205,20 @@ pkgs.testers.runNixOSTest {
             break
         time.sleep(.1)
     assert control()['fullscreen'] is None
+    control('resize', 2000)
+    available = control()['outputs'][0]['work_area'][2] - 2 * control()['preferences']['layout']['gap']
+    presets = [max(200, int(available * ratio + .5)) for ratio in [.25, .5, .75]]
+    focused = control()['focused']
+    for key, expected in [('meta_l-r', presets[0]), ('meta_l-r', presets[1]),
+                          ('meta_l-r', presets[2]), ('meta_l-r', presets[0]),
+                          ('meta_l-shift-r', presets[2])]:
+        machine.send_key(key)
+        for attempt in range(100):
+            state = control()
+            if next(w for w in state['windows'] if w['id'] == focused)['width'] == expected:
+                break
+            time.sleep(.1)
+        assert next(w for w in state['windows'] if w['id'] == focused)['width'] == expected, state
     machine.send_key("meta_l-dot")
     for attempt in range(100):
         state = control()

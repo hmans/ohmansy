@@ -158,6 +158,46 @@ impl Layout {
         self.reveal();
     }
 
+    pub fn cycle_width(&mut self, reverse: bool, minimum: i32, maximum: i32) {
+        let Some(id) = self.focused() else {
+            return;
+        };
+        let minimum = minimum.max(200);
+        let maximum = if maximum <= 0 {
+            i32::MAX
+        } else {
+            maximum.max(minimum)
+        };
+        let available = (self.work_area.2 - 2 * self.gap).max(1);
+        let mut presets: Vec<_> = [0.25, 0.5, 0.75]
+            .into_iter()
+            .map(|fraction| ((available as f64 * fraction).round() as i32).clamp(minimum, maximum))
+            .collect();
+        presets.dedup();
+        let current = self
+            .workspace()
+            .columns
+            .iter()
+            .find(|c| c.id == id)
+            .unwrap()
+            .width;
+        let width = if reverse {
+            presets
+                .iter()
+                .rev()
+                .copied()
+                .find(|width| *width < current)
+                .unwrap_or(*presets.last().unwrap())
+        } else {
+            presets
+                .iter()
+                .copied()
+                .find(|width| *width > current)
+                .unwrap_or(presets[0])
+        };
+        self.set_width(id, width);
+    }
+
     pub fn maximize(&mut self, id: WindowId, enabled: bool) {
         for workspace in &mut self.workspaces {
             if let Some(column) = workspace.columns.iter_mut().find(|column| column.id == id) {
@@ -330,6 +370,49 @@ impl Layout {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn width_cycle_wraps_in_both_directions_and_uses_the_work_area() {
+        let mut layout = Layout::default();
+        layout.set_size((1000, 700));
+        layout.insert(1);
+        layout.set_width(1, 300);
+        for width in [488, 732, 244, 488] {
+            layout.cycle_width(false, 0, 0);
+            assert_eq!(layout.geometries()[0].3, width);
+        }
+        for width in [244, 732, 488] {
+            layout.cycle_width(true, 0, 0);
+            assert_eq!(layout.geometries()[0].3, width);
+        }
+        layout.set_work_area((40, 44, 800, 600));
+        layout.cycle_width(false, 0, 0);
+        assert_eq!(layout.geometries()[0].3, 582);
+        layout.maximize(1, true);
+        layout.cycle_width(false, 0, 0);
+        assert_eq!(layout.geometries()[0].3, 200);
+        assert!(layout.workspace().columns[0].restore_width.is_none());
+    }
+
+    #[test]
+    fn width_cycle_skips_unreachable_client_sizes_and_duplicate_presets() {
+        let mut layout = Layout::default();
+        layout.cycle_width(false, 0, 0); // Empty workspace.
+        layout.set_size((1000, 700));
+        layout.insert(1);
+        layout.set_width(1, 500);
+        for width in [400, 488, 500, 400] {
+            layout.cycle_width(false, 400, 500);
+            assert_eq!(layout.geometries()[0].3, width);
+        }
+        layout.cycle_width(true, 400, 500);
+        assert_eq!(layout.geometries()[0].3, 500);
+        layout.set_work_area((0, 0, 240, 600));
+        for reverse in [false, true] {
+            layout.cycle_width(reverse, 0, 0);
+            assert_eq!(layout.geometries()[0].3, 200);
+        }
+    }
 
     #[test]
     fn panels_reserve_space_but_fullscreen_uses_the_output() {

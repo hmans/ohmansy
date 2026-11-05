@@ -450,16 +450,7 @@ impl Smallvil {
         self.apply_window_preferences();
         use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel::State;
         for (id, window) in &self.windows {
-            let (min, max) = smithay::wayland::compositor::with_states(
-                window.toplevel().unwrap().wl_surface(),
-                |states| {
-                    let mut cached = states
-                        .cached_state
-                        .get::<smithay::wayland::shell::xdg::SurfaceCachedState>();
-                    let state = cached.current();
-                    (state.min_size.w, state.max_size.w)
-                },
-            );
+            let (min, max) = window_width_limits(window);
             self.layout.constrain_width(*id, min, max);
         }
         let geometries = self.layout.geometries();
@@ -567,6 +558,19 @@ impl Smallvil {
                     .ok_or("resize needs a pixel delta")?
                     .clamp(-2000, 2000) as i32,
             ),
+            "cycle-width" => {
+                let direction = value.unwrap_or(1);
+                if ![-1, 1].contains(&direction) {
+                    return Err("cycle-width direction must be 1 or -1".into());
+                }
+                let (min, max) = self
+                    .layout
+                    .focused()
+                    .and_then(|id| self.windows.get(&id))
+                    .map(window_width_limits)
+                    .unwrap_or((0, 0));
+                self.layout.cycle_width(direction < 0, min, max);
+            }
             "workspace" => {
                 let index = value.ok_or("workspace needs an index from 1 to 4")?;
                 if !(1..=4).contains(&index) {
@@ -706,6 +710,16 @@ impl Smallvil {
 #[derive(Default)]
 pub struct ClientState {
     pub compositor_state: CompositorClientState,
+}
+
+fn window_width_limits(window: &Window) -> (i32, i32) {
+    smithay::wayland::compositor::with_states(window.toplevel().unwrap().wl_surface(), |states| {
+        let mut cached = states
+            .cached_state
+            .get::<smithay::wayland::shell::xdg::SurfaceCachedState>();
+        let state = cached.current();
+        (state.min_size.w, state.max_size.w)
+    })
 }
 
 impl ClientData for ClientState {

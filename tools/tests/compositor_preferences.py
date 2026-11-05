@@ -146,6 +146,17 @@ def run():
             assert {w['id'] for w in control()['windows']} == identities
             config.write_text(saved)
             trial.wait_for(lambda: control()['config_error'] is None)
+            control('focus', new['id'])
+            available = control()['outputs'][0]['work_area'][2] - 2 * control()['preferences']['layout']['gap']
+            widths = [max(200, int(available * ratio + .5)) for ratio in [.25, .5, .75]]
+            control('resize', 2000)  # Start above all presets; next must wrap to 25%.
+            for expected in widths + widths[:1]:
+                trial.send_keys([19], modifier)
+                assert window(new['id'])['width'] == expected, 'Mod+R width cycle'
+            for expected in widths[::-1]:
+                trial.send_keys([19], (*modifier, 'shift'))
+                assert window(new['id'])['width'] == expected, 'Mod+Shift+R reverse width cycle'
+            assert window(ordinary['id'])['width'] == 480, 'Cycling changed another window'
             (artifacts / 'verification.json').write_text(json.dumps(control(), indent=2))
             control('quit')
             assert process.wait(timeout=10) == 0
@@ -155,7 +166,7 @@ def run():
                 process.wait(timeout=10)
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
-    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save and invalid-keymap recovery; parent preserved')
+    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save, invalid-keymap recovery and forward/reverse width shortcuts; parent preserved')
 
 
 if __name__ == '__main__':

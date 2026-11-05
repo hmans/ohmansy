@@ -57,6 +57,8 @@ def run():
             if original_focus is not None:
                 trial.focus_parent_window(original_focus)
             trial.keys(control, pid, terminal['id'], [32], shortcut)
+            assert not trial.window_for(control, 'wofi'), 'Mod+D must not open the launcher'
+            trial.keys(control, pid, terminal['id'], [57], shortcut)
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='application picker')
             trial.send_keys([1])
             trial.wait_for(lambda: not trial.window_for(control, 'wofi'), description='picker closing')
