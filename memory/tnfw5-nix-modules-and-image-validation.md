@@ -551,6 +551,12 @@ enable options with mkDefault and a replaceable ohmansy.software.packages list.
 Fish's login-shell preference applies only while enabled; first-boot setup
 receives the configured shell instead of hardcoding Bash.
 
+Foot title bars (2026-11-05): `terminal.nix` sets `[csd] size=0` so Foot
+hides its client-side title bar even when the compositor requests client
+decorations. The generated x86 configuration passed `foot --check-config`;
+the native customization check passed. No installed activation or visual
+runtime check was performed. Existing windows need to be reopened after rebuilding.
+
 terminal.nix coordinates ohmansy.terminal.package and desktopEntry, installs
 `ohmansy-terminal`, and supplies xdg-terminals.list.
 Shortcuts, network controls, and installer launchers use xdg-terminal-exec;
