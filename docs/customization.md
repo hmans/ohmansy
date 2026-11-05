@@ -73,6 +73,12 @@ Run `chromium` to open it, or `chromium --app="https://example.com"` to open a
 website in its own window. Browser profiles and sign-ins belong to each user.
 Set `programs.chromium.enable = false;` to omit Chromium.
 
+The optional software bundle also includes Chatto (`chat.chatto.run`), WhatsApp
+(`web.whatsapp.com`), and Bluesky (`bsky.app`) application shortcuts. Each uses
+`google-chrome --app=https://…/` to open its own window with your Chrome profile.
+Install Google Chrome separately; these shortcuts use `TryExec=google-chrome`
+so compatible application menus hide them when Chrome is unavailable.
+
 Run `nvim`, `codium`, or `zeditor` to open the bundled code editors. VSCodium
 and Zed also appear in the application menu. Editor settings and extensions
 belong to each user; ohmansy installs the editors without a custom configuration.

@@ -3,7 +3,7 @@
   imports = [ ./firefox-style.nix ./fish-style.nix ./flatpak.nix ];
   options.ohmansy.software.packages = lib.mkOption {
     type = lib.types.listOf lib.types.package;
-    default = with pkgs; [
+    default = (with pkgs; [
       git
       tig
       lazygit
@@ -30,6 +30,19 @@
       btop
       htop
       psmisc
+    ]) ++ map (app: pkgs.makeDesktopItem {
+      name = "ohmansy-${app.id}";
+      desktopName = app.name;
+      exec = "google-chrome --app=https://${app.host}/";
+      tryExec = "google-chrome";
+      icon = app.icon;
+      terminal = false;
+      categories = [ "Network" ];
+      keywords = [ app.host ];
+    }) [
+      { id = "chatto"; name = "Chatto"; host = "chat.chatto.run"; icon = "applications-internet"; }
+      { id = "whatsapp"; name = "WhatsApp"; host = "web.whatsapp.com"; icon = "whatsapp"; }
+      { id = "bluesky"; name = "Bluesky"; host = "bsky.app"; icon = "applications-internet"; }
     ];
     description = ''
       Optional command-line tools bundled with ohmansy. Assign a list to replace

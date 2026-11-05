@@ -9,6 +9,14 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Chrome web apps (2026-11-05): `software.nix` includes Chatto, WhatsApp, and
+Bluesky desktop entries in `ohmansy.software.packages`. They run
+`google-chrome --app=https://…/` and use `TryExec=google-chrome`; Chrome is
+separately installed by the user. The three native desktop-entry packages
+built and passed Nixpkgs' desktop-file validation. Their generated files were
+installed in the current user's application directory without OS activation.
+No browser windows were launched or sign-ins tested.
+
 Terminal tools (2026-11-05): the optional software bundle now includes tig,
 lazygit, tmux, fzf, ripgrep, eza, and bat alongside the existing wget and curl.
 All nine requested tools evaluated as included in all seven ARM/x86 image
