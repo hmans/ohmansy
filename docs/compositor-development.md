@@ -115,6 +115,7 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+Up / Mod+Down | Cycle to the previous/next workspace, wrapping at either end |
 | Mod+Shift+Up / Mod+Shift+Down | Move the focused window to the previous/next workspace, wrapping at either end |
 | Mod+Enter | Open a terminal |
+| Mod+E | Open Files |
 | Mod+Space | Open the application picker |
 | Mod+F | Toggle 100% working width, restoring the previous width |
 | Mod+Shift+F | Toggle fullscreen |

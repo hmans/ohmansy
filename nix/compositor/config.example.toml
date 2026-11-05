@@ -36,6 +36,7 @@ color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
 # Mod is Super in a login and Super+Alt in a nested preview.
 # Omitted bindings keep their defaults. Use action="none" to remove one.
 [bindings]
+"Mod+E" = { action = "launch", program = "nautilus" }
 "Mod+Return" = { action = "terminal" }
 "Mod+Space" = { action = "launcher" }
 "Mod+R" = { action = "cycle-width" }

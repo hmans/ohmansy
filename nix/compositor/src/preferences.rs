@@ -424,6 +424,13 @@ pub fn bindings(
         ("Shift+Print".into(), Screenshot { annotate: true }),
         ("Mod+Return".to_owned(), Terminal),
         ("Mod+Space".into(), Launcher),
+        (
+            "Mod+E".into(),
+            Launch {
+                program: "nautilus".into(),
+                args: Vec::new(),
+            },
+        ),
         ("Mod+R".into(), CycleWidth { reverse: false }),
         ("Mod+Shift+R".into(), CycleWidth { reverse: true }),
         ("Mod+Shift+E".into(), Logout),
@@ -573,6 +580,10 @@ mod tests {
                     .map(|(_, a)| a)
             };
             assert!(matches!(action("Mod+Space"), Some(Action::Launcher)));
+            assert!(matches!(
+                action("Mod+E"),
+                Some(Action::Launch { program, args }) if program == "nautilus" && args.is_empty()
+            ));
             assert!(action("Mod+D").is_none());
             assert!(action("Mod+Q").is_none());
             assert!(matches!(action("Mod+W"), Some(Action::Close)));

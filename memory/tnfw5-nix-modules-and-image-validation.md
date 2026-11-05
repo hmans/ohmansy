@@ -9,6 +9,15 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Shine Files shortcut (2026-11-05): `Mod+E` launches Nautilus through the existing
+launch action. Login sessions use Super+E; nested demos use Super+Alt+E.
+Defaults and example TOML live in `nix/compositor/`; the shortcut is documented
+in `docs/compositor-development.md`. Both modifier profiles have unit coverage.
+Formatting, 33 Rust tests and strict Clippy passed. The equivalent local TOML
+binding was confirmed loaded in the running installed compositor with no config
+error and Nautilus present. No key injection, app launch or session restart was
+performed; the shared default ships on rebuild.
+
 Keychron Launcher HID access (2026-11-05): `desktop.nix` packages
 `70-ohmansy-keychron.rules`, tagging USB vendor 3434 hidraw devices with
 `uaccess` before systemd seat-late applies active-seat ACLs. This supports
