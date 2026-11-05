@@ -5,6 +5,9 @@
     type = lib.types.listOf lib.types.package;
     default = with pkgs; [
       git
+      tig
+      lazygit
+      tmux
       mise
       herdr
       vim
@@ -13,6 +16,10 @@
       zed-editor
       curl
       wget
+      fzf
+      ripgrep
+      eza
+      bat
       jq
       gcc
       gnumake
@@ -33,6 +40,7 @@
   config = {
     services.flatpak.enable = lib.mkDefault true;
     programs.firefox.enable = lib.mkDefault true;
+    programs.chromium.enable = lib.mkDefault true;
     programs.fish.enable = lib.mkDefault true;
     # Keep activation with the optional bundle, including when a host replaces it.
     programs.bash.interactiveShellInit = lib.mkIf (builtins.elem pkgs.mise config.ohmansy.software.packages) ''
@@ -80,6 +88,8 @@
     # Bash already defines a priority-1000 default. A normal host definition
     # still wins over this preference. Disabling Fish restores NixOS's default.
     users.defaultUserShell = lib.mkIf config.programs.fish.enable (lib.mkOverride 900 pkgs.fish);
-    environment.systemPackages = config.ohmansy.software.packages;
+    # The NixOS Chromium module configures policies but does not install it.
+    environment.systemPackages = config.ohmansy.software.packages
+      ++ lib.optional config.programs.chromium.enable pkgs.chromium;
   };
 }

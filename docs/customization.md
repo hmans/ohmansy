@@ -12,7 +12,7 @@ The root flake exports these NixOS modules:
 | --- | --- |
 | `nixosModules.default` | Desktop and software defaults |
 | `nixosModules.desktop` | Niri, Quickshell, login screen, desktop services, and terminal integration |
-| `nixosModules.software` | Firefox, Fish, and optional command-line tools |
+| `nixosModules.software` | Firefox, Chromium, Fish, and optional command-line tools |
 | `nixosModules.vm` | Guest display and Virtio integration |
 | `nixosModules.updates` | Command-line release preparation and boot selection |
 
@@ -37,6 +37,7 @@ For example, create a `preferences.nix` module:
 ```nix
 { pkgs, ... }: {
   programs.firefox.enable = false;
+  programs.chromium.enable = false;
   programs.fish.enable = false;
   programs.zsh.enable = true;
   users.defaultUserShell = pkgs.zsh;
@@ -56,16 +57,21 @@ add it to the host's module imports. Then rebuild:
 sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
-The optional software bundle defaults to Git, mise, herdr, Vim, Neovim,
-VSCodium, Zed, curl, wget, jq,
+The optional software bundle defaults to Git, tig, lazygit, tmux, mise, herdr,
+Vim, Neovim, VSCodium, Zed, curl, wget, fzf, ripgrep, eza, bat, jq,
 GCC, GNU Make, Python 3, pkg-config, fastfetch, btop, htop, and psmisc (including
 `killall`). These defaults live in `nix/modules/software.nix`, exported by the
 root flake as `nixosModules.software`.
 Assigning `ohmansy.software.packages` replaces that list; ordinary
-`environment.systemPackages` entries add to it. Firefox and Fish use their
+`environment.systemPackages` entries add to it. Firefox, Chromium, and Fish use their
 standard NixOS enable options. Disabling Fish restores NixOS's Bash default
 unless you select another shell. Individual accounts can set
 `users.users.<name>.shell` instead.
+
+Chromium is included alongside Firefox and appears in the application menu.
+Run `chromium` to open it, or `chromium --app="https://example.com"` to open a
+website in its own window. Browser profiles and sign-ins belong to each user.
+Set `programs.chromium.enable = false;` to omit Chromium.
 
 Run `nvim`, `codium`, or `zeditor` to open the bundled code editors. VSCodium
 and Zed also appear in the application menu. Editor settings and extensions

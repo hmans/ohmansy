@@ -28,6 +28,7 @@ let
     ohmansyModules.default
     {
       programs.firefox.enable = false;
+      programs.chromium.enable = false;
       programs.fish.enable = false;
       programs.zsh.enable = true;
       users.defaultUserShell = pkgs.zsh;
@@ -41,6 +42,11 @@ let
 in
 assert hostOwnedState.system.stateVersion == "25.11";
 assert defaults.programs.firefox.enable && defaults.programs.fish.enable;
+assert defaults.programs.chromium.enable && softwareOnly.programs.chromium.enable;
+assert builtins.elem pkgs.chromium defaults.environment.systemPackages;
+assert !desktopOnly.programs.chromium.enable;
+assert !custom.programs.chromium.enable;
+assert !(builtins.elem pkgs.chromium custom.environment.systemPackages);
 assert defaults.services.displayManager.defaultSession == "niri";
 assert defaults.ohmansy.greeter.sessions ? niri;
 assert defaults.ohmansy.greeter.sessions ? ohmansy;

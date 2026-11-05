@@ -9,6 +9,25 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Terminal tools (2026-11-05): the optional software bundle now includes tig,
+lazygit, tmux, fzf, ripgrep, eza, and bat alongside the existing wget and curl.
+All nine requested tools evaluated as included in all seven ARM/x86 image
+configurations. The native customization check passed. Hosts can still replace
+`ohmansy.software.packages`. No installed-system activation, image build, or
+runtime tool launch was performed.
+
+Chromium (2026-11-05): the shared software module defaults
+`programs.chromium.enable` to true and explicitly adds `pkgs.chromium` when
+enabled. The pinned NixOS Chromium module only configures policies; enabling
+it alone does not install a browser. Hosts can opt out with
+`programs.chromium.enable = false`. Firefox and user browser profiles remain
+unchanged. All seven ARM/x86 image configurations evaluated with Chromium
+included. The native customization check passed default inclusion, desktop-only
+scope, and opt-out assertions. The native Chromium 155.0.8059.84 package was
+fetched, its version command passed, and its desktop entry was inspected.
+No graphical launch, installed-system activation, image rebuild, or boot was
+performed. See `docs/customization.md` for app-window invocation.
+
 XCB and keyboard runtime libraries (2026-11-05): the shared nix-ld library
 list includes `libxcb` and `libxkbcommon`. The latter package provides both
 `libxkbcommon.so.0` and `libxkbcommon-x11.so.0`; there is no separate
