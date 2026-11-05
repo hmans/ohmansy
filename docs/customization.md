@@ -116,9 +116,12 @@ theme in the compositor and applications.
 
 ## Downloaded Linux binaries
 
-The shared nix-ld environment includes libxcb, libxkbcommon, and
-libxkbcommon-x11 (the latter two share one Nix package). Rebuild an existing
-installation to receive these libraries for downloaded Linux apps.
+The software defaults enable `nix-ld` with GTK 3 and supporting font, audio,
+and X11 libraries for downloaded desktop apps, including browsers. This includes
+libxcb, libxkbcommon, and libxkbcommon-x11 (the latter two share one Nix package).
+Other apps may need extra libraries in
+`programs.nix-ld.libraries`. Existing installations need a rebuild to receive
+changes to this library set.
 
 ## Flatpak apps
 

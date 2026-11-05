@@ -44,9 +44,34 @@
     programs.fish.interactiveShellInit = lib.mkIf (builtins.elem pkgs.mise config.ohmansy.software.packages) ''
       ${lib.getExe pkgs.mise} activate fish | source
     '';
-    programs.nix-ld.enable = true;
-    # libxkbcommon also provides libxkbcommon-x11.
-    programs.nix-ld.libraries = with pkgs; [ libxcb libxkbcommon ];
+    programs.nix-ld = {
+      enable = true;
+      # Downloaded GTK apps need these libraries outside their Nix wrappers.
+      libraries = with pkgs; [
+        gtk3
+        glib
+        pango
+        atk
+        cairo
+        gdk-pixbuf
+        fontconfig
+        freetype
+        dbus
+        alsa-lib
+        libx11
+        libxcb
+        # Includes both libxkbcommon.so and libxkbcommon-x11.so.
+        libxkbcommon
+        libxcomposite
+        libxcursor
+        libxdamage
+        libxext
+        libxfixes
+        libxi
+        libxrandr
+        libxrender
+      ];
+    };
     programs.appimage = {
       enable = lib.mkDefault true;
       binfmt = lib.mkDefault true;
