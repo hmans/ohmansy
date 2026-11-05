@@ -205,11 +205,21 @@ impl Desktop {
         })
     }
     pub fn geometries(&self) -> Vec<(WindowId, i32, i32, i32, i32)> {
+        self.geometries_at(true)
+    }
+    pub fn target_geometries(&self) -> Vec<(WindowId, i32, i32, i32, i32)> {
+        self.geometries_at(false)
+    }
+    fn geometries_at(&self, visual: bool) -> Vec<(WindowId, i32, i32, i32, i32)> {
         self.monitors
             .iter()
             .flat_map(|m| {
-                m.layout
-                    .geometries()
+                let geometries = if visual {
+                    m.layout.geometries()
+                } else {
+                    m.layout.target_geometries()
+                };
+                geometries
                     .into_iter()
                     .map(|(id, x, y, w, h)| (id, x + m.origin.0, y + m.origin.1, w, h))
             })

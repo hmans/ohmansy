@@ -52,9 +52,15 @@ def wait_for(function, timeout=15, description="condition"):
 def parent_windows():
     path = os.environ.get('OHMANSY_COMPOSITOR_CONTROL')
     if path:
-        state = Control(path)()
-        return [{**window, 'pid': state['pid'], 'is_focused': window['focused']}
-                for window in state['windows']]
+        try:
+            state = Control(path)()
+            if state['wayland_display'] == Path(os.environ['WAYLAND_DISPLAY']).name:
+                return [{**window, 'pid': state['pid'], 'is_focused': window['focused']}
+                        for window in state['windows']]
+        except (OSError, ValueError, AssertionError):
+            pass
+        # A retained agent can outlive the login that supplied this path too.
+        os.environ.pop('OHMANSY_COMPOSITOR_CONTROL', None)
     try:
         return json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"], stderr=subprocess.PIPE))
     except (OSError, subprocess.CalledProcessError):

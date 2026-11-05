@@ -683,7 +683,8 @@ impl Smallvil {
                 let width = workspace.and_then(|index| layout.unwrap().workspaces[index].columns.iter().find(|column| column.id == *id)).map(|column| column.width);
                 let density = size.zip(surface_size).filter(|(_, surface)| surface.0 > 0).map(|(buffer, surface)| buffer.0 as f64 * scale as f64 / surface.0 as f64);
                 let geometry = self.layout.geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
-                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
+                let target_geometry = self.layout.target_geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
+                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"target_geometry":target_geometry,"moving":layout.is_some_and(|l| l.is_moving(*id)),"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
             })
         }).collect();
         let keyboard_focus = self

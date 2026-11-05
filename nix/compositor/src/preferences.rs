@@ -447,6 +447,12 @@ impl Smallvil {
             let layout = &mut monitor.layout;
             layout.gap = self.output_settings.layout.gap;
             layout.default_width = self.output_settings.layout.default_column_width.clone();
+            if layout.animations_enabled != self.output_settings.animations.enabled
+                || layout.animation_duration
+                    != self.output_settings.animations.duration_ms as f64 / 1000.0
+            {
+                layout.finish_movements();
+            }
             layout.animations_enabled = self.output_settings.animations.enabled;
             layout.animation_duration = self.output_settings.animations.duration_ms as f64 / 1000.0;
             layout.set_size(layout.size);

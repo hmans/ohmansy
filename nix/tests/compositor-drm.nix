@@ -285,6 +285,44 @@ pkgs.testers.runNixOSTest {
         time.sleep(.1)
     assert state["rendered_frames"] > before, state
     assert first in [w["id"] for w in state["windows"]], state
+    # Animate a same-output reorder through native libinput, including its
+    # interruption by the reverse shortcut. Client dimensions must stay fixed.
+    script = 'from pathlib import Path; p=Path("/run/user/1000/shine-test.toml"); s=p.read_text(); assert "enabled=false" in s; p.write_text(s.replace("enabled=false", "enabled=true\\nduration_ms=1000"))'
+    as_user('python3 -c ' + shlex.quote(script))
+    for attempt in range(100):
+        if control()['preferences']['animations']['enabled']:
+            break
+        time.sleep(.1)
+    assert control()['preferences']['animations']['enabled']
+    control('output', 1)
+    control('launch', program='foot', args=['--app-id=shine-drm-movement', 'sleep', '120'])
+    for attempt in range(100):
+        moving_window = next((w for w in control()['windows'] if w['app_id'] == 'shine-drm-movement' and w['surface_size']), None)
+        if moving_window:
+            break
+        time.sleep(.1)
+    assert moving_window
+    ident = moving_window['id']
+    control('focus', ident)
+    dimensions = moving_window['client_geometry'][2:]
+    machine.send_key('meta_l-shift-left', delay=.15)
+    for attempt in range(30):
+        state = control()
+        if next(w for w in state['windows'] if w['id'] == ident)['moving']:
+            break
+        time.sleep(.02)
+    assert next(w for w in state['windows'] if w['id'] == ident)['moving'], state
+    assert state['focused'] == state['keyboard_focus'] == ident, state
+    machine.send_key('meta_l-shift-right', delay=.15)
+    for attempt in range(100):
+        state = control()
+        if not any(w['moving'] for w in state['windows']) and state['viewport'] == state['viewport_target']:
+            break
+        time.sleep(.05)
+    assert not any(w['moving'] for w in state['windows']), state
+    assert state['viewport'] == state['viewport_target'], state
+    assert state['focused'] == state['keyboard_focus'] == ident
+    assert next(w for w in state['windows'] if w['id'] == ident)['client_geometry'][2:] == dimensions
     time.sleep(.5)
     machine.screenshot("shine-two-monitors")
     control("quit")

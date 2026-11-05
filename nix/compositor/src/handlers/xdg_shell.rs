@@ -169,6 +169,7 @@ impl XdgShellHandler for Smallvil {
     ) {
         if let Some(id) = self.window_id(surface.wl_surface()) {
             self.layout.focus(id);
+            self.layout.finish_movements();
             let active = self.layout.active;
             self.layout.workspaces[active].fullscreen = Some(id);
             self.sync_focus();
@@ -181,6 +182,7 @@ impl XdgShellHandler for Smallvil {
             .and_then(|id| self.layout.owner(id))
         {
             let layout = &mut self.layout.monitors[index].layout;
+            layout.finish_movements();
             layout.workspaces[layout.active].fullscreen = None;
             self.relayout();
         }

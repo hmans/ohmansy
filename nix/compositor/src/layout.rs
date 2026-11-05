@@ -1,6 +1,18 @@
 //! Window policy independent of Wayland, rendering, and input devices.
+use std::collections::BTreeMap;
 
 pub type WindowId = u64;
+
+#[derive(Clone, Copy, Debug)]
+struct Movement {
+    from: f64,
+    elapsed: f64,
+}
+impl Movement {
+    fn offset(self, duration: f64) -> f64 {
+        self.from * (1.0 - self.elapsed / duration).clamp(0.0, 1.0).powi(3)
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Column {
@@ -19,6 +31,7 @@ pub struct Workspace {
     animation_target: f64,
     animation_from: f64,
     animation_elapsed: f64,
+    movements: BTreeMap<WindowId, Movement>,
 }
 
 pub struct Layout {
@@ -56,6 +69,7 @@ impl Layout {
     }
 
     pub fn insert(&mut self, id: WindowId) {
+        self.finish_movements();
         let width = self.default_width.resolve(self.work_area.2 - 2 * self.gap);
         let workspace = &mut self.workspaces[self.active];
         let index = workspace
@@ -76,6 +90,7 @@ impl Layout {
     }
 
     pub fn remove(&mut self, id: WindowId) {
+        self.finish_movements();
         for workspace in &mut self.workspaces {
             let Some(index) = workspace.columns.iter().position(|column| column.id == id) else {
                 continue;
@@ -108,6 +123,9 @@ impl Layout {
             .iter()
             .position(|w| w.columns.iter().any(|c| c.id == id))
         {
+            if self.active != index {
+                self.finish_movements();
+            }
             self.active = index;
             let workspace = &mut self.workspaces[index];
             workspace.focused = Some(id);
@@ -132,6 +150,7 @@ impl Layout {
     }
 
     pub fn resize(&mut self, delta: i32) {
+        self.finish_movements();
         let focused = self.focused();
         let max_width = (self.size.0 * 2).max(200);
         if let Some(column) = self.workspaces[self.active]
@@ -146,16 +165,78 @@ impl Layout {
     }
 
     pub fn reorder(&mut self, delta: i32) {
-        let workspace = &mut self.workspaces[self.active];
+        let workspace = self.workspace();
         if let Some(index) = workspace
             .columns
             .iter()
             .position(|c| Some(c.id) == workspace.focused)
         {
             let next = (index as i32 + delta).clamp(0, workspace.columns.len() as i32 - 1) as usize;
+            if index == next {
+                return;
+            }
+            let animate = self.animations_enabled
+                && self.animation_duration > 0.0
+                && workspace.fullscreen.is_none();
+            let affected = [workspace.columns[index].id, workspace.columns[next].id];
+            let mut x = self.gap as f64;
+            let before: BTreeMap<_, _> = workspace
+                .columns
+                .iter()
+                .map(|column| {
+                    let offset = if animate {
+                        workspace
+                            .movements
+                            .get(&column.id)
+                            .map_or(0.0, |m| m.offset(self.animation_duration))
+                    } else {
+                        0.0
+                    };
+                    let position = x + offset;
+                    x += (column.width + self.gap) as f64;
+                    (column.id, position)
+                })
+                .collect();
+            let workspace = &mut self.workspaces[self.active];
             workspace.columns.swap(index, next);
+            if animate {
+                let mut x = self.gap as f64;
+                for column in &workspace.columns {
+                    if affected.contains(&column.id) {
+                        let from = before[&column.id] - x;
+                        if from.abs() < 1e-6 {
+                            workspace.movements.remove(&column.id);
+                        } else {
+                            workspace
+                                .movements
+                                .insert(column.id, Movement { from, elapsed: 0.0 });
+                        }
+                    }
+                    x += (column.width + self.gap) as f64;
+                }
+            } else {
+                workspace.movements.clear();
+            }
+            self.reveal();
+            // The viewport and the reordered columns start from the same frame.
+            let workspace = &mut self.workspaces[self.active];
+            workspace.animation_from = workspace.scroll;
+            workspace.animation_target = workspace.target;
+            workspace.animation_elapsed = 0.0;
         }
-        self.reveal();
+    }
+
+    pub fn finish_movements(&mut self) {
+        for workspace in &mut self.workspaces {
+            workspace.movements.clear();
+        }
+    }
+
+    pub fn is_moving(&self, id: WindowId) -> bool {
+        self.animations_enabled
+            && self.animation_duration > 0.0
+            && self.workspace().fullscreen.is_none()
+            && self.workspace().movements.contains_key(&id)
     }
 
     pub fn cycle_width(&mut self, reverse: bool, minimum: i32, maximum: i32) {
@@ -211,6 +292,7 @@ impl Layout {
     }
 
     pub fn maximize(&mut self, id: WindowId, enabled: bool) {
+        self.finish_movements();
         for workspace in &mut self.workspaces {
             if let Some(column) = workspace.columns.iter_mut().find(|column| column.id == id) {
                 if enabled {
@@ -236,6 +318,9 @@ impl Layout {
 
     pub fn switch_workspace(&mut self, index: usize) {
         if index < self.workspaces.len() {
+            if index != self.active {
+                self.finish_movements();
+            }
             self.active = index;
             self.reveal();
         }
@@ -264,6 +349,7 @@ impl Layout {
     }
 
     pub fn toggle_fullscreen(&mut self) {
+        self.finish_movements();
         let workspace = &mut self.workspaces[self.active];
         workspace.fullscreen = if workspace.fullscreen.is_some() {
             None
@@ -278,6 +364,9 @@ impl Layout {
     }
 
     pub fn set_work_area(&mut self, area: (i32, i32, i32, i32)) {
+        if self.work_area != area {
+            self.finish_movements();
+        }
         self.work_area = area;
         for workspace in &mut self.workspaces {
             for column in &mut workspace.columns {
@@ -290,6 +379,7 @@ impl Layout {
     }
 
     pub fn set_width(&mut self, id: WindowId, width: i32) {
+        self.finish_movements();
         for workspace in &mut self.workspaces {
             if let Some(column) = workspace.columns.iter_mut().find(|column| column.id == id) {
                 column.width = width.max(200);
@@ -315,24 +405,47 @@ impl Layout {
             }
         }
         if changed {
+            self.finish_movements();
             self.reveal();
         }
         changed
     }
 
     pub fn geometries(&self) -> Vec<(WindowId, i32, i32, i32, i32)> {
+        self.geometries_at(true)
+    }
+
+    pub fn target_geometries(&self) -> Vec<(WindowId, i32, i32, i32, i32)> {
+        self.geometries_at(false)
+    }
+
+    fn geometries_at(&self, visual: bool) -> Vec<(WindowId, i32, i32, i32, i32)> {
         let workspace = self.workspace();
         if let Some(id) = workspace.fullscreen {
             return vec![(id, 0, 0, self.size.0, self.size.1)];
         }
         let mut x = self.gap;
+        let animated = visual && self.animations_enabled && self.animation_duration > 0.0;
+        let scroll = if animated {
+            workspace.scroll
+        } else {
+            workspace.target
+        };
         workspace
             .columns
             .iter()
             .map(|column| {
+                let offset = if animated {
+                    workspace
+                        .movements
+                        .get(&column.id)
+                        .map_or(0.0, |m| m.offset(self.animation_duration))
+                } else {
+                    0.0
+                };
                 let geometry = (
                     column.id,
-                    self.work_area.0 + x - workspace.scroll.round() as i32,
+                    self.work_area.0 + x + offset.round() as i32 - scroll.round() as i32,
                     self.work_area.1 + self.gap,
                     column.width,
                     (self.work_area.3 - 2 * self.gap).max(1),
@@ -345,6 +458,15 @@ impl Layout {
 
     pub fn tick(&mut self, seconds: f64) -> bool {
         let workspace = &mut self.workspaces[self.active];
+        let moving = !workspace.movements.is_empty();
+        if !self.animations_enabled || self.animation_duration == 0.0 {
+            workspace.movements.clear();
+        } else {
+            workspace.movements.retain(|_, movement| {
+                movement.elapsed += seconds.max(0.0);
+                movement.elapsed < self.animation_duration
+            });
+        }
         let previous = workspace.scroll;
         if workspace.animation_target != workspace.target {
             workspace.animation_target = workspace.target;
@@ -362,7 +484,7 @@ impl Layout {
             workspace.animation_from
                 + (workspace.target - workspace.animation_from) * (1.0 - (1.0 - progress).powi(3))
         };
-        workspace.scroll != previous
+        workspace.scroll != previous || moving
     }
 
     fn reveal(&mut self) {
@@ -392,6 +514,141 @@ impl Layout {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn movement_layout(width: i32) -> Layout {
+        let mut layout = Layout {
+            animation_duration: 1.0,
+            ..Default::default()
+        };
+        layout.set_size((width, 700));
+        for id in 1..=3 {
+            layout.insert(id);
+            layout.set_width(id, 300);
+        }
+        layout.focus(1);
+        layout.tick(1.0);
+        layout
+    }
+
+    #[test]
+    fn reordering_animates_both_columns_without_changing_widths_or_focus() {
+        let mut layout = movement_layout(1100);
+        let before = layout.geometries();
+        layout.reorder(1);
+        assert_eq!(layout.focused(), Some(1));
+        assert_eq!(
+            layout.geometries().into_iter().find(|g| g.0 == 1),
+            before.iter().copied().find(|g| g.0 == 1)
+        );
+        assert!(layout.is_moving(1) && layout.is_moving(2));
+        assert!(!layout.is_moving(3));
+        assert_eq!(
+            layout
+                .workspace()
+                .columns
+                .iter()
+                .map(|c| c.id)
+                .collect::<Vec<_>>(),
+            vec![2, 1, 3]
+        );
+        let target = layout.target_geometries();
+        assert!(layout.tick(0.5));
+        for id in [1, 2] {
+            let start = before.iter().find(|g| g.0 == id).unwrap();
+            let end = target.iter().find(|g| g.0 == id).unwrap();
+            let current = layout.geometries().into_iter().find(|g| g.0 == id).unwrap();
+            assert!(current.1 > start.1.min(end.1) && current.1 < start.1.max(end.1));
+            assert_eq!((current.3, current.4), (start.3, start.4));
+        }
+        assert!(layout.tick(0.5));
+        assert_eq!(layout.geometries(), target);
+        assert!(!layout.is_moving(1) && !layout.tick(0.1));
+    }
+
+    #[test]
+    fn interrupted_moves_preserve_visible_positions_and_finish_at_the_new_order() {
+        let mut layout = movement_layout(1100);
+        layout.reorder(1);
+        layout.tick(0.2);
+        let before = layout.geometries();
+        layout.reorder(-1);
+        for old in before {
+            assert_eq!(
+                layout
+                    .geometries()
+                    .into_iter()
+                    .find(|g| g.0 == old.0)
+                    .unwrap(),
+                old
+            );
+        }
+        layout.tick(0.2);
+        let before = layout.geometries();
+        layout.reorder(1);
+        for old in before {
+            assert_eq!(
+                layout
+                    .geometries()
+                    .into_iter()
+                    .find(|g| g.0 == old.0)
+                    .unwrap(),
+                old
+            );
+        }
+        layout.tick(1.0);
+        assert_eq!(layout.geometries(), layout.target_geometries());
+        assert_eq!(layout.focused(), Some(1));
+    }
+
+    #[test]
+    fn reorder_and_viewport_scroll_share_progress() {
+        let mut layout = movement_layout(500);
+        let before = layout.geometries();
+        layout.reorder(1);
+        let target = layout.target_geometries();
+        assert!(layout.workspace().target > 0.0);
+        layout.tick(0.5);
+        for current in layout.geometries() {
+            let start = before.iter().find(|g| g.0 == current.0).unwrap().1;
+            let end = target.iter().find(|g| g.0 == current.0).unwrap().1;
+            assert!(
+                (current.1 as f64 - (start as f64 + (end - start) as f64 * 0.875)).abs() <= 1.0
+            );
+        }
+        layout.tick(0.5);
+        assert_eq!(layout.geometries(), target);
+    }
+
+    #[test]
+    fn moves_snap_when_disabled_and_clear_on_other_layout_changes() {
+        let mut layout = movement_layout(1100);
+        layout.reorder(1);
+        layout.animations_enabled = false;
+        assert_eq!(layout.geometries(), layout.target_geometries());
+        layout.tick(0.0);
+        assert!(layout.workspace().movements.is_empty());
+        layout.animations_enabled = true;
+        layout.animation_duration = 0.0;
+        layout.reorder(-1);
+        assert_eq!(layout.geometries(), layout.target_geometries());
+        assert!(layout.workspace().movements.is_empty());
+        layout.animation_duration = 1.0;
+        layout.reorder(1);
+        layout.resize(20);
+        assert!(layout.workspace().movements.is_empty());
+        layout.reorder(-1);
+        layout.toggle_fullscreen();
+        assert!(layout.workspace().movements.is_empty());
+        assert_eq!(layout.geometries(), vec![(1, 0, 0, 1100, 700)]);
+        layout.toggle_fullscreen();
+        layout.reorder(1);
+        layout.switch_workspace(1);
+        layout.switch_workspace(0);
+        assert!(layout.workspace().movements.is_empty());
+        layout.reorder(-1);
+        layout.remove(2);
+        assert!(layout.workspace().movements.is_empty());
+    }
 
     #[test]
     fn width_cycle_wraps_in_both_directions_and_uses_the_work_area() {

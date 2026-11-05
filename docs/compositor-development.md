@@ -213,8 +213,15 @@ Gap is in logical pixels (0–128). Width is either a proportion greater than ze
 and at most one, or a pixel width (200–32768). Proportions use the output width
 minus its outer gaps; columns have a minimum width of 200. Default widths affect
 new windows. Gap changes reposition existing windows while preserving their
-column widths. Animations currently control scrolling; `duration_ms` is 0–5000,
-and disabling animations or choosing zero snaps to the destination.
+column widths. Animations control scrolling and same-workspace column reordering;
+`duration_ms` is 0–5000, with 180 ms as the default. Shift+Mod+Left/Right (or H/L)
+slides both swapped columns using cubic easing. Repeated moves start from their
+current visible positions, and any accompanying viewport scroll uses the same
+timing. Keyboard focus stays with the moved window; its ring, menus, and pointer
+input follow the visible position. Disabling animations or choosing zero snaps
+to the destination. Width changes, workspace transfers, and monitor transfers
+remain immediate. Resize, fullscreen, layout changes, and window removal finish
+pending reorder animations.
 
 ### Rounded corners and focus ring
 
@@ -364,6 +371,7 @@ mise run compositor-integration
 python3 tools/tests/compositor_nesting.py
 python3 tools/tests/compositor_monitors.py
 python3 tools/tests/compositor_preferences.py
+python3 tools/tests/compositor_movement.py
 nix build .#checks.x86_64-linux.compositor-drm
 mise run compositor -- --scale 1.5 --close-after 10
 ```
@@ -374,6 +382,11 @@ frames. It requires a running Niri or ohmansy desktop. Test input goes through a
 control socket into the normal compositor handlers; `--test-input` enables this
 path and ignores physical input from the parent window during the trial.
 Artifacts stay in ignored `.local/compositor-tests/`.
+
+The movement trial checks intermediate window/ring pixels, visible-position
+pointer input, interrupted swaps, coordinated scrolling, unchanged client sizes,
+animation disabling and cleanup. Window status exposes visual `geometry`, final
+`target_geometry`, and `moving` so these transitions can be inspected over IPC.
 The nesting trial checks real Wayland key forwarding between a Super host and
 a Super+Alt child, including focus changes and independent scale shortcuts.
 

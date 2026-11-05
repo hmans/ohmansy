@@ -632,6 +632,42 @@ preserving parent desktop windows. Example configuration, CLI, demo and guide
 were updated. The native DRM fixture's presets were updated, but that VM was
 not rerun for this refinement. No installed-system activation or session restart.
 
+
+## Shine column movement animation (2026-11-05)
+
+Same-workspace column reorders animate both swapped windows with temporary
+world-position offsets in `Layout`, while logical order updates immediately.
+The existing cubic easing and `[animations] enabled/duration_ms` control both
+movement and scrolling (180 ms default). The viewport and swapped columns
+start together; interrupted moves restart from current visible positions.
+This follows Niri's separation of layout positions and render offsets:
+https://github.com/niri-wm/niri/blob/main/src/layout/tile.rs.
+
+Visual positions map through the existing Space, so focus rings, popup trees
+and pointer hit tests move with the window without configuring different client
+sizes. Status exposes visual `geometry`, final `target_geometry`, and `moving`.
+Resize, width constraints that actually change, fullscreen, workspace changes,
+window removal and other structural geometry changes finish pending movements.
+Disabled animations and zero duration snap immediately. Width and monitor/workspace
+transfer animations are outside this implementation.
+
+Thirty Rust tests, formatting, strict Clippy and development build passed.
+`compositor_movement.py` verified a real reorder shortcut, intermediate ring
+pixels, interrupted moves, visible-position clicks, unchanged client sizes and
+keyboard focus, coordinated scrolling, disabling/cancellation and idle frames.
+Client/clipboard/menu/cursor, decoration and preference regressions passed.
+The reusable session package built and its nested launch/logout/isolation test
+passed. The native DRM VM also passed real libinput reorder/reversal, unchanged
+dimensions/focus and exact viewport settling, along with monitor mode/hotplug,
+VT, screenshot, graphical keyring and password login checks. No installed
+activation or physical login replacement was performed.
+
+A retained agent may also inherit a dead Shine control socket. The test helper
+validates its Wayland display and falls back after connection failure instead
+of trusting the environment variable. Pixel trials must warm up nested screenshot
+capture before timing an animation: capture has a two-second startup delay.
+
+
 ## Shine workspace and close shortcuts (2026-11-05)
 
 Mod+Up selects the previous workspace; Mod+Down selects the next. Both wrap
