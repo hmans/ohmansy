@@ -10,6 +10,22 @@ ShellRoot {
     id: root
     property var state: ({ outputs: [] })
     property var requests: []
+    property string screenshotMessage: ""
+    property string screenshotTitle: ""
+    property string screenshotResult: ""
+    onStateChanged: {
+        const shot = state.screenshot;
+        const result = shot ? JSON.stringify(shot) : "";
+        if (result && result !== screenshotResult) {
+            screenshotTitle = shot.error ? "Screenshot failed" : "Screenshot saved";
+            screenshotMessage = shot.error ? shot.error
+                : shot.path + (shot.clipboard ? "\nCopied to clipboard" : "\nClipboard copy failed")
+                    + (shot.annotation_error ? "\nCould not open Satty" : "");
+            screenshotTimer.restart();
+        }
+        screenshotResult = result;
+    }
+    Timer { id: screenshotTimer; interval: 8000; onTriggered: root.screenshotMessage = "" }
     function request(action, output, value) {
         requests = requests.concat([{ action: action, output: output, value: value }]);
         if (!control.connected) control.connected = true;
@@ -87,6 +103,60 @@ ShellRoot {
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
+            }
+        }
+    }
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            id: screenshotToast
+            required property var modelData
+            readonly property bool showMessage: root.screenshotMessage !== "" && modelData.name ===
+                (root.state.screenshot?.output || root.state.active_output)
+            // Keep the layer role alive: Smithay 0.7 validates a trailing
+            // null-buffer commit against the destroyed role's reset size.
+            // Hidden feedback is transparent and has an empty input region.
+            screen: modelData
+            mask: Region { item: screenshotToast.showMessage ? screenshotBackground : null }
+            anchors { bottom: true; right: true }
+            margins { bottom: 16; right: 16 }
+            implicitWidth: Math.min(460, modelData.width - 32)
+            implicitHeight: Math.max(160, screenshotContent.implicitHeight + 32)
+            exclusiveZone: 0
+            color: "transparent"
+            WlrLayershell.namespace: "ohmansy-screenshot-result"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            Item {
+                id: screenshotBackground
+                anchors.fill: parent
+                visible: screenshotToast.showMessage
+                GlassSurface { anchors.fill: parent; tint: Theme.solidSurface }
+                ColumnLayout {
+                    id: screenshotContent
+                    anchors { fill: parent; margins: 16 }
+                    spacing: 8
+                    Text {
+                        text: root.screenshotTitle
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 15
+                        font.weight: Font.Medium
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.screenshotMessage
+                        color: Theme.secondary
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        wrapMode: Text.WrapAnywhere
+                    }
+                    GlassButton {
+                        text: "Dismiss"
+                        actionRole: "secondary"
+                        onClicked: { screenshotTimer.stop(); root.screenshotMessage = ""; }
+                    }
+                }
             }
         }
     }

@@ -141,6 +141,9 @@ pub fn init_winit(
                     state.import_buffers(backend.renderer());
                     state.space.refresh();
                     state.maintain_scene();
+                    for output in &outputs {
+                        state.capture_output(backend.renderer(), output, &mut decorations);
+                    }
                     state.needs_redraw = false;
                     let size = backend.window_size();
                     if size.w <= 0 || size.h <= 0 {
@@ -162,6 +165,7 @@ pub fn init_winit(
                                         None,
                                         &mut decorations,
                                         (left, 0).into(),
+                                        true,
                                     )
                                     .into_iter()
                                     .map(|e| {
@@ -263,6 +267,7 @@ impl Smallvil {
         }
     }
     pub fn maintain_scene(&mut self) {
+        self.poll_screenshot();
         self.poll_output_config();
         let before = self.window_preferences_applied.len();
         self.apply_window_preferences();

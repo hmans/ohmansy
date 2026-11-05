@@ -92,6 +92,15 @@ impl ServerDndGrabHandler for Smallvil {}
 
 delegate_data_device!(Smallvil);
 
+impl smithay::wayland::selection::wlr_data_control::DataControlHandler for Smallvil {
+    fn data_control_state(
+        &self,
+    ) -> &smithay::wayland::selection::wlr_data_control::DataControlState {
+        &self.data_control_state
+    }
+}
+smithay::delegate_data_control!(Smallvil);
+
 //
 // Wl Output & Xdg Output
 //

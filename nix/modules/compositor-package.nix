@@ -24,6 +24,7 @@ pkgs.rustPlatform.buildRustPackage {
   OHMANSY_COMPOSITOR_ASSETS = "${../compositor}";
   postFixup = ''
     wrapProgram "$out/bin/ohmansy-compositor" \
+      --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.coreutils pkgs.wl-clipboard pkgs.xdg-user-dirs pkgs.satty ]} \
       --run '. ${cursor.environment}' \
       --prefix LD_LIBRARY_PATH : ${
         pkgs.lib.makeLibraryPath [

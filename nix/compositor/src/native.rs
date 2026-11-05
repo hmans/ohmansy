@@ -361,6 +361,7 @@ impl Native {
             state.needs_redraw = false;
         }
         for head in &mut self.heads {
+            state.capture_output(&mut self.renderer, &head.output, &mut self.decorations);
             let original_mode = head.mode;
             if !head.pending && head.failed_revision != Some(state.config_revision) {
                 let info = state.output_info.get(&head.output.name()).unwrap();
@@ -399,6 +400,7 @@ impl Native {
                 Some(&mut self.cursors),
                 &mut self.decorations,
                 (0, 0).into(),
+                true,
             );
             let result = match head.scanout.render_frame(
                 &mut self.renderer,

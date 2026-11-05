@@ -20,6 +20,7 @@
       ripgrep
       eza
       bat
+      satty
       jq
       gcc
       gnumake

@@ -76,6 +76,7 @@ pub struct Smallvil {
     pub session_mode: bool,
     pub shortcut_modifier: crate::input::ShortcutModifier,
     pub screenshot: Option<std::path::PathBuf>,
+    pub capture: crate::screenshot::State,
     pub commits: u64,
     pub rendered_frames: u64,
     pub forwarded_keys: u64,
@@ -94,6 +95,7 @@ pub struct Smallvil {
     pub output_manager_state: OutputManagerState,
     pub seat_state: SeatState<Smallvil>,
     pub data_device_state: DataDeviceState,
+    pub data_control_state: smithay::wayland::selection::wlr_data_control::DataControlState,
     pub popups: PopupManager,
 
     pub seat: Seat<Self>,
@@ -195,6 +197,7 @@ impl Smallvil {
             session_mode: false,
             shortcut_modifier: Default::default(),
             screenshot: None,
+            capture: Default::default(),
             commits: 0,
             rendered_frames: 0,
             forwarded_keys: 0,
@@ -207,6 +210,13 @@ impl Smallvil {
             output_manager_state,
             seat_state,
             data_device_state,
+            // Clipboard helpers must not open a temporary window to acquire focus.
+            data_control_state:
+                smithay::wayland::selection::wlr_data_control::DataControlState::new::<Self, _>(
+                    &dh,
+                    None,
+                    |_| true,
+                ),
             popups,
             seat,
         }

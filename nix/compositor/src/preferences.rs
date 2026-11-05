@@ -191,6 +191,10 @@ pub enum Action {
     Terminal,
     Launcher,
     Logout,
+    Screenshot {
+        #[serde(default)]
+        annotate: bool,
+    },
     Close,
     FocusOutputPrev,
     FocusOutputNext,
@@ -261,6 +265,7 @@ impl Action {
         use Action::*;
         let (name, value) = match self {
             None => return Ok(()),
+            Screenshot { annotate } => return state.request_screenshot(Option::None, *annotate),
             Launch { program, args } => {
                 return crate::spawn_application(&state.socket_name, program, args)
                     .map_err(|e| e.to_string())
@@ -365,6 +370,9 @@ pub fn bindings(
 ) -> Result<Vec<(Chord, Action)>, String> {
     use Action::*;
     let mut defaults = vec![
+        ("Print".into(), Screenshot { annotate: false }),
+        ("Ctrl+Print".into(), Screenshot { annotate: false }),
+        ("Shift+Print".into(), Screenshot { annotate: true }),
         ("Mod+Return".to_owned(), Terminal),
         ("Mod+Space".into(), Launcher),
         ("Mod+R".into(), CycleWidth { reverse: false }),

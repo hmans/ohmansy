@@ -95,6 +95,11 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                     } else {
                         Err("key needs a physical code and pressed boolean".into())
                     }
+                } else if action == "screenshot-screen" {
+                    data.state.request_screenshot(
+                        request["path"].as_str().map(PathBuf::from),
+                        request["annotate"].as_bool().unwrap_or(false),
+                    )
                 } else if action == "screenshot" {
                     if data.state.native_mode {
                         Err("Framebuffer screenshots are currently available in nested mode".into())
@@ -161,7 +166,11 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                     }
                 };
                 let reply = match result {
-                    Ok(()) => json!({"ok":true,"state":data.state.status()}),
+                    Ok(()) => {
+                        let mut state = data.state.status();
+                        state["screenshot"] = json!(data.state.capture.last);
+                        json!({"ok":true,"state":state})
+                    }
                     Err(error) => json!({"ok":false,"error":error}),
                 };
                 let _ = response.send(reply);
@@ -265,6 +274,15 @@ pub fn send(path: &str, command: &[String]) -> Result<()> {
             .clone()
             .into();
         request["args"] = json!(&command[2..]);
+    } else if action == "screenshot-screen" {
+        request["annotate"] = command.iter().skip(1).any(|arg| arg == "--annotate").into();
+        if let Some(path) = command
+            .iter()
+            .skip(1)
+            .find(|arg| arg.as_str() != "--annotate")
+        {
+            request["path"] = path.clone().into();
+        }
     } else if action == "screenshot" {
         request["path"] = command
             .get(1)

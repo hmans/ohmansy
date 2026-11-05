@@ -111,6 +111,7 @@ impl Smallvil {
         mut named: Option<&mut Cursors>,
         decorations: &mut crate::decoration::Renderer,
         canvas: Point<i32, Physical>,
+        include_cursor: bool,
     ) -> Vec<OutputElement> {
         let Some(index) = self
             .layout
@@ -129,6 +130,7 @@ impl Smallvil {
         if self.layout.at(pointer.x, pointer.y) == Some(index) {
             let local = pointer - origin.to_f64();
             match &self.cursor_image {
+                _ if !include_cursor => (),
                 CursorImageStatus::Surface(surface) => {
                     let hotspot = with_states(surface, |s| {
                         s.data_map

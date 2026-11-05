@@ -58,7 +58,7 @@ sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
 The optional software bundle defaults to Git, tig, lazygit, tmux, mise, herdr,
-Vim, Neovim, VSCodium, Zed, curl, wget, fzf, ripgrep, eza, bat, jq,
+Vim, Neovim, VSCodium, Zed, curl, wget, fzf, ripgrep, eza, bat, Satty, jq,
 GCC, GNU Make, Python 3, pkg-config, fastfetch, btop, htop, and psmisc (including
 `killall`). These defaults live in `nix/modules/software.nix`, exported by the
 root flake as `nixosModules.software`.

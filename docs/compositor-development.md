@@ -110,6 +110,8 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+Shift+F | Toggle fullscreen |
 | Mod+W | Close the focused window |
 | Mod+S | Cycle the focused monitor's scale from 100% to 200% |
+| Print / Ctrl+Print | Save the focused monitor and copy its PNG to the clipboard |
+| Shift+Print | Capture the focused monitor and open Satty for annotation |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
 
@@ -154,12 +156,59 @@ images; they are not limited to X11.
 
 The login session uses `--backend drm`; development uses `--backend winit`
 inside the parent desktop. Native output support currently covers connectors
-on one primary GPU, with preferred or explicitly selected modes. Rotation,
-multi-GPU rendering, and native framebuffer screenshots are not implemented.
+on one primary GPU, with preferred or explicitly selected modes. Rotation
+and multi-GPU rendering are not implemented.
 Clipboard exchange is local to
 its clients. X11 clients and
 moving existing Niri windows into it are unsupported. Its 3D presentation remains
 in the separate snapshot experiment.
+
+## Screenshots
+
+**Print** or **Ctrl+Print** captures the focused monitor without the mouse cursor.
+The PNG includes its windows, popups, panel and compositor decorations. Shine
+saves it under `Screenshots` in your configured Pictures directory and copies
+the same image to the clipboard. A popup briefly shows the saved path and
+whether copying succeeded, including in fullscreen. It keeps keyboard focus
+in your application. Screenshots have unique timestamped names and never
+replace an existing file. PNG encoding, saving and clipboard transfer run off
+the compositor thread.
+Clipboard helpers use the data-control protocol, so copying does not require
+opening a temporary window or changing keyboard focus.
+
+**Shift+Print** also opens the saved image in Satty, which is included for
+annotation. Satty's own save and copy actions apply your edits; the initial
+clipboard image is the unedited screenshot. Region and window selection are
+not yet available in Shine. Niri retains its built-in selection workflow.
+
+The parent desktop may intercept Print in a nested preview. Use the private
+control socket or configure another binding for that preview:
+
+```toml
+[bindings]
+"Mod+P" = { action = "screenshot" }
+"Mod+Shift+P" = { action = "screenshot", annotate = true }
+```
+
+Capture through the CLI with either backend:
+
+```sh
+.build/spatial/debug/ohmansy-compositor msg --socket .local/compositor-control.sock screenshot-screen
+.build/spatial/debug/ohmansy-compositor msg --socket .local/compositor-control.sock screenshot-screen /tmp/shine.png --annotate
+```
+
+The command queues a capture; poll `status` for its `screenshot` result, including
+the saved path, pixel dimensions, and any save, clipboard or annotation error.
+The older `screenshot PNG` command remains a nested-only diagnostic capture of
+the whole preview canvas. Neither command supplies a public Wayland capture
+protocol or desktop portal; external capture apps still need those interfaces.
+
+Run `python3 tools/tests/compositor_screenshots.py` inside `nix develop .#spatial`
+after building the development binary. Build
+`.#checks.x86_64-linux.compositor-screenshots` for a focused native VM check
+of two monitors, mixed scaling, Print, fullscreen and PNG clipboard contents.
+It exports the captured PNGs under `screenshots/` in its result. The broader
+`compositor-drm` check also exercises capture across an output mode change.
 
 ## Configuration
 

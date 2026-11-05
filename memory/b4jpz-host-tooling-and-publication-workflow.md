@@ -683,3 +683,45 @@ and wrapping under the German keymap, unchanged window identities, Mod+Q
 preserving a disposable window and Mod+W closing it. Parent windows were
 preserved. CLI help, example TOML, demo and compositor guide were updated.
 No installed-system activation, session restart or native DRM VM trial.
+
+
+## Shine screenshots (2026-11-05)
+
+`Print` and `Ctrl+Print` save the focused monitor as a PNG under the configured
+Pictures/Screenshots directory and copy that image to the clipboard.
+`Shift+Print` also opens Satty. Satty ships in the software defaults and the
+compositor wrapper supplies its helpers. `screenshot-screen [PNG] [--annotate]`
+queues capture through the private CLI; poll status.screenshot for completion
+and errors. The old `screenshot PNG` whole-canvas diagnostic stays nested-only.
+Region/window selection and public screenshot/screencast protocols remain absent.
+See `docs/compositor-development.md` for usage and customization.
+
+`screenshot.rs` renders the shared scene offscreen for either backend, excluding
+named and client cursors. Its Flipped180 transform produces top-to-bottom PNG
+rows; map_texture's flipped flag still controls mapping inversion. PNG encoding,
+file writes, clipboard copying and annotation launch run in a worker. Destinations
+use create_new and are never overwritten. Save failures and clipboard/annotation
+failures are reported separately. Wlr data-control lets clipboard helpers operate
+without a temporary focus-acquiring window; normal application clipboard still works.
+
+The Quickshell result overlay keeps keyboard focus and is visible in fullscreen.
+Keep its layer surface mapped, transparent and with an empty input region when
+hidden. Destroying a popup role and then committing Qt's null buffer trips the
+pinned Smithay 0.7 pre-commit size check against reset role state (observed
+wl_display.error: width 0 without left/right anchors), disconnecting the shell.
+Keeping the role alive avoids this; do not reintroduce visible/LazyLoader teardown
+without fixing that lifetime issue. Hidden-overlay click-through is tested.
+
+Verification: Rust tests, fmt and strict Clippy passed. The nested screenshot
+trial passed real pixels including title/text orientation, cursor exclusion,
+two monitors, 100–200% scale, fullscreen, empty-desktop idle, keyboard focus,
+PNG clipboard bytes, Print, existing-file protection, error recovery, Satty,
+and transparent-overlay click-through. Firefox/GTK/cursor/clipboard integration
+and the packaged nested session check passed. All seven image configurations
+include Satty; native customization passed. The dedicated x86 compositor-screenshots
+NixOS VM booted and passed mixed-scale monitor captures, Print, fullscreen,
+clipboard byte equality and preserved keyboard focus; exported PNGs and the
+result popup were visually inspected. This is VM/native DRM plus nested GPU
+verification, not an installed-system activation or physical-session trial.
+The broader compositor-drm suite reached its screenshot checks but failed later
+in keyring password-relogin checks; do not report that whole suite as passed.
