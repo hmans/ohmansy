@@ -122,6 +122,7 @@ pub struct Decorations {
     pub corner_radius: u32,
     pub focus_ring_width: u32,
     pub focus_ring_color: [f32; 4],
+    pub shadow: Shadow,
 }
 impl Default for Decorations {
     fn default() -> Self {
@@ -129,6 +130,7 @@ impl Default for Decorations {
             corner_radius: 14,
             focus_ring_width: 2,
             focus_ring_color: [0.67, 0.57, 0.78, 1.0],
+            shadow: Shadow::default(),
         }
     }
 }
@@ -145,6 +147,48 @@ impl Decorations {
             .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
         {
             return Err("Focus ring color needs four RGBA values from 0 to 1".into());
+        }
+        self.shadow.validate()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Shadow {
+    pub enabled: bool,
+    pub softness: u32,
+    pub spread: u32,
+    pub offset: [i32; 2],
+    pub color: [f32; 4],
+}
+impl Default for Shadow {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            softness: 12,
+            spread: 2,
+            offset: [0, 6],
+            color: [0.0, 0.0, 0.0, 0.35],
+        }
+    }
+}
+impl Shadow {
+    fn validate(&self) -> Result<(), String> {
+        if !(1..=64).contains(&self.softness)
+            || self.spread > 64
+            || self.offset.iter().any(|v| !(-128..=128).contains(v))
+        {
+            return Err(
+                "Shadow softness must be 1–64, spread 0–64, and offsets −128–128 logical pixels"
+                    .into(),
+            );
+        }
+        if self
+            .color
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err("Shadow color needs four RGBA values from 0 to 1".into());
         }
         Ok(())
     }

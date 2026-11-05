@@ -810,3 +810,36 @@ the normal key handler. Both saved a PNG, served identical clipboard bytes and
 preserved window workspace/focus. The broad screenshot trial hit its earlier
 popup-expiry fixture before reaching the shortcut; do not claim that whole
 trial passed. No installed activation or physical keyboard trial.
+
+## Shine window shadows (2026-11-05)
+
+Regular windows now have compositor-drawn drop shadows. `[decorations.shadow]`
+configures enabled (default true), softness (1–64, default 12), spread (0–64,
+default 2), offset (two −128–128 logical pixels, default [0,6]) and RGBA color
+(default black at 0.35 alpha). Settings use the existing strict validation,
+live reload and comment-preserving saves. `config.example.toml` documents them.
+
+`decoration.rs` caches four shader bands per window, leaving the interior out
+and masking rounded corners in `shadow.frag`. A bounded Gaussian falloff
+softens the shifted/expanded shape. Cutting out the original window prevents
+shadows tinting translucent interiors. The normal front-to-back scene inserts
+each shadow immediately below its window, cropped to the output. Existing
+visual bounds handle scrolling and reordering; fullscreen omits shadows.
+No layout sizes, input regions or client buffers change. Cached geometry and
+uniforms avoid adding repaint work while stationary.
+
+32 Rust tests, formatting and strict Clippy passed. The two-output
+`tools/tests/compositor_shadows.py` trial passed actual shadow/falloff pixels,
+translucent interiors, maximum-size shadow clipping at an output boundary,
+100–200% scaling, offset/spread changes, square corners, fullscreen, live
+reload/disable/save, idle rendering and parent-window preservation. Debug
+shadow screenshots were visually inspected. Existing decoration and movement
+trials passed; the decoration fixture explicitly disables shadows to keep its
+corner/ring assertions independent. The session package built. No installed OS
+activation, physical session replacement, commit or push.
+
+The packaged nested session trial also passed, and its normal ribbon/terminal
+screenshot was visually inspected. The focused `compositor-screenshots` native
+DRM VM suite booted and passed capture, focus, clipboard, scale/mode, fullscreen
+and feedback checks with the new shader. This is VM DRM evidence; physical DRM
+outputs were not tested.

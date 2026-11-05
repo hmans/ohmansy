@@ -536,6 +536,14 @@ mod tests {
             "[decorations]\nfocus_ring_width=17",
             "[decorations]\nfocus_ring_color=[1.1,0.5,0.5,1.0]",
             "[decorations]\nfocus_ring_color=[0.5,0.5,0.5,nan]",
+            "[decorations.shadow]\nsoftness=0",
+            "[decorations.shadow]\nsoftness=65",
+            "[decorations.shadow]\nspread=65",
+            "[decorations.shadow]\noffset=[-129,0]",
+            "[decorations.shadow]\noffset=[0,129]",
+            "[decorations.shadow]\ncolor=[0.0,0.0,0.0,1.1]",
+            "[decorations.shadow]\ncolor=[0.0,nan,0.0,0.5]",
+            "[decorations.shadow]\nunknown=true",
         ] {
             assert!(Settings::parse(invalid).is_err(), "{invalid}");
         }

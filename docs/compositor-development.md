@@ -287,10 +287,11 @@ to the destination. Width changes, workspace transfers, and monitor transfers
 remain immediate. Resize, fullscreen, layout changes, and window removal finish
 pending reorder animations.
 
-### Rounded corners and focus ring
+### Rounded corners, focus ring and shadows
 
-Windows have 14 px rounded corners and a 2 px lavender ring around the focused
-window. Fullscreen windows have square corners and no ring. Menus and tooltips
+Windows have 14 px rounded corners, soft drop shadows, and a 2 px lavender ring
+around the focused window. Fullscreen windows have square corners, no shadow,
+and no ring. Menus and tooltips
 remain free to extend beyond the window. Transparent corners do not receive
 pointer input.
 
@@ -299,12 +300,28 @@ pointer input.
 corner_radius = 14
 focus_ring_width = 2
 focus_ring_color = [0.67, 0.57, 0.78, 1.0]
+
+[decorations.shadow]
+enabled = true
+softness = 12
+spread = 2
+offset = [0, 6]
+color = [0.0, 0.0, 0.0, 0.35]
 ```
 
 Dimensions are logical pixels: radius 0–128 and ring width 0–16. Zero disables
 that decoration. The color is RGBA with four values from 0 to 1. Edits apply
 live to existing windows; output saves preserve this section. This uses the
 same renderer in the login session and the nested desktop preview.
+
+Drop shadows follow each window's rounded shape and movement, and disappear in
+fullscreen. Their interiors are cut out so translucent windows keep their
+original background opacity. `enabled = false` disables shadows. `softness`
+controls the soft falloff (1–64), `spread` expands the shape (0–64), and `offset`
+sets its horizontal and vertical displacement (−128–128 each), all in logical
+pixels. `color` is RGBA from 0 to 1; its alpha controls opacity. Shadow edits
+reload live and are preserved when saving monitor settings. Shadows are visual
+only and do not change window sizes, spacing, or input regions.
 
 ### Bindings and window rules
 
@@ -436,6 +453,7 @@ python3 tools/tests/compositor_nesting.py
 python3 tools/tests/compositor_monitors.py
 python3 tools/tests/compositor_preferences.py
 python3 tools/tests/compositor_movement.py
+python3 tools/tests/compositor_shadows.py
 nix build .#checks.x86_64-linux.compositor-drm
 mise run compositor -- --scale 1.5 --close-after 10
 ```

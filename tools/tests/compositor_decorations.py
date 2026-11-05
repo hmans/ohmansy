@@ -65,6 +65,8 @@ enabled=false
 corner_radius={radius}
 focus_ring_width={width}
 focus_ring_color={color}
+[decorations.shadow]
+enabled=false
 ''')
         temporary.replace(config)
 

@@ -1,4 +1,4 @@
-//! Window masks and focus rings shared by native and nested rendering.
+//! Window masks, shadows and focus rings shared by native and nested rendering.
 use crate::{layout::WindowId, preferences::Decorations};
 use smithay::{
     backend::renderer::{
@@ -26,8 +26,10 @@ struct Ring {
 pub struct Renderer {
     rounded: GlesTexProgram,
     border: GlesPixelProgram,
+    shadow: GlesPixelProgram,
     masks: HashMap<Id, MaskId>,
     rings: HashMap<WindowId, Ring>,
+    shadows: HashMap<WindowId, Ring>,
     used: HashSet<Id>,
 }
 impl Renderer {
@@ -52,8 +54,22 @@ impl Renderer {
                     UniformName::new("piece_offset", UniformType::_2f),
                 ],
             )?,
+            shadow: renderer.compile_custom_pixel_shader(
+                include_str!("shadow.frag"),
+                &[
+                    UniformName::new("radius", UniformType::_1f),
+                    UniformName::new("softness", UniformType::_1f),
+                    UniformName::new("spread", UniformType::_1f),
+                    UniformName::new("offset", UniformType::_2f),
+                    UniformName::new("shadow_color", UniformType::_4f),
+                    UniformName::new("window_size", UniformType::_2f),
+                    UniformName::new("piece_offset", UniformType::_2f),
+                    UniformName::new("feather", UniformType::_1f),
+                ],
+            )?,
             masks: HashMap::new(),
             rings: HashMap::new(),
+            shadows: HashMap::new(),
             used: HashSet::new(),
         })
     }
@@ -65,6 +81,7 @@ impl Renderer {
             live.contains(&m.window) && (!owned.contains(&m.window) || self.used.contains(id))
         });
         self.rings.retain(|id, _| live.contains(id));
+        self.shadows.retain(|id, _| live.contains(id));
     }
     pub fn rounded(
         &mut self,
@@ -108,6 +125,59 @@ impl Renderer {
             radius: radius as f32 * scale as f32,
             logical_radius: radius,
         }
+    }
+    pub fn shadow(
+        &mut self,
+        id: WindowId,
+        bounds: Rectangle<i32, Logical>,
+        style: &Decorations,
+        scale: f64,
+    ) -> Vec<PixelShaderElement> {
+        let shadow = &style.shadow;
+        let padding = (shadow.softness * 3 + shadow.spread) as i32
+            + shadow.offset[0].abs().max(shadow.offset[1].abs())
+            + 1;
+        let radius = (style.corner_radius as i32).min(bounds.size.w.min(bounds.size.h) / 2);
+        let (w, h) = (bounds.size.w, bounds.size.h);
+        // The interior is deliberately absent, including for translucent clients.
+        // Only rounded corners and the bands outside the window need shading.
+        let pieces = [
+            Rectangle::new(
+                (-padding, -padding).into(),
+                (w + 2 * padding, padding + radius).into(),
+            ),
+            Rectangle::new(
+                (-padding, h - radius).into(),
+                (w + 2 * padding, padding + radius).into(),
+            ),
+            Rectangle::new((-padding, radius).into(), (padding, h - 2 * radius).into()),
+            Rectangle::new((w, radius).into(), (padding, h - 2 * radius).into()),
+        ];
+        let key = (style.clone(), scale.to_bits(), w, h);
+        let cache = self.shadows.entry(id).or_insert_with(|| Ring {
+            style: key.clone(),
+            elements: pieces
+                .iter()
+                .map(|piece| {
+                    PixelShaderElement::new(
+                        self.shadow.clone(),
+                        Rectangle::new(bounds.loc + piece.loc, piece.size),
+                        None,
+                        1.0,
+                        shadow_uniforms(style, scale, bounds.size, piece.loc),
+                        Kind::Unspecified,
+                    )
+                })
+                .collect(),
+        });
+        for (element, piece) in cache.elements.iter_mut().zip(pieces) {
+            element.resize(Rectangle::new(bounds.loc + piece.loc, piece.size), None);
+            if cache.style != key {
+                element.update_uniforms(shadow_uniforms(style, scale, bounds.size, piece.loc));
+            }
+        }
+        cache.style = key;
+        cache.elements.clone()
     }
     pub fn ring(
         &mut self,
@@ -158,6 +228,26 @@ impl Renderer {
         cache.style = key;
         cache.elements.clone()
     }
+}
+fn shadow_uniforms(
+    style: &Decorations,
+    scale: f64,
+    size: smithay::utils::Size<i32, Logical>,
+    offset: Point<i32, Logical>,
+) -> Vec<Uniform<'static>> {
+    vec![
+        Uniform::new("radius", style.corner_radius as f32),
+        Uniform::new("softness", style.shadow.softness as f32),
+        Uniform::new("spread", style.shadow.spread as f32),
+        Uniform::new(
+            "offset",
+            (style.shadow.offset[0] as f32, style.shadow.offset[1] as f32),
+        ),
+        Uniform::new("shadow_color", style.shadow.color),
+        Uniform::new("window_size", (size.w as f32, size.h as f32)),
+        Uniform::new("piece_offset", (offset.x as f32, offset.y as f32)),
+        Uniform::new("feather", 0.5 / scale as f32),
+    ]
 }
 fn ring_uniforms(
     style: &Decorations,

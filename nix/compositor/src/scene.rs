@@ -318,6 +318,15 @@ impl Smallvil {
                     elements.push(SceneElement::Window(element));
                 }
             }
+            // Elements are ordered front to back: each shadow sits below its
+            // own window and above windows behind it, with output-local clipping.
+            if !fullscreen && style.shadow.enabled && style.shadow.color[3] > 0.0 {
+                for shadow in decorations.shadow(id, bounds, style, scale) {
+                    if let Some(shadow) = CropRenderElement::from_element(shadow, 1.0, crop) {
+                        elements.push(SceneElement::Ring(shadow));
+                    }
+                }
+            }
         }
         decorations.finish_output(&self.windows.keys().copied().collect(), &owned);
         elements.extend(render_layers(renderer, &[Layer::Bottom, Layer::Background]));
