@@ -481,6 +481,14 @@ or restarted. Install a new build before using the new action in live config.
 
 ## Shine Quickshell bar (2026-11-05)
 
+Desktop styling should be applied and verified in the running session by default,
+as codified in root `AGENTS.md` and the runtime iteration section of
+`docs/linux-development.md`. Use live TOML reloads, checkout QML reloads, or a
+graceful shell-only replacement. Keep reusable source changes alongside runtime
+testing. Builds do not imply live application, and temporary shell replacement
+does not update the next login's installed wrapper. Compositor code changes use
+a disposable nested preview until a session restart is planned.
+
 Shine now provides layer-shell output mapping, rendering, pointer targeting,
 frame callbacks and exclusive work areas. Layouts retain full monitor bounds
 for pointer movement and fullscreen, while ordinary/maximized windows use the

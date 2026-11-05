@@ -74,7 +74,11 @@ a Quickshell bar on each monitor. The bar has four workspace buttons, a Terminal
 button, and a clock. Buttons act on their own monitor. Windows leave room for
 the bar; fullscreen covers it. The same bar starts in the packaged Shine session.
 Its QML lives in `nix/modules/shine-shell/shell.qml` and reloads on save in the
-development preview. Restart the preview after changing Rust or shared UI components.
+development preview. Shared UI changes require rebuilt dependencies and a shell
+replacement; Rust changes require rebuilding and restarting the disposable preview.
+For styling in an installed session, use the
+[runtime iteration workflow](linux-development.md#iterate-in-the-running-desktop)
+to reload settings or replace only the shell while keeping applications open.
 
 These are interactive applications on a private Wayland socket. Firefox uses a
 fresh profile, and the editor uses separate application state under ignored

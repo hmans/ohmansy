@@ -32,6 +32,10 @@ or push unless asked. Preserve unrelated changes.
 - Implement shared OS and desktop changes in this repo's reusable modules,
   packages, and defaults so they ship in ohmansy. Use the current installation
   to test them; keep machine-only settings in its local configuration.
+- For desktop styling, apply and verify changes in the running session by
+  default: reload Shine settings or checkout QML, or gracefully replace only
+  Quickshell. Preserve the compositor and application windows. Do not require
+  logout for these changes. See [runtime iteration](docs/linux-development.md#iterate-in-the-running-desktop).
 - `flakey/` is ignored reference material, never an official flake input or staged
   content. Its old VM was deleted. Do not recreate it as a fallback.
 - Keep credentials, VM state, generated bundles, and personal configuration out

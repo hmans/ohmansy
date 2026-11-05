@@ -77,7 +77,40 @@ authenticate, reboot, or shut down the machine. `nix run .#first-boot-preview`
 previews onboarding without creating accounts. The `ribbons` flake check tests
 both desktop OpenGL and ES on a software renderer; it does not replace a GPU test.
 
-For a desktop panel preview, build first, then temporarily replace only its
+### Iterate in the running desktop
+
+Apply requested desktop styling changes to the running session when supported,
+and verify the result there. Keep the reusable source change as well so it
+ships in ohmansy. A successful build alone does not finish a visual iteration.
+
+| Change | Fast iteration path |
+| --- | --- |
+| Shine ring, corners, shadows or other existing settings | Edit the active TOML configuration; it reloads live. Verify effective `preferences` and `config_error` through IPC. |
+| Quickshell bar QML | Run the shell from checkout QML once; later saves reload automatically. |
+| Shared QML imports or compiled shell assets | Rebuild the shell dependencies and gracefully replace only Quickshell. |
+| Compositor Rust code | Build and test in a disposable nested preview; replacing the login compositor requires a planned session restart. |
+| Installed defaults and session wrappers | Rebuild the installed system for persistence; use the runtime paths above for immediate visual feedback. |
+
+First verify the active compositor, shell PID, configuration path and Wayland
+socket. A terminal can retain a stale control socket after a session restart.
+For shell replacement, recover only the required display, control, import and
+D-Bus settings from the verified shell process; do not save its full environment.
+Packaged QML in `/nix/store` is immutable, so editing the checkout does not affect
+a shell launched from that copy.
+
+For Shine, use `nix/modules/shine-shell/shell.qml` as the replacement shell's
+`--path`. Keep its working dependency imports and actual compositor control
+socket. Stop the old shell cleanly before starting the new one, and restore the
+packaged shell if loading fails. Verify bars on every output, no QML errors,
+and preserved compositor and application window identities. Never start a second
+panel or wallpaper over the first. No logout or compositor restart is needed.
+Afterward, checkout QML reloads on save. This is a runtime preview: the installed
+session wrapper will use its packaged shell again at the next login until updated.
+
+For an isolated Shine preview, `mise run compositor-desktop` already points the
+shell at checkout QML. See [Shine development](compositor-development.md).
+
+For a Niri desktop panel preview, build first, then temporarily replace only its
 user service. Run this in the Bash shell opened by `nix develop`:
 
 ```sh
