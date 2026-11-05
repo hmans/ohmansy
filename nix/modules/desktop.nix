@@ -46,6 +46,15 @@ in {
   };
   hardware.graphics.enable = true;
   hardware.bluetooth.enable = lib.mkDefault true;
+  # WebHID configurators need raw HID access for the active local seat user.
+  # Tag before systemd's seat-late rule applies the device ACL.
+  services.udev.packages = [ (pkgs.writeTextFile {
+    name = "ohmansy-keychron-udev";
+    destination = "/lib/udev/rules.d/70-ohmansy-keychron.rules";
+    text = ''
+      SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="3434", TAG+="uaccess"
+    '';
+  }) ];
   fonts.packages = with pkgs; [ inter jetbrains-mono ibm-plex ];
 
   # No account, credentials, machine identifiers, or personal services here.

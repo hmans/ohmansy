@@ -46,6 +46,19 @@ Record the checkout, running generation, test commands, and pending work. Do not
 copy Mac-specific paths or credentials from another machine. Each agent must
 verify the current state again.
 
+## Configure a Keychron keyboard
+
+For the K2 HE, connect by USB in Cable mode and open
+[Keychron Launcher](https://launcher.keychron.com) in Chrome or Chromium.
+Keep the layout switch on Mac and edit Layer 0. Assign Print Screen to the
+screenshot key to use Shift with it for Satty in Shine.
+
+The desktop module includes a Keychron USB HID rule that grants access to the
+active local user. If Launcher lists the device but reports "Failed to open
+the device", check its `/dev/hidraw*` permissions. Existing installations need
+the updated desktop module activated, then the device reconnected. Bluetooth
+and receiver configuration support depends on the keyboard model.
+
 ## Check and preview small changes
 
 Stage newly added Nix input files so the Git-backed flake includes them. Keep

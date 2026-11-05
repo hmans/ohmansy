@@ -9,6 +9,18 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Keychron Launcher HID access (2026-11-05): `desktop.nix` packages
+`70-ohmansy-keychron.rules`, tagging USB vendor 3434 hidraw devices with
+`uaccess` before systemd seat-late applies active-seat ACLs. This supports
+Launcher without world-writable devices or input-group membership. A live
+receiver was enumerated but its HID nodes denied the desktop user's read/write
+access, consistent with Launcher's "Failed to open the device" error. The rule
+package built, `udevadm verify` and native customization passed. Sudo required
+a password, so no rule was applied to the running system and no browser
+connection or remapping was verified. K2 HE configuration uses Keychron
+Launcher over USB; edit Mac Layer 0 to replace Screenshot with Print Screen.
+See `docs/linux-development.md`.
+
 Chrome web apps (2026-11-05): `software.nix` includes Chatto, WhatsApp, and
 Bluesky desktop entries in `ohmansy.software.packages`. They run
 `google-chrome --app=https://…/` and use `TryExec=google-chrome`; Chrome is
