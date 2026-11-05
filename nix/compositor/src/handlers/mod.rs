@@ -1,4 +1,5 @@
 mod compositor;
+mod layer_shell;
 mod protocols;
 mod xdg_shell;
 

@@ -62,11 +62,22 @@ Run the Shine desktop experiment inside the current Wayland desktop:
 mise run compositor-desktop
 ```
 
-It opens a nested desktop with a new terminal, Firefox, and GNOME Text Editor.
+It opens a nested desktop with a new terminal, Firefox, GNOME Text Editor, and
+a Quickshell bar on each monitor. The bar has four workspace buttons, a Terminal
+button, and a clock. Buttons act on their own monitor. Windows leave room for
+the bar; fullscreen covers it. The same bar starts in the packaged Shine session.
+Its QML lives in `nix/modules/shine-shell/shell.qml` and reloads on save in the
+development preview. Restart the preview after changing Rust or shared UI components.
+
 These are interactive applications on a private Wayland socket. Firefox uses a
 fresh profile, and the editor uses separate application state under ignored
 `.local/compositor-demo/`. Commands in the new terminal execute on this machine.
 Closing the outer window ends the nested session and disconnects its clients.
+
+The bar uses Shine's layer-shell support and private control socket, independent
+of Niri's panel and services. This first version has no application menu, tray,
+audio controls, or keyboard-focused layer popups. The plain `compositor` demo
+stays minimal; use `compositor-desktop` to preview the bar.
 
 Windows form a horizontal strip with persistent widths. Focusing a window
 scrolls it into view; adding another window keeps existing widths. There are

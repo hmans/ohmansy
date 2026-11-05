@@ -143,7 +143,22 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                         .map_err(|e| e.to_string())
                     }
                 } else {
-                    data.state.action(action, request["value"].as_i64())
+                    let output = request["output"].as_str();
+                    let target = output.and_then(|name| {
+                        data.state
+                            .layout
+                            .monitors
+                            .iter()
+                            .position(|m| m.name == name)
+                    });
+                    if output.is_some() && target.is_none() {
+                        Err("Output does not exist".into())
+                    } else {
+                        if let Some(index) = target {
+                            data.state.layout.focus_monitor(index);
+                        }
+                        data.state.action(action, request["value"].as_i64())
+                    }
                 };
                 let reply = match result {
                     Ok(()) => json!({"ok":true,"state":data.state.status()}),

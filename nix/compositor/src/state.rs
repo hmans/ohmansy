@@ -89,6 +89,7 @@ pub struct Smallvil {
     // Smithay State
     pub compositor_state: CompositorState,
     pub xdg_shell_state: XdgShellState,
+    pub layer_shell_state: smithay::wayland::shell::wlr_layer::WlrLayerShellState,
     pub shm_state: ShmState,
     pub output_manager_state: OutputManagerState,
     pub seat_state: SeatState<Smallvil>,
@@ -138,6 +139,9 @@ impl Smallvil {
         Self {
             start_time,
             display_handle: dh.clone(),
+            layer_shell_state: smithay::wayland::shell::wlr_layer::WlrLayerShellState::new::<Self>(
+                &dh,
+            ),
 
             space,
             loop_signal,
@@ -257,11 +261,16 @@ impl Smallvil {
         &self,
         pos: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<f64, Logical>)> {
-        self.window_under(pos).and_then(|(window, location)| {
-            window
-                .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
-                .map(|(s, p)| (s, (p + location).to_f64()))
-        })
+        use smithay::wayland::shell::wlr_layer::Layer;
+        self.layer_under(pos, &[Layer::Overlay, Layer::Top])
+            .or_else(|| {
+                self.window_under(pos).and_then(|(window, location)| {
+                    window
+                        .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                        .map(|(s, p)| (s, (p + location).to_f64()))
+                })
+            })
+            .or_else(|| self.layer_under(pos, &[Layer::Bottom, Layer::Background]))
     }
 
     pub fn window_under(&self, pos: Point<f64, Logical>) -> Option<(&Window, Point<i32, Logical>)> {
@@ -362,6 +371,7 @@ impl Smallvil {
             }
         }
         self.ui_scale = self.layout.current().scale;
+        self.arrange_layers();
         self.apply_positions();
         let position = anchor
             .and_then(|(name, x, y)| {
@@ -658,7 +668,13 @@ impl Smallvil {
         let outputs: Vec<_> = self.layout.monitors.iter().enumerate().filter(|(_,m)|self.space.outputs().any(|o|o.name()==m.name)).map(|(i,m)| {
             let info=self.output_info.get(&m.name);
             let mode=self.space.outputs().find(|o|o.name()==m.name).and_then(|o|o.current_mode());
-            serde_json::json!({"name":m.name,"id":info.map(|i|&i.id),"make":info.map(|i|&i.make),"model":info.map(|i|&i.model),"modes":info.map(|i|&i.modes),"mode":mode.map(|m|serde_json::json!({"width":m.size.w,"height":m.size.h,"refresh":m.refresh})),"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"scale":m.scale,"workspace":m.layout.active+1,"primary":self.primary_output().as_deref()==Some(&m.name),"focused":i==self.layout.active_monitor})
+            let output = self.space.outputs().find(|o| o.name() == m.name).unwrap();
+            let map = smithay::desktop::layer_map_for_output(output);
+            let layers: Vec<_> = map.layers().map(|layer| {
+                let geometry = map.layer_geometry(layer);
+                serde_json::json!({"namespace":layer.namespace(),"geometry":geometry.map(|g| (g.loc.x,g.loc.y,g.size.w,g.size.h))})
+            }).collect();
+            serde_json::json!({"name":m.name,"id":info.map(|i|&i.id),"make":info.map(|i|&i.make),"model":info.map(|i|&i.model),"modes":info.map(|i|&i.modes),"mode":mode.map(|m|serde_json::json!({"width":m.size.w,"height":m.size.h,"refresh":m.refresh})),"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"work_area":m.layout.work_area,"layers":layers,"scale":m.scale,"workspace":m.layout.active+1,"primary":self.primary_output().as_deref()==Some(&m.name),"focused":i==self.layout.active_monitor})
         }).collect();
         serde_json::json!({"preferences":{"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }

@@ -2,7 +2,7 @@
 data:
   area: tooling
   kind: workflow
-  reviewed: "2026-11-04"
+  reviewed: "2026-11-05"
   status: current
 id: b4jpz
 title: Host tooling and publication workflow
@@ -478,3 +478,36 @@ trial verified US equal/Shift-plus, German plus/minus, both clamps, unchanged
 column widths during scaling and the new resize chords, preserving parent
 windows. The development binary was built; the live session was not replaced
 or restarted. Install a new build before using the new action in live config.
+
+## Shine Quickshell bar (2026-11-05)
+
+Shine now provides layer-shell output mapping, rendering, pointer targeting,
+frame callbacks and exclusive work areas. Layouts retain full monitor bounds
+for pointer movement and fullscreen, while ordinary/maximized windows use the
+remaining work area. Top panels are hidden below fullscreen; Overlay remains
+above it. Keyboard-focused layer surfaces and layer popups are not implemented.
+
+`nix/modules/shine-shell/shell.qml` supplies an independent Quickshell bar on
+each output with four workspace buttons, Terminal and a clock, using shared
+Ohmansy.Ui controls. Commands target the clicked output through Shine's private
+IPC; panel clicks preserve application keyboard focus. No Niri state, theme
+scripts or parent activation environment are used. The shell resolves relative
+control-socket paths against the launcher's PWD. Its request queue removes
+requests when sent, so an in-flight status poll cannot discard a button click.
+
+`shine-shell.nix` packages the QML and shared UI. Both the packaged Shine session
+and `mise run compositor-desktop` start it; the plain compositor demo remains
+minimal. The development helper points OHMANSY_SHINE_QML at the checkout for
+live QML reloads. Shared UI or Rust edits require rebuilding/restarting the
+preview. No service is installed into the parent desktop for previews.
+
+Twenty-two Rust tests, formatting and strict Clippy passed. The two-output
+Quickshell trial verified rendering, reserved/released space, workspace and
+terminal clicks on the correct monitor, preserved keyboard focus, fullscreen,
+scale changes, relative socket paths, panel restart and shell exit when the
+compositor closes. Existing preferences and Firefox/GTK/cursor/clipboard tests
+passed. The final session package built and its nested launcher, canceled and
+confirmed logout, 2x terminal and parent environment/window preservation trial
+passed. An interactive desktop preview with the bar, Firefox, Text Editor and
+terminal was running and visually checked at handoff; verify its live state.
+No installed OS activation, physical DRM login, image build or boot was tested.

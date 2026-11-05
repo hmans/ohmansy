@@ -8,6 +8,7 @@
 let
   cursor = import ./cursor-theme.nix { inherit pkgs; };
   compositor = import ./compositor-package.nix { inherit pkgs; };
+  shell = import ./shine-shell.nix { inherit pkgs; };
   launcher = pkgs.writeShellScript "ohmansy-compositor-applications" ''
     exec ${pkgs.wofi}/bin/wofi --normal-window --show drun --prompt Applications
   '';
@@ -88,6 +89,7 @@ let
     export OHMANSY_COMPOSITOR_LAUNCHER=${launcher}
     export OHMANSY_COMPOSITOR_LOGOUT=${logout}
     export OHMANSY_COMPOSITOR_SESSION_SETUP=${setup}
+    export OHMANSY_COMPOSITOR_SHELL=${shell}/bin/ohmansy-shine-shell
     if [ "$OHMANSY_COMPOSITOR_SESSION_KIND" = nested ]; then
       exec ${pkgs.dbus}/bin/dbus-run-session -- \
         ${compositor}/bin/ohmansy-compositor --backend "$backend" --session --mod-key "$mod_key" "$@"

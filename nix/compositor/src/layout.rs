@@ -25,6 +25,7 @@ pub struct Layout {
     pub workspaces: Vec<Workspace>,
     pub active: usize,
     pub size: (i32, i32),
+    pub work_area: (i32, i32, i32, i32),
     pub gap: i32,
     pub default_width: crate::preferences::Width,
     pub animations_enabled: bool,
@@ -37,6 +38,7 @@ impl Default for Layout {
             workspaces: (0..4).map(|_| Workspace::default()).collect(),
             active: 0,
             size: (1000, 700),
+            work_area: (0, 0, 1000, 700),
             gap: 12,
             default_width: Default::default(),
             animations_enabled: true,
@@ -54,7 +56,7 @@ impl Layout {
     }
 
     pub fn insert(&mut self, id: WindowId) {
-        let width = self.default_width.resolve(self.size.0 - 2 * self.gap);
+        let width = self.default_width.resolve(self.work_area.2 - 2 * self.gap);
         let workspace = &mut self.workspaces[self.active];
         let index = workspace
             .focused
@@ -161,7 +163,7 @@ impl Layout {
             if let Some(column) = workspace.columns.iter_mut().find(|column| column.id == id) {
                 if enabled {
                     column.restore_width.get_or_insert(column.width);
-                    column.width = (self.size.0 - 2 * self.gap).max(200);
+                    column.width = (self.work_area.2 - 2 * self.gap).max(200);
                 } else if let Some(width) = column.restore_width.take() {
                     column.width = width;
                 }
@@ -210,10 +212,15 @@ impl Layout {
 
     pub fn set_size(&mut self, size: (i32, i32)) {
         self.size = (size.0.max(1), size.1.max(1));
+        self.set_work_area((0, 0, self.size.0, self.size.1));
+    }
+
+    pub fn set_work_area(&mut self, area: (i32, i32, i32, i32)) {
+        self.work_area = area;
         for workspace in &mut self.workspaces {
             for column in &mut workspace.columns {
                 if column.restore_width.is_some() {
-                    column.width = (self.size.0 - 2 * self.gap).max(200);
+                    column.width = (self.work_area.2 - 2 * self.gap).max(200);
                 }
             }
         }
@@ -263,10 +270,10 @@ impl Layout {
             .map(|column| {
                 let geometry = (
                     column.id,
-                    x - workspace.scroll.round() as i32,
-                    self.gap,
+                    self.work_area.0 + x - workspace.scroll.round() as i32,
+                    self.work_area.1 + self.gap,
                     column.width,
-                    (self.size.1 - 2 * self.gap).max(1),
+                    (self.work_area.3 - 2 * self.gap).max(1),
                 );
                 x += column.width + self.gap;
                 geometry
@@ -306,14 +313,14 @@ impl Layout {
             }
             left += (column.width + self.gap) as f64;
         }
-        let max_scroll = (left - self.size.0 as f64).max(0.0);
+        let max_scroll = (left - self.work_area.2 as f64).max(0.0);
         if let Some((left, right)) = focused_bounds {
-            if right - left >= (self.size.0 - 2 * self.gap) as f64
+            if right - left >= (self.work_area.2 - 2 * self.gap) as f64
                 || left < workspace.target + self.gap as f64
             {
                 workspace.target = left - self.gap as f64;
-            } else if right > workspace.target + (self.size.0 - self.gap) as f64 {
-                workspace.target = right - (self.size.0 - self.gap) as f64;
+            } else if right > workspace.target + (self.work_area.2 - self.gap) as f64 {
+                workspace.target = right - (self.work_area.2 - self.gap) as f64;
             }
         }
         workspace.target = workspace.target.clamp(0.0, max_scroll);
@@ -323,6 +330,25 @@ impl Layout {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn panels_reserve_space_but_fullscreen_uses_the_output() {
+        let mut layout = Layout::default();
+        layout.set_size((1000, 700));
+        layout.set_work_area((20, 44, 980, 656));
+        layout.insert(1);
+        assert_eq!(layout.geometries()[0].1, 32);
+        assert_eq!(layout.geometries()[0].2, 56);
+        assert_eq!(layout.geometries()[0].4, 632);
+        layout.maximize(1, true);
+        assert_eq!(layout.geometries()[0].3, 956);
+        layout.toggle_fullscreen();
+        assert_eq!(layout.geometries(), vec![(1, 0, 0, 1000, 700)]);
+        layout.toggle_fullscreen();
+        layout.set_work_area((0, 0, 1000, 700));
+        assert_eq!(layout.geometries()[0].2, 12);
+        assert_eq!(layout.geometries()[0].4, 676);
+    }
     #[test]
     fn animation_duration_and_disable_are_exact() {
         let mut layout = Layout {

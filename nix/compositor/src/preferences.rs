@@ -433,7 +433,7 @@ impl Smallvil {
                     self.layout.set_width(
                         id,
                         rule.default_column_width
-                            .resolve(layout.size.0 - 2 * layout.gap),
+                            .resolve(layout.work_area.2 - 2 * layout.gap),
                     );
                     changed = true;
                 }

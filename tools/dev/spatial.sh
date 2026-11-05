@@ -33,6 +33,7 @@ esac
 manifest="$repo/experiments/$experiment/Cargo.toml"
 if [[ $experiment == compositor ]]; then
   manifest="$repo/nix/compositor/Cargo.toml"
+  export OHMANSY_SHINE_QML="$repo/nix/modules/shine-shell/shell.qml"
 fi
 if [[ $action == integration ]]; then
   mise exec -- cargo build --locked --manifest-path "$manifest"

@@ -78,7 +78,13 @@ impl Smallvil {
         let serial = SERIAL_COUNTER.next_serial();
 
         if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
-            if let Some((window, _loc)) = self
+            use smithay::wayland::shell::wlr_layer::Layer;
+            if self
+                .layer_under(pointer.current_location(), &[Layer::Overlay, Layer::Top])
+                .is_some()
+            {
+                // A panel with keyboardFocus=None must preserve the application's focus.
+            } else if let Some((window, _loc)) = self
                 .window_under(pointer.current_location())
                 .map(|(w, l)| (w.clone(), l))
             {

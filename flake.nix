@@ -263,6 +263,7 @@
       devShells = nixpkgs.lib.genAttrs [ system pcSystem ] (target:
         let tools = import nixpkgs { system = target; overlays = [ self.overlays.default ]; };
         in { spatial = tools.mkShell {
+          OHMANSY_COMPOSITOR_SHELL = "${import ./nix/modules/shine-shell.nix { pkgs = tools; }}/bin/ohmansy-shine-shell";
           packages = with tools; [ rustup pkg-config gcc tools.mise python3 niri wl-clipboard foot firefox gnome-text-editor ];
           buildInputs = with tools; [ wayland libxkbcommon libGL libgbm libdrm libinput seatd udev ];
           LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL ]);

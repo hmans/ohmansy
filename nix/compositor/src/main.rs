@@ -366,6 +366,9 @@ fn main() -> Result<()> {
         spawn_terminal(&data.state.socket_name, false)?;
         spawn_terminal(&data.state.socket_name, true)?;
     }
+    if session_mode || desktop {
+        spawn_session_tool(&data.state.socket_name, "SHELL")?;
+    }
     let started = Instant::now();
     event_loop.run(Some(Duration::from_millis(50)), &mut data, |data| {
         // Protocol replies must reach clients even when no frame is drawn.

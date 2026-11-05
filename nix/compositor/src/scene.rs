@@ -182,6 +182,49 @@ impl Smallvil {
                 );
             }
         }
+        let layer_map = smithay::desktop::layer_map_for_output(output);
+        let layers: Vec<_> = layer_map
+            .layers()
+            .filter_map(|layer| {
+                layer_map
+                    .layer_geometry(layer)
+                    .map(|geometry| (layer.clone(), geometry.loc))
+            })
+            .collect();
+        drop(layer_map);
+        let fullscreen = monitor.layout.workspace().fullscreen.is_some();
+        let render_layers =
+            |renderer: &mut GlesRenderer, kinds: &[smithay::wayland::shell::wlr_layer::Layer]| {
+                let mut rendered = Vec::new();
+                for kind in kinds {
+                    for (layer, location) in layers
+                        .iter()
+                        .rev()
+                        .filter(|(layer, _)| layer.layer() == *kind)
+                    {
+                        rendered.extend(
+                            layer
+                                .render_elements::<WaylandSurfaceRenderElement<GlesRenderer>>(
+                                    renderer,
+                                    (location.x, location.y).into(),
+                                    1.0.into(),
+                                    1.0,
+                                )
+                                .into_iter()
+                                .filter_map(|element| {
+                                    CropRenderElement::from_element(element, 1.0, crop)
+                                })
+                                .map(SceneElement::Window),
+                        );
+                    }
+                }
+                rendered
+            };
+        use smithay::wayland::shell::wlr_layer::Layer;
+        elements.extend(render_layers(renderer, &[Layer::Overlay]));
+        if !fullscreen {
+            elements.extend(render_layers(renderer, &[Layer::Top]));
+        }
         for window in self.space.elements().rev() {
             let Some(id) = self.window_id(window.toplevel().unwrap().wl_surface()) else {
                 continue;
@@ -202,6 +245,7 @@ impl Smallvil {
                 }
             }
         }
+        elements.extend(render_layers(renderer, &[Layer::Bottom, Layer::Background]));
         elements
             .into_iter()
             .map(|element| RescaleRenderElement::from_element(element, (0, 0).into(), scale))
@@ -209,6 +253,14 @@ impl Smallvil {
     }
 
     pub fn send_output_frames(&mut self, output: &Output) {
+        for layer in smithay::desktop::layer_map_for_output(output).layers() {
+            layer.send_frame(
+                output,
+                self.start_time.elapsed(),
+                Some(std::time::Duration::ZERO),
+                |_, _| Some(output.clone()),
+            );
+        }
         for window in self.space.elements() {
             let Some(id) = self.window_id(window.toplevel().unwrap().wl_surface()) else {
                 continue;
