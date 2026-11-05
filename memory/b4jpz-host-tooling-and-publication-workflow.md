@@ -541,3 +541,48 @@ Fixture pitfall: creating a login collection with --unlock after the already
 initialized service starts can leave its collection skeleton missing and make
 the graphical test fail. Seed the VM-only file before starting the session.
 Use /dev/vcs1 prompt checks for agreety; OCR requires a separate test dependency.
+
+## Shine rounded windows and focused ring (2026-11-05)
+
+`decoration.rs`, `rounded.frag` and `focus-ring.frag` add shared native/nested
+window rendering. Defaults are 14 logical pixel corners and a 2 pixel lavender
+focused ring. Optional [decorations] fields corner_radius (0–128),
+focus_ring_width (0–16), and focus_ring_color (four RGBA values in 0–1) reload
+live; zero disables that feature. Status includes these effective preferences.
+Fullscreen skips both decorations, and losing keyboard focus removes the ring.
+
+The scene renders xdg popups separately, then the ring and masked toplevel tree.
+The mask follows xdg window geometry, excluding client shadows. Transparent
+corners are excluded from pointer hit testing while popup input remains free
+of the parent's mask. Buffer/viewport transforms and inverted textures are
+handled through the renderer's texture matrix. Each output gets its own mask
+coordinates, including nested canvas offsets and fractional scale.
+
+Niri's clipped-surface and focus-ring code was inspected as a reference:
+https://github.com/niri-wm/niri/blob/main/src/render_helpers/clipped_surface.rs
+and https://github.com/niri-wm/niri/blob/main/src/layout/focus_ring.rs.
+The implementation uses a texture shader without copying windows into another
+texture. Rounded pixels are excluded from opaque regions so backgrounds repaint
+correctly. Cached surface identities invalidate when the mask changes; ring
+pieces retain identities and update only when their geometry/style changes.
+Four nonoverlapping edge bands avoid shading a large transparent center.
+Caches prune closed windows and obsolete surfaces on each output.
+
+Twenty-three Rust tests, formatting and strict Clippy passed. The new
+compositor_decorations.py trial checks actual framebuffer colors, focus transfer
+and clearing, corner input, two outputs, 100–200% scales, square fullscreen,
+live radius/color/width edits, disabling, preserved config saves and idle frames.
+Firefox/GTK popup, subsurface, grab, clipboard, cursor and typing regressions
+passed, along with the existing preferences trial. The final native DRM VM
+passed monitor mode/hotplug, input/VT, graphical keyring and real password-login
+checks; its screenshot visually confirmed the rounded windows and focus ring.
+The reusable session package built. A nested interactive desktop was running
+and visually checked at handoff. No installed OS activation, physical session
+replacement or reboot was performed.
+
+Framebuffer fixture lessons: wait for the PNG's IEND chunk, not just file
+creation. Use a clean terminal config and hide its text cursor before sampling
+corner colors. Write fixture TOML atomically and wait for the requested effective
+preferences; a truncated but valid empty file can temporarily load defaults.
+
+The user subsequently confirmed the appearance on their desktop (2026-11-05).

@@ -24,6 +24,8 @@ use std::collections::HashMap;
 render_elements! {
     pub SceneElement<=GlesRenderer>;
     Window=CropRenderElement<WaylandSurfaceRenderElement<GlesRenderer>>,
+    Rounded=CropRenderElement<crate::decoration::RoundedSurface>,
+    Ring=CropRenderElement<smithay::backend::renderer::gles::element::PixelShaderElement>,
     Surface=WaylandSurfaceRenderElement<GlesRenderer>,
     Cursor=MemoryRenderBufferRenderElement<GlesRenderer>,
 }
@@ -107,6 +109,8 @@ impl Smallvil {
         renderer: &mut GlesRenderer,
         output: &Output,
         mut named: Option<&mut Cursors>,
+        decorations: &mut crate::decoration::Renderer,
+        canvas: Point<i32, Physical>,
     ) -> Vec<OutputElement> {
         let Some(index) = self
             .layout
@@ -225,6 +229,13 @@ impl Smallvil {
         if !fullscreen {
             elements.extend(render_layers(renderer, &[Layer::Top]));
         }
+        decorations.begin_output();
+        let owned = self
+            .windows
+            .keys()
+            .copied()
+            .filter(|id| self.layout.owner(*id) == Some(index))
+            .collect();
         for window in self.space.elements().rev() {
             let Some(id) = self.window_id(window.toplevel().unwrap().wl_surface()) else {
                 continue;
@@ -234,17 +245,69 @@ impl Smallvil {
             }
             let location =
                 self.space.element_location(window).unwrap() - window.geometry().loc - origin;
-            for element in window.render_elements::<WaylandSurfaceRenderElement<GlesRenderer>>(
+            let surface = window.toplevel().unwrap().wl_surface();
+            // Popups have their own geometry and may extend beyond the window.
+            for (popup, offset) in smithay::desktop::PopupManager::popups_for_surface(surface) {
+                let popup_location =
+                    location + window.geometry().loc + offset - popup.geometry().loc;
+                for element in render_elements_from_surface_tree::<
+                    GlesRenderer,
+                    WaylandSurfaceRenderElement<GlesRenderer>,
+                >(
+                    renderer,
+                    popup.wl_surface(),
+                    (popup_location.x, popup_location.y),
+                    1.0,
+                    1.0,
+                    Kind::Unspecified,
+                ) {
+                    if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
+                        elements.push(SceneElement::Window(element));
+                    }
+                }
+            }
+            let bounds = Rectangle::new(location + window.geometry().loc, window.geometry().size);
+            let style = &self.output_settings.decorations;
+            if !fullscreen
+                && self.layout.focused() == Some(id)
+                && style.focus_ring_width > 0
+                && self.seat.get_keyboard().unwrap().current_focus().is_some()
+            {
+                for ring in decorations.ring(id, bounds, style, scale) {
+                    if let Some(ring) = CropRenderElement::from_element(ring, 1.0, crop) {
+                        elements.push(SceneElement::Ring(ring));
+                    }
+                }
+            }
+            for element in render_elements_from_surface_tree::<
+                GlesRenderer,
+                WaylandSurfaceRenderElement<GlesRenderer>,
+            >(
                 renderer,
-                (location.x, location.y).into(),
-                1.0.into(),
+                surface,
+                (location.x, location.y),
                 1.0,
+                1.0,
+                Kind::Unspecified,
             ) {
-                if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
+                if !fullscreen && style.corner_radius > 0 {
+                    let element = decorations.rounded(
+                        id,
+                        element,
+                        bounds,
+                        style.corner_radius,
+                        scale,
+                        canvas,
+                    );
+                    if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
+                        elements.push(SceneElement::Rounded(element));
+                    }
+                } else if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
                     elements.push(SceneElement::Window(element));
                 }
             }
         }
+        decorations.finish_output(&self.windows.keys().copied().collect(), &owned);
         elements.extend(render_layers(renderer, &[Layer::Bottom, Layer::Background]));
         elements
             .into_iter()

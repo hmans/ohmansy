@@ -21,6 +21,11 @@ natural_scroll = true
 gap = 12
 default_column_width = { proportion = 0.62 }
 
+[decorations]
+corner_radius = 14
+focus_ring_width = 2
+focus_ring_color = [0.67, 0.57, 0.78, 1.0] # RGBA, each from 0 to 1
+
 # Mod is Super in a login and Super+Alt in a nested preview.
 # Omitted bindings keep their defaults. Use action="none" to remove one.
 [bindings]

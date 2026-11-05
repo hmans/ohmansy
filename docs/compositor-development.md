@@ -158,7 +158,7 @@ Shine uses one TOML file at `~/.config/shine/config.toml`, honoring
 `XDG_CONFIG_HOME`; `--config PATH` selects a separate file for development.
 Every section is optional. See the complete
 [example configuration](../nix/compositor/config.example.toml) for outputs,
-input, layout, bindings, application rules and animations.
+input, layout, window decorations, bindings, application rules and animations.
 
 Edits reload live. Unknown fields/actions, invalid widths or shortcuts, and
 keyboard layouts that fail to compile keep the working configuration. Inspect
@@ -206,6 +206,25 @@ minus its outer gaps; columns have a minimum width of 200. Default widths affect
 new windows. Gap changes reposition existing windows while preserving their
 column widths. Animations currently control scrolling; `duration_ms` is 0–5000,
 and disabling animations or choosing zero snaps to the destination.
+
+### Rounded corners and focus ring
+
+Windows have 14 px rounded corners and a 2 px lavender ring around the focused
+window. Fullscreen windows have square corners and no ring. Menus and tooltips
+remain free to extend beyond the window. Transparent corners do not receive
+pointer input.
+
+```toml
+[decorations]
+corner_radius = 14
+focus_ring_width = 2
+focus_ring_color = [0.67, 0.57, 0.78, 1.0]
+```
+
+Dimensions are logical pixels: radius 0–128 and ring width 0–16. Zero disables
+that decoration. The color is RGBA with four values from 0 to 1. Edits apply
+live to existing windows; output saves preserve this section. This uses the
+same renderer in the login session and the nested desktop preview.
 
 ### Bindings and window rules
 

@@ -1,5 +1,6 @@
 #![allow(irrefutable_let_patterns)]
 
+mod decoration;
 mod desktop;
 mod grabs;
 mod handlers;

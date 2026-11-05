@@ -265,8 +265,7 @@ impl Smallvil {
         self.layer_under(pos, &[Layer::Overlay, Layer::Top])
             .or_else(|| {
                 self.window_under(pos).and_then(|(window, location)| {
-                    window
-                        .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                    self.window_surface_at(window, pos - location.to_f64())
                         .map(|(s, p)| (s, (p + location).to_f64()))
                 })
             })
@@ -281,10 +280,34 @@ impl Smallvil {
                 return None;
             }
             let location = self.space.element_location(window)? - window.geometry().loc;
-            window
-                .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+            self.window_surface_at(window, pos - location.to_f64())
                 .map(|_| (window, location))
         })
+    }
+
+    fn window_surface_at(
+        &self,
+        window: &Window,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
+        if let Some(popup) = window.surface_under(
+            point,
+            WindowSurfaceType::POPUP | WindowSurfaceType::SUBSURFACE,
+        ) {
+            return Some(popup);
+        }
+        let id = self.window_id(window.toplevel()?.wl_surface())?;
+        let radius = self.output_settings.decorations.corner_radius;
+        if radius > 0
+            && !self.layout.fullscreen_for(id)
+            && !crate::decoration::contains(window.geometry(), radius, point)
+        {
+            return None;
+        }
+        window.surface_under(
+            point,
+            WindowSurfaceType::TOPLEVEL | WindowSurfaceType::SUBSURFACE,
+        )
     }
 
     pub fn relayout(&mut self) {
@@ -676,7 +699,7 @@ impl Smallvil {
             }).collect();
             serde_json::json!({"name":m.name,"id":info.map(|i|&i.id),"make":info.map(|i|&i.make),"model":info.map(|i|&i.model),"modes":info.map(|i|&i.modes),"mode":mode.map(|m|serde_json::json!({"width":m.size.w,"height":m.size.h,"refresh":m.refresh})),"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"work_area":m.layout.work_area,"layers":layers,"scale":m.scale,"workspace":m.layout.active+1,"primary":self.primary_output().as_deref()==Some(&m.name),"focused":i==self.layout.active_monitor})
         }).collect();
-        serde_json::json!({"preferences":{"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+        serde_json::json!({"preferences":{"decorations":self.output_settings.decorations,"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }
 }
 

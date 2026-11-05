@@ -108,6 +108,7 @@ struct Native {
     renderer: GlesRenderer,
     heads: Vec<Head>,
     cursors: Cursors,
+    decorations: crate::decoration::Renderer,
     active: bool,
     rescan: bool,
     devices: Rc<RefCell<(u64, Vec<InputDevice>)>>,
@@ -392,8 +393,13 @@ impl Native {
                 continue;
             }
             state.cursor_rendered_elements = 0;
-            let elements =
-                state.output_elements(&mut self.renderer, &head.output, Some(&mut self.cursors));
+            let elements = state.output_elements(
+                &mut self.renderer,
+                &head.output,
+                Some(&mut self.cursors),
+                &mut self.decorations,
+                (0, 0).into(),
+            );
             let result = match head.scanout.render_frame(
                 &mut self.renderer,
                 &elements,
@@ -470,7 +476,8 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
     let gbm = GbmDevice::new(fd)?;
     let display = unsafe { EGLDisplay::new(gbm.clone()) }?;
     let context = EGLContext::new(&display)?;
-    let renderer = unsafe { GlesRenderer::new(context) }?;
+    let mut renderer = unsafe { GlesRenderer::new(context) }?;
+    let decorations = crate::decoration::Renderer::new(&mut renderer)?;
     let render_device = EGLDevice::device_for_display(&display)
         .ok()
         .and_then(|d| d.try_get_render_node().ok().flatten())
@@ -490,6 +497,7 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
         renderer,
         heads: vec![],
         cursors: Cursors::default(),
+        decorations,
         rescan: true,
         devices,
         input_revision: None,

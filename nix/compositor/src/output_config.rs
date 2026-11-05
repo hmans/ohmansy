@@ -112,6 +112,8 @@ pub struct Settings {
     pub window_rules: Vec<crate::preferences::WindowRule>,
     #[serde(default, skip_serializing_if = "crate::preferences::is_default")]
     pub animations: crate::preferences::Animations,
+    #[serde(default, skip_serializing_if = "crate::preferences::is_default")]
+    pub decorations: crate::preferences::Decorations,
 }
 
 #[derive(Clone, Debug)]
@@ -132,6 +134,7 @@ impl Settings {
         Ok(settings)
     }
     fn validate_preferences(&self) -> Result<(), String> {
+        self.decorations.validate()?;
         if !(0..=128).contains(&self.layout.gap) {
             return Err("Layout gap must be 0 to 128 logical pixels".into());
         }
@@ -529,6 +532,10 @@ mod tests {
             "[bindings]\n'Mod+1'={action='workspace',value=0}",
             "[layout]\ndefault_column_width={pixels=900,proportion=0.5}",
             "[animations]\nduration_ms=5001",
+            "[decorations]\ncorner_radius=129",
+            "[decorations]\nfocus_ring_width=17",
+            "[decorations]\nfocus_ring_color=[1.1,0.5,0.5,1.0]",
+            "[decorations]\nfocus_ring_color=[0.5,0.5,0.5,nan]",
         ] {
             assert!(Settings::parse(invalid).is_err(), "{invalid}");
         }

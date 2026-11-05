@@ -60,6 +60,7 @@ pub fn init_winit(
     let (mut graphics, events) = winit::init_from_attributes::<GlesRenderer>(attributes)
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     let formats = graphics.renderer().dmabuf_formats();
+    let mut decorations = crate::decoration::Renderer::new(graphics.renderer())?;
     let device = EGLDevice::device_for_display(graphics.renderer().egl_context().display())
         .and_then(|d| d.render_device_path().or_else(|_| d.drm_device_path()))
         .ok()
@@ -155,7 +156,13 @@ pub fn init_winit(
                         for output in &outputs {
                             elements.extend(
                                 state
-                                    .output_elements(renderer, output, None)
+                                    .output_elements(
+                                        renderer,
+                                        output,
+                                        None,
+                                        &mut decorations,
+                                        (left, 0).into(),
+                                    )
                                     .into_iter()
                                     .map(|e| {
                                         RelocateRenderElement::from_element(

@@ -118,6 +118,40 @@ impl Default for LayoutPreferences {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
+pub struct Decorations {
+    pub corner_radius: u32,
+    pub focus_ring_width: u32,
+    pub focus_ring_color: [f32; 4],
+}
+impl Default for Decorations {
+    fn default() -> Self {
+        Self {
+            corner_radius: 14,
+            focus_ring_width: 2,
+            focus_ring_color: [0.67, 0.57, 0.78, 1.0],
+        }
+    }
+}
+impl Decorations {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.corner_radius > 128 || self.focus_ring_width > 16 {
+            return Err(
+                "Corner radius must be 0–128 and focus ring width 0–16 logical pixels".into(),
+            );
+        }
+        if self
+            .focus_ring_color
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err("Focus ring color needs four RGBA values from 0 to 1".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Animations {
     pub enabled: bool,
     pub duration_ms: u32,

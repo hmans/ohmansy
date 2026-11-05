@@ -1,0 +1,305 @@
+//! Window masks and focus rings shared by native and nested rendering.
+use crate::{layout::WindowId, preferences::Decorations};
+use smithay::{
+    backend::renderer::{
+        element::{surface::WaylandSurfaceRenderElement, Element, Id, Kind, RenderElement},
+        gles::{
+            element::PixelShaderElement, GlesError, GlesFrame, GlesPixelProgram, GlesRenderer,
+            GlesTexProgram, Uniform, UniformName, UniformType,
+        },
+        utils::{CommitCounter, DamageSet, OpaqueRegions},
+    },
+    utils::{Buffer, Logical, Physical, Point, Rectangle, Scale, Transform},
+};
+use std::collections::{HashMap, HashSet};
+
+type MaskKey = (i32, i32, i32, i32, u32, u64);
+struct MaskId {
+    window: WindowId,
+    key: MaskKey,
+    id: Id,
+}
+struct Ring {
+    style: (Decorations, u64, i32, i32),
+    elements: Vec<PixelShaderElement>,
+}
+pub struct Renderer {
+    rounded: GlesTexProgram,
+    border: GlesPixelProgram,
+    masks: HashMap<Id, MaskId>,
+    rings: HashMap<WindowId, Ring>,
+    used: HashSet<Id>,
+}
+impl Renderer {
+    pub fn new(renderer: &mut GlesRenderer) -> Result<Self, GlesError> {
+        Ok(Self {
+            rounded: renderer.compile_custom_texture_shader(
+                include_str!("rounded.frag"),
+                &[
+                    UniformName::new("draw_origin", UniformType::_2f),
+                    UniformName::new("mask_rect", UniformType::_4f),
+                    UniformName::new("radius", UniformType::_1f),
+                ],
+            )?,
+            border: renderer.compile_custom_pixel_shader(
+                include_str!("focus-ring.frag"),
+                &[
+                    UniformName::new("radius", UniformType::_1f),
+                    UniformName::new("thickness", UniformType::_1f),
+                    UniformName::new("feather", UniformType::_1f),
+                    UniformName::new("ring_color", UniformType::_4f),
+                    UniformName::new("full_size", UniformType::_2f),
+                    UniformName::new("piece_offset", UniformType::_2f),
+                ],
+            )?,
+            masks: HashMap::new(),
+            rings: HashMap::new(),
+            used: HashSet::new(),
+        })
+    }
+    pub fn begin_output(&mut self) {
+        self.used.clear();
+    }
+    pub fn finish_output(&mut self, live: &HashSet<WindowId>, owned: &HashSet<WindowId>) {
+        self.masks.retain(|id, m| {
+            live.contains(&m.window) && (!owned.contains(&m.window) || self.used.contains(id))
+        });
+        self.rings.retain(|id, _| live.contains(id));
+    }
+    pub fn rounded(
+        &mut self,
+        window: WindowId,
+        inner: WaylandSurfaceRenderElement<GlesRenderer>,
+        bounds: Rectangle<i32, Logical>,
+        radius: u32,
+        scale: f64,
+        canvas: Point<i32, Physical>,
+    ) -> RoundedSurface {
+        let geometry = inner.geometry(1.0.into());
+        let key = (
+            bounds.loc.x - geometry.loc.x,
+            bounds.loc.y - geometry.loc.y,
+            bounds.size.w,
+            bounds.size.h,
+            radius,
+            scale.to_bits(),
+        );
+        self.used.insert(inner.id().clone());
+        let cache = self
+            .masks
+            .entry(inner.id().clone())
+            .or_insert_with(|| MaskId {
+                window,
+                key,
+                id: Id::new(),
+            });
+        if cache.key != key {
+            cache.key = key;
+            cache.id = Id::new();
+        }
+        let mut physical = bounds.to_physical_precise_round(scale);
+        physical.loc += canvas;
+        RoundedSurface {
+            inner,
+            id: cache.id.clone(),
+            program: self.rounded.clone(),
+            bounds,
+            physical,
+            radius: radius as f32 * scale as f32,
+            logical_radius: radius,
+        }
+    }
+    pub fn ring(
+        &mut self,
+        id: WindowId,
+        bounds: Rectangle<i32, Logical>,
+        style: &Decorations,
+        scale: f64,
+    ) -> Vec<PixelShaderElement> {
+        let width = style.focus_ring_width as i32;
+        let area = Rectangle::new(
+            bounds.loc - Point::from((width, width)),
+            (bounds.size.w + 2 * width, bounds.size.h + 2 * width).into(),
+        );
+        // Leave the large transparent center out of the fragment shader.
+        let band = (style.corner_radius as i32 + width + 1).min(area.size.h / 2);
+        let pieces = [
+            Rectangle::new((0, 0).into(), (area.size.w, band).into()),
+            Rectangle::new((0, area.size.h - band).into(), (area.size.w, band).into()),
+            Rectangle::new((0, band).into(), (width, area.size.h - 2 * band).into()),
+            Rectangle::new(
+                (area.size.w - width, band).into(),
+                (width, area.size.h - 2 * band).into(),
+            ),
+        ];
+        let key = (style.clone(), scale.to_bits(), area.size.w, area.size.h);
+        let cache = self.rings.entry(id).or_insert_with(|| Ring {
+            style: key.clone(),
+            elements: pieces
+                .iter()
+                .map(|piece| {
+                    PixelShaderElement::new(
+                        self.border.clone(),
+                        Rectangle::new(area.loc + piece.loc, piece.size),
+                        None,
+                        1.0,
+                        ring_uniforms(style, scale, area.size, piece.loc),
+                        Kind::Unspecified,
+                    )
+                })
+                .collect(),
+        });
+        for (element, piece) in cache.elements.iter_mut().zip(pieces) {
+            element.resize(Rectangle::new(area.loc + piece.loc, piece.size), None);
+            if cache.style != key {
+                element.update_uniforms(ring_uniforms(style, scale, area.size, piece.loc));
+            }
+        }
+        cache.style = key;
+        cache.elements.clone()
+    }
+}
+fn ring_uniforms(
+    style: &Decorations,
+    scale: f64,
+    size: smithay::utils::Size<i32, Logical>,
+    offset: Point<i32, Logical>,
+) -> Vec<Uniform<'static>> {
+    vec![
+        Uniform::new("radius", style.corner_radius as f32),
+        Uniform::new("thickness", style.focus_ring_width as f32),
+        Uniform::new("feather", 0.5 / scale as f32),
+        Uniform::new("ring_color", style.focus_ring_color),
+        Uniform::new("full_size", (size.w as f32, size.h as f32)),
+        Uniform::new("piece_offset", (offset.x as f32, offset.y as f32)),
+    ]
+}
+
+#[derive(Debug)]
+pub struct RoundedSurface {
+    inner: WaylandSurfaceRenderElement<GlesRenderer>,
+    id: Id,
+    program: GlesTexProgram,
+    bounds: Rectangle<i32, Logical>,
+    physical: Rectangle<i32, Physical>,
+    radius: f32,
+    logical_radius: u32,
+}
+impl Element for RoundedSurface {
+    fn id(&self) -> &Id {
+        &self.id
+    }
+    fn current_commit(&self) -> CommitCounter {
+        self.inner.current_commit()
+    }
+    fn src(&self) -> Rectangle<f64, Buffer> {
+        self.inner.src()
+    }
+    fn transform(&self) -> Transform {
+        self.inner.transform()
+    }
+    fn geometry(&self, scale: Scale<f64>) -> Rectangle<i32, Physical> {
+        self.inner.geometry(scale)
+    }
+    fn damage_since(
+        &self,
+        scale: Scale<f64>,
+        commit: Option<CommitCounter>,
+    ) -> DamageSet<i32, Physical> {
+        self.inner.damage_since(scale, commit)
+    }
+    fn opaque_regions(&self, scale: Scale<f64>) -> OpaqueRegions<i32, Physical> {
+        // Only advertise the fully covered central cross; rounded pixels need blending.
+        let mut regions = Vec::new();
+        let bounds = self.bounds.to_physical_precise_round(scale);
+        let radius = (self.logical_radius as f64 * scale.x).ceil() as i32 + 1;
+        let safe = [
+            Rectangle::new(
+                bounds.loc + Point::from((radius, 0)),
+                ((bounds.size.w - 2 * radius).max(0), bounds.size.h).into(),
+            ),
+            Rectangle::new(
+                bounds.loc + Point::from((0, radius)),
+                (bounds.size.w, (bounds.size.h - 2 * radius).max(0)).into(),
+            ),
+        ];
+        let origin = self.inner.geometry(scale).loc;
+        for region in self.inner.opaque_regions(scale) {
+            let region = Rectangle::new(region.loc + origin, region.size);
+            for safe in safe {
+                if let Some(mut part) = region.intersection(safe) {
+                    part.loc -= origin;
+                    regions.push(part);
+                }
+            }
+        }
+        OpaqueRegions::from_slice(&regions)
+    }
+    fn alpha(&self) -> f32 {
+        self.inner.alpha()
+    }
+    fn kind(&self) -> Kind {
+        self.inner.kind()
+    }
+}
+impl RenderElement<GlesRenderer> for RoundedSurface {
+    fn draw(
+        &self,
+        frame: &mut GlesFrame<'_, '_>,
+        src: Rectangle<f64, Buffer>,
+        dst: Rectangle<i32, Physical>,
+        damage: &[Rectangle<i32, Physical>],
+        opaque: &[Rectangle<i32, Physical>],
+    ) -> Result<(), GlesError> {
+        frame.override_default_tex_program(
+            self.program.clone(),
+            vec![
+                Uniform::new("draw_origin", (dst.loc.x as f32, dst.loc.y as f32)),
+                Uniform::new(
+                    "mask_rect",
+                    (
+                        self.physical.loc.x as f32,
+                        self.physical.loc.y as f32,
+                        self.physical.size.w as f32,
+                        self.physical.size.h as f32,
+                    ),
+                ),
+                Uniform::new("radius", self.radius),
+            ],
+        );
+        let result = self.inner.draw(frame, src, dst, damage, opaque);
+        frame.clear_tex_program_override();
+        result
+    }
+}
+
+pub fn contains(bounds: Rectangle<i32, Logical>, radius: u32, point: Point<f64, Logical>) -> bool {
+    if !bounds.to_f64().contains(point) {
+        return false;
+    }
+    let r = (radius as f64).min(bounds.size.w.min(bounds.size.h).max(0) as f64 / 2.0);
+    let p = point - bounds.loc.to_f64();
+    let x = p.x.clamp(r, bounds.size.w as f64 - r);
+    let y = p.y.clamp(r, bounds.size.h as f64 - r);
+    (p.x - x).powi(2) + (p.y - y).powi(2) <= r * r
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn rounded_hit_regions_match_edges_and_clamp_small_windows() {
+        let bounds = Rectangle::new((100, 40).into(), (200, 100).into());
+        assert!(!contains(bounds, 14, (100.5, 40.5).into()));
+        assert!(contains(bounds, 14, (114.0, 40.5).into()));
+        assert!(contains(bounds, 14, (104.5, 44.5).into()));
+        assert!(!contains(bounds, 14, (299.5, 139.5).into()));
+        assert!(contains(bounds, 0, (100.5, 40.5).into()));
+        assert!(!contains(bounds, 0, (300.0, 140.0).into()));
+        assert!(contains(
+            Rectangle::from_size((10, 10).into()),
+            128,
+            (5.0, 5.0).into()
+        ));
+    }
+}
