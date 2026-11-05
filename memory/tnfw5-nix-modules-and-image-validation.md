@@ -9,6 +9,16 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Code editors (2026-11-05): the optional software bundle now includes
+`pkgs.neovim`, `pkgs.vscodium`, and `pkgs.zed-editor`. Commands are `nvim`,
+`codium`, and `zeditor`; settings and extensions remain user-owned. The existing
+Vim package remains available. Hosts can replace `ohmansy.software.packages`.
+All seven ARM/x86 image configurations evaluated with the three packages in
+their defaults. The native customization check passed, all three native
+packages were fetched from the Nix cache, and their version commands passed
+(Neovim 0.12.4, VSCodium 1.116.02821, Zed 1.3.6). No graphical editor launch,
+installed-system activation, image rebuild, or boot was performed.
+
 Flatpak (2026-11-05): the shared software module enables the standard NixOS
 Flatpak service by default. `flatpak.nix` supplies a GTK portal fallback and a
 user service that registers Flathub from a checksum-pinned repository file.

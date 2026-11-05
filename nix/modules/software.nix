@@ -8,6 +8,9 @@
       mise
       herdr
       vim
+      neovim
+      vscodium
+      zed-editor
       curl
       wget
       jq
