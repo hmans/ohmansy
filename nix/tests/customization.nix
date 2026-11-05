@@ -14,6 +14,7 @@ let
   withoutCompositor = evaluate [ ohmansyModules.desktop { ohmansy.compositor.enable = false; } ];
   softwareOnly = evaluate [ ohmansyModules.software ];
   noAppImages = evaluate [ ohmansyModules.software { programs.appimage.enable = false; } ];
+  noFlatpak = evaluate [ ohmansyModules.software { services.flatpak.enable = false; } ];
   noFish = evaluate [ ohmansyModules.default { programs.fish.enable = false; } ];
   noFishStyle = evaluate [ ohmansyModules.software { ohmansy.fishStyle.enable = false; } ];
   customPrompt = evaluate [ ohmansyModules.software {
@@ -52,6 +53,16 @@ assert defaults.environment.etc."xdg/xdg-terminals.list".text == "foot.desktop\n
 assert defaults.environment.etc ? "xdg/foot/foot.ini";
 assert !desktopOnly.programs.firefox.enable && !desktopOnly.programs.fish.enable;
 assert !softwareOnly.programs.niri.enable;
+assert defaults.services.flatpak.enable && softwareOnly.services.flatpak.enable;
+assert !desktopOnly.services.flatpak.enable;
+assert softwareOnly.xdg.portal.enable;
+assert builtins.elem pkgs.xdg-desktop-portal-gtk softwareOnly.xdg.portal.extraPortals;
+assert builtins.elem defaults.services.flatpak.package defaults.environment.systemPackages;
+assert builtins.elem "$HOME/.local/share/flatpak/exports" defaults.environment.profiles;
+assert builtins.elem "/var/lib/flatpak/exports" defaults.environment.profiles;
+assert defaults.systemd.user.services.ohmansy-flathub.wantedBy == [ "default.target" ];
+assert lib.hasInfix "remote-add --user --if-not-exists flathub" defaults.systemd.user.services.ohmansy-flathub.serviceConfig.ExecStart;
+assert !(noFlatpak.systemd.user.services ? ohmansy-flathub);
 assert defaults.programs.appimage.enable && defaults.programs.appimage.binfmt;
 assert softwareOnly.programs.appimage.enable && !desktopOnly.programs.appimage.enable;
 assert builtins.elem defaults.programs.appimage.package defaults.environment.systemPackages;
@@ -107,5 +118,10 @@ pkgs.runCommand "ohmansy-customization" {
     ${custom.environment.etc."ohmansy/niri.kdl".source} \
     ${custom.environment.etc."ohmansy/desktop.kdl".source} \
     ${../modules/desktop/shortcuts.json}
+  # Register from the bundled definition without network access or app installs.
+  ${defaults.systemd.user.services.ohmansy-flathub.serviceConfig.ExecStart}
+  ${defaults.systemd.user.services.ohmansy-flathub.serviceConfig.ExecStart}
+  test "$(${defaults.services.flatpak.package}/bin/flatpak remotes --user --columns=name,url)" = \
+    "$(printf 'flathub\thttps://dl.flathub.org/repo/')"
   touch "$out"
 ''

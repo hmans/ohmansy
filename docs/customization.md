@@ -109,6 +109,32 @@ wrappers also honor `XCURSOR_THEME`, `XCURSOR_SIZE`, and `XCURSOR_PATH`.
 After installing an updated system, log out and back in to reload the cursor
 theme in the compositor and applications.
 
+## Flatpak apps
+
+ohmansy includes Flatpak and sets up Flathub for each user at login. After
+rebuilding an existing installation, log out and back in to load the launcher
+paths and start repository setup. Apps installed this way belong to your
+account and do not require an OS rebuild.
+
+For example, install Discord:
+
+```sh
+flatpak install --user flathub com.discordapp.Discord
+```
+
+Open installed apps from the application menu, or run
+`flatpak run com.discordapp.Discord`. Manage your apps with:
+
+```sh
+flatpak list --user
+flatpak update --user
+flatpak uninstall --user com.discordapp.Discord
+```
+
+App availability depends on your CPU architecture. To disable Flatpak and
+automatic Flathub setup, set `services.flatpak.enable = false;` in your machine's
+preferences. Existing app data remains in your home directory.
+
 ## AppImages
 
 The software defaults include `appimage-run` and register type 1 and type 2

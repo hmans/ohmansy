@@ -9,6 +9,22 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+Flatpak (2026-11-05): the shared software module enables the standard NixOS
+Flatpak service by default. `flatpak.nix` supplies a GTK portal fallback and a
+user service that registers Flathub from a checksum-pinned repository file.
+The remote belongs to each user; no applications are installed automatically.
+The standard module supplies user/system export paths for launcher discovery.
+Setting `services.flatpak.enable = false` omits the setup service too.
+Existing installations need a rebuild and a new login for the user service
+and launcher paths. Avoid shell-init network setup or activation-time downloads.
+
+The native customization check passed real, repeated remote registration
+in an isolated build home without network access, plus module/portal/export
+path and opt-out assertions. Flatpak warns when optional remote metadata cannot
+be fetched, but registers the remote successfully. All-system flake evaluation
+passed for ARM and x86, including all seven image configurations. No installed-system
+activation, desktop app launch, or image boot was performed.
+
 Nix-ld (2026-11-04): `nix/modules/software.nix` enables
 `programs.nix-ld.enable = true` for the shared software configuration.
 An isolated snapshot of committed sources plus this setting evaluated it to

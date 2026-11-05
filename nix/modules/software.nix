@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 {
-  imports = [ ./firefox-style.nix ./fish-style.nix ];
+  imports = [ ./firefox-style.nix ./fish-style.nix ./flatpak.nix ];
   options.ohmansy.software.packages = lib.mkOption {
     type = lib.types.listOf lib.types.package;
     default = with pkgs; [
@@ -28,6 +28,7 @@
   };
 
   config = {
+    services.flatpak.enable = lib.mkDefault true;
     programs.firefox.enable = lib.mkDefault true;
     programs.fish.enable = lib.mkDefault true;
     # Keep activation with the optional bundle, including when a host replaces it.
