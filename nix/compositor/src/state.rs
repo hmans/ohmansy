@@ -586,6 +586,7 @@ impl Smallvil {
                 self.layout.move_to_workspace(index as usize - 1);
             }
             "fullscreen" => self.layout.toggle_fullscreen(),
+            "maximize" => self.layout.toggle_maximize(),
             "focus-output-next" => self.layout.monitor_delta(1, false),
             "focus-output-prev" => self.layout.monitor_delta(-1, false),
             "move-output-next" => self.layout.monitor_delta(1, true),

@@ -37,7 +37,8 @@ focus_ring_color = [0.67, 0.57, 0.78, 1.0] # RGBA, each from 0 to 1
 "Mod+Right" = { action = "focus-next" }
 "Mod+Shift+Right" = { action = "move-next" }
 "Mod+1" = { action = "workspace", value = 1 }
-"Mod+F" = { action = "fullscreen" }
+"Mod+F" = { action = "maximize" }
+"Mod+Shift+F" = { action = "fullscreen" }
 "Mod+minus" = { action = "scale-adjust", value = -5 }
 "Mod+equal" = { action = "scale-adjust", value = 5 }
 

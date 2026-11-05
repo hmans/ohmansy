@@ -207,7 +207,7 @@ pkgs.testers.runNixOSTest {
     assert control()['fullscreen'] is None
     control('resize', 2000)
     available = control()['outputs'][0]['work_area'][2] - 2 * control()['preferences']['layout']['gap']
-    presets = [max(200, int(available * ratio + .5)) for ratio in [.25, .5, .75]]
+    presets = [max(200, int(available * ratio + .5)) for ratio in [1/3, .5, 2/3]]
     focused = control()['focused']
     for key, expected in [('meta_l-r', presets[0]), ('meta_l-r', presets[1]),
                           ('meta_l-r', presets[2]), ('meta_l-r', presets[0]),

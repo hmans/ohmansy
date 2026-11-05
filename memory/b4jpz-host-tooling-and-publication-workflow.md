@@ -591,7 +591,7 @@ The user subsequently confirmed the appearance on their desktop (2026-11-05).
 
 The default launcher binding is Mod+Space; Mod+D is no longer a default.
 The existing application picker remains unchanged. Mod+R cycles the focused
-column through 25%, 50% and 75%; Mod+Shift+R reverses the order. Mod is Super
+column through 33⅓%, 50% and 66⅔%; Mod+Shift+R reverses the order. Mod is Super
 in native login and Super+Alt in nested sessions. Explicit user bindings still
 override defaults; do not rewrite personal configuration when changing defaults.
 
@@ -618,3 +618,16 @@ does, plus existing launcher/logout and parent isolation checks. The native DRM
 VM passed real Super+R and Shift+Super+R input and all existing monitor, VT,
 keyring and session checks. The reusable session package built. No installed
 OS activation, session replacement or reboot was performed for this change.
+
+Width/fullscreen refinement (2026-11-05): Mod+F now toggles 100% working width
+and restores that column's previous width. Mod+Shift+F toggles fullscreen.
+The maximize action is available in TOML and IPC; it reuses client maximize
+restore state. Manual resize or width cycling clears restore state. Fullscreen
+preserves that state so leaving fullscreen can still restore the original width.
+
+Thirty-one Rust tests, formatting, strict Clippy and a development build passed.
+The real Wayland preferences trial passed forward/reverse thirds-based cycling,
+full-width restore and separate fullscreen key handling under the German keymap,
+preserving parent desktop windows. Example configuration, CLI, demo and guide
+were updated. The native DRM fixture's presets were updated, but that VM was
+not rerun for this refinement. No installed-system activation or session restart.

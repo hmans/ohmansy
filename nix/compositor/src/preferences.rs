@@ -187,6 +187,7 @@ pub enum Action {
     MovePrev,
     MoveNext,
     Fullscreen,
+    Maximize,
     Terminal,
     Launcher,
     Logout,
@@ -278,6 +279,7 @@ impl Action {
                     MovePrev => "move-prev",
                     MoveNext => "move-next",
                     Fullscreen => "fullscreen",
+                    Maximize => "maximize",
                     Terminal => "terminal",
                     Launcher => "launcher",
                     Logout => "logout",
@@ -379,7 +381,8 @@ pub fn bindings(
         ("Mod+Shift+equal".into(), ScaleAdjust { value: 5 }),
         ("Mod+Ctrl+minus".into(), Resize { value: -80 }),
         ("Mod+Ctrl+equal".into(), Resize { value: 80 }),
-        ("Mod+F".into(), Fullscreen),
+        ("Mod+F".into(), Maximize),
+        ("Mod+Shift+F".into(), Fullscreen),
         ("Mod+Q".into(), Close),
         (
             "Mod+S".into(),
@@ -500,6 +503,8 @@ mod tests {
             };
             assert!(matches!(action("Mod+Space"), Some(Action::Launcher)));
             assert!(action("Mod+D").is_none());
+            assert!(matches!(action("Mod+F"), Some(Action::Maximize)));
+            assert!(matches!(action("Mod+Shift+F"), Some(Action::Fullscreen)));
             assert!(matches!(
                 action("Mod+R"),
                 Some(Action::CycleWidth { reverse: false })

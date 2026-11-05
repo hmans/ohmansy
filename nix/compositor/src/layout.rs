@@ -169,7 +169,7 @@ impl Layout {
             maximum.max(minimum)
         };
         let available = (self.work_area.2 - 2 * self.gap).max(1);
-        let mut presets: Vec<_> = [0.25, 0.5, 0.75]
+        let mut presets: Vec<_> = [1.0 / 3.0, 0.5, 2.0 / 3.0]
             .into_iter()
             .map(|fraction| ((available as f64 * fraction).round() as i32).clamp(minimum, maximum))
             .collect();
@@ -196,6 +196,18 @@ impl Layout {
                 .unwrap_or(presets[0])
         };
         self.set_width(id, width);
+    }
+
+    pub fn toggle_maximize(&mut self) {
+        let Some(column) = self
+            .workspace()
+            .columns
+            .iter()
+            .find(|c| Some(c.id) == self.focused())
+        else {
+            return;
+        };
+        self.maximize(column.id, column.restore_width.is_none());
     }
 
     pub fn maximize(&mut self, id: WindowId, enabled: bool) {
@@ -377,21 +389,55 @@ mod tests {
         layout.set_size((1000, 700));
         layout.insert(1);
         layout.set_width(1, 300);
-        for width in [488, 732, 244, 488] {
+        for width in [325, 488, 651, 325] {
             layout.cycle_width(false, 0, 0);
             assert_eq!(layout.geometries()[0].3, width);
         }
-        for width in [244, 732, 488] {
+        for width in [651, 488, 325] {
             layout.cycle_width(true, 0, 0);
             assert_eq!(layout.geometries()[0].3, width);
         }
         layout.set_work_area((40, 44, 800, 600));
         layout.cycle_width(false, 0, 0);
-        assert_eq!(layout.geometries()[0].3, 582);
+        assert_eq!(layout.geometries()[0].3, 388);
         layout.maximize(1, true);
         layout.cycle_width(false, 0, 0);
-        assert_eq!(layout.geometries()[0].3, 200);
+        assert_eq!(layout.geometries()[0].3, 259);
         assert!(layout.workspace().columns[0].restore_width.is_none());
+    }
+
+    #[test]
+    fn full_width_toggle_restores_each_windows_width_and_preserves_panels() {
+        let mut layout = Layout::default();
+        layout.toggle_maximize(); // Empty workspace.
+        layout.set_size((1000, 700));
+        layout.set_work_area((0, 40, 1000, 660));
+        layout.insert(1);
+        layout.set_width(1, 420);
+        layout.insert(2);
+        layout.set_width(2, 600);
+        layout.toggle_maximize();
+        assert_eq!(
+            layout.geometries().iter().find(|c| c.0 == 2).unwrap().3,
+            976
+        );
+        assert_eq!(layout.geometries().iter().find(|c| c.0 == 2).unwrap().2, 52);
+        assert_eq!(layout.workspace().fullscreen, None);
+        layout.focus(1);
+        layout.toggle_maximize();
+        layout.toggle_maximize();
+        assert_eq!(layout.workspace().columns[0].width, 420);
+        layout.focus(2);
+        layout.toggle_fullscreen();
+        assert_eq!(layout.geometries(), vec![(2, 0, 0, 1000, 700)]);
+        layout.toggle_fullscreen();
+        layout.toggle_maximize();
+        assert_eq!(layout.workspace().columns[1].width, 600);
+        layout.toggle_maximize();
+        layout.resize(-80);
+        layout.toggle_maximize();
+        layout.toggle_maximize();
+        assert_eq!(layout.workspace().columns[1].width, 896);
     }
 
     #[test]

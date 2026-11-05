@@ -148,8 +148,8 @@ def run():
             trial.wait_for(lambda: control()['config_error'] is None)
             control('focus', new['id'])
             available = control()['outputs'][0]['work_area'][2] - 2 * control()['preferences']['layout']['gap']
-            widths = [max(200, int(available * ratio + .5)) for ratio in [.25, .5, .75]]
-            control('resize', 2000)  # Start above all presets; next must wrap to 25%.
+            widths = [max(200, int(available * ratio + .5)) for ratio in [1/3, .5, 2/3]]
+            control('resize', 2000)  # Start above all presets; next must wrap to one-third.
             for expected in widths + widths[:1]:
                 trial.send_keys([19], modifier)
                 assert window(new['id'])['width'] == expected, 'Mod+R width cycle'
@@ -157,6 +157,19 @@ def run():
                 trial.send_keys([19], (*modifier, 'shift'))
                 assert window(new['id'])['width'] == expected, 'Mod+Shift+R reverse width cycle'
             assert window(ordinary['id'])['width'] == 480, 'Cycling changed another window'
+            config.write_text(config.read_text().replace('"Mod+F" = { action = "none" }', ''))
+            trial.wait_for(lambda: 'Mod+F' not in control()['preferences']['bindings'])
+            previous = window(new['id'])['width']
+            trial.send_keys([33], modifier)
+            assert window(new['id'])['width'] == available, 'Mod+F full working width'
+            assert control()['fullscreen'] is None, 'Full width must preserve the working area'
+            trial.send_keys([33], (*modifier, 'shift'))
+            assert control()['fullscreen'] == new['id'], 'Mod+Shift+F fullscreen'
+            trial.send_keys([33], (*modifier, 'shift'))
+            assert control()['fullscreen'] is None
+            assert window(new['id'])['width'] == available
+            trial.send_keys([33], modifier)
+            assert window(new['id'])['width'] == previous, 'Mod+F restores previous width'
             (artifacts / 'verification.json').write_text(json.dumps(control(), indent=2))
             control('quit')
             assert process.wait(timeout=10) == 0
@@ -166,7 +179,7 @@ def run():
                 process.wait(timeout=10)
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
-    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save, invalid-keymap recovery and forward/reverse width shortcuts; parent preserved')
+    print('PASS: real custom bindings, disabled defaults, app rules, persistent manual widths, US/German keymap reload, gap/default width updates, snapping, comment-preserving save, invalid-keymap recovery, forward/reverse width shortcuts, full-width restore and separate fullscreen keys; parent preserved')
 
 
 if __name__ == '__main__':

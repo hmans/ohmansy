@@ -100,12 +100,13 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+Shift+comma/period | Move window to previous/next monitor |
 | Mod+minus/plus (or equal) | Decrease/increase the focused monitor's scale by 5 percentage points (50–200%) |
 | Mod+Ctrl+minus/equal | Narrow/widen the focused column |
-| Mod+R / Mod+Shift+R | Cycle column widths through 25%, 50%, and 75%, forward/backward |
+| Mod+R / Mod+Shift+R | Cycle column widths through 33⅓%, 50%, and 66⅔%, forward/backward |
 | Mod+1–4 | Switch workspace |
 | Mod+Shift+1–4 | Move the focused window to a workspace |
 | Mod+Enter | Open a terminal |
 | Mod+Space | Open the application picker |
-| Mod+F | Toggle fullscreen |
+| Mod+F | Toggle 100% working width, restoring the previous width |
+| Mod+Shift+F | Toggle fullscreen |
 | Mod+Q | Close the focused window |
 | Mod+S | Cycle the focused monitor's scale from 100% to 200% |
 
@@ -258,7 +259,7 @@ and Shift modifiers are also supported, with exact modifier matching. Keys use
 XKB names such as Return, Left, comma, space or F6. Ctrl+Alt+F1–F12 remain reserved
 for VT switching. Key releases stay paired with intercepted presses across reloads.
 
-Actions include terminal, launcher, logout, close, fullscreen, focus-prev/next,
+Actions include terminal, launcher, logout, close, maximize, fullscreen, focus-prev/next,
 move-prev/next, focus-output-prev/next, move-output-prev/next, resize, cycle-width, workspace,
 move-workspace, output, scale, scale-adjust, launch, reload-config and save-config. Resize
 uses `value` in logical pixels; workspace/move-workspace use 1–4, output is
@@ -403,7 +404,7 @@ The socket has owner-only permissions. Status includes outputs, their scales,
 positions, active workspaces, and each window's output, plus window geometry, workspace,
 render density, and render/import counters. Commands also include `focus ID`,
 `focus-next`, `focus-prev`, `move-next`, `move-prev`, `resize DELTA`, `cycle-width [1|-1]`, `workspace N`,
-`move-workspace N`, `fullscreen`, `terminal`, `close`, `screenshot PNG`, and `quit`.
+`move-workspace N`, `maximize`, `fullscreen`, `terminal`, `close`, `screenshot PNG`, and `quit`.
 Use `output N` to focus a monitor (starting at 1), `focus-output-next` or
 `focus-output-prev` to cycle, and `move-output-next` or `move-output-prev` to move
 the focused window. `scale PERCENT` affects the focused monitor.
