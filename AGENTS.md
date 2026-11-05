@@ -6,6 +6,12 @@ Write the product name as **ohmansy** in all user-facing copy. Follow
 Use `apply_patch`, simple English, and Conventional Commits. Do not spawn agents
 or push unless asked. Preserve unrelated changes.
 
+## Goals
+
+- Ship a fantastic looking Linux desktop environment
+- Prevent focus stealing through newly spawned windows
+- In dark mode, automatically apply color grading to apps that don't support it
+
 ## Session workflow
 
 1. Inspect Git status and read [README.md](README.md).
