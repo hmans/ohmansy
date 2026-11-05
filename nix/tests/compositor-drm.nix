@@ -57,8 +57,6 @@ let
   '';
   keyringTrial = pkgs.writeShellScript "shine-keyring-fixture" ''
     set -eu
-    # Disposable VM fixture only; no real account credential or host keyring.
-    printf shinefixture | ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon --unlock >/dev/null
     exec ${python}/bin/python3 ${probe}
   '';
 in
@@ -81,7 +79,7 @@ pkgs.testers.runNixOSTest {
       serviceConfig.ExecStart = "${python}/bin/python3 ${touchpadFixture}";
     };
     security.polkit.enable = true;
-    users.users.alice = { isNormalUser = true; uid = 1000; linger = true; };
+    users.users.alice = { isNormalUser = true; uid = 1000; linger = true; initialPassword = "shinefixture"; };
     services.gnome.gnome-keyring.enable = true;
     security.pam.services.greetd.enableGnomeKeyring = true;
     fonts.packages = [ pkgs.dejavu_fonts ];
@@ -90,13 +88,18 @@ pkgs.testers.runNixOSTest {
       enable = true;
       settings = let
         command = "${pkgs.writeShellScript "shine-test-session" ''
+          # Seed only this disposable VM's first autologin, before Secret
+          # Service initialization. The later password login uses PAM alone.
+          if [ ! -f "$HOME/.local/share/keyrings/login.keyring" ]; then
+            printf shinefixture | ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon --unlock >/dev/null
+          fi
           exec ${import ../modules/compositor-session-package.nix { inherit pkgs; }}/bin/ohmansy-compositor-session \
             --no-clients --config /run/user/1000/shine-test.toml \
             --control-socket /run/user/1000/shine.sock 2>/run/user/1000/shine-session.log
         ''}";
       in {
         initial_session = { user = "alice"; inherit command; };
-        default_session = { user = "alice"; command = "${pkgs.coreutils}/bin/sleep infinity"; };
+        default_session = { user = "greeter"; command = "${pkgs.greetd}/bin/agreety --cmd ${command}"; };
       };
     };
   };
@@ -137,6 +140,9 @@ pkgs.testers.runNixOSTest {
         if len(control()['windows']) == 1:
             break
         time.sleep(.1)
+    if len(control()['windows']) != 1:
+        print(machine.succeed('cat /run/user/1000/shine-session.log'))
+        print(machine.succeed('journalctl -b --no-pager -p warning'))
     assert len(control()['windows']) == 1, control()
     # Type a public fixture password into the VM's standard keyring dialog.
     machine.send_chars('shinefixture')
@@ -276,5 +282,25 @@ pkgs.testers.runNixOSTest {
         time.sleep(.1)
     assert 'WAYLAND_DISPLAY' not in environment, environment
     assert 'XDG_CURRENT_DESKTOP' not in environment, environment
+    # A real password login must retain PAM's unlock, before any fixture helper
+    # can call --unlock. The earlier autologin only tests graphical prompting.
+    machine.wait_until_succeeds("grep -aq 'login:' /dev/vcs1", timeout=20)
+    machine.send_chars('alice\n')
+    machine.wait_until_succeeds("grep -aq 'Password:' /dev/vcs1", timeout=20)
+    machine.send_chars('shinefixture\n')
+    machine.wait_for_file('/run/user/1000/shine.sock', timeout=30)
+    # Ask the bus itself, without activating Secret Service as a side effect.
+    machine.wait_until_succeeds("runuser -u alice -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus sh -c 'busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus NameHasOwner s org.freedesktop.secrets | grep -qx \"b true\"'", timeout=15)
+    locked = as_user('busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/login org.freedesktop.Secret.Collection Locked').strip()
+    assert locked == 'b false', locked
+    # Repeated activation must reach the same initialized daemon and must not
+    # prompt or relock the login keyring.
+    owner = as_user('busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus GetNameOwner s org.freedesktop.secrets').strip()
+    for attempt in range(3):
+        time.sleep(1)
+        assert as_user('busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/login org.freedesktop.Secret.Collection Locked').strip() == 'b false'
+        assert as_user('busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus GetNameOwner s org.freedesktop.secrets').strip() == owner
+    assert not control()['windows'], control()
+    control('quit')
   '';
 }

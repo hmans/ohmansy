@@ -511,3 +511,33 @@ confirmed logout, 2x terminal and parent environment/window preservation trial
 passed. An interactive desktop preview with the bar, Firefox, Text Editor and
 terminal was running and visually checked at handoff; verify its live state.
 No installed OS activation, physical DRM login, image build or boot was tested.
+
+## Shine login keyring initialization (2026-11-05)
+
+PAM unlock alone does not finish GNOME Keyring initialization. A normal Shine
+login now runs `gnome-keyring-daemon --start --components=secrets,pkcs11` in its
+setup helper, after publishing the session environment and before desktop
+applications start. This completes the PAM login-mode daemon instead of relying
+on a later D-Bus activation. The module follows services.gnome.gnome-keyring.enable;
+nested previews skip the initialization and preserve the parent keyring.
+GNOME documents this split in https://wiki.gnome.org/Projects/GnomeKeyring/RunningDaemon.
+
+The observed installed login logged a successful PAM unlock, but later Secret
+Service activation found no control socket and the login collection was locked.
+The missing session initialization is consistent with that failure. No real
+keyring files, passwords or stored secrets were read or changed to diagnose it.
+
+The compositor-drm VM now seeds an encrypted disposable keyring before Secret
+Service initialization, tests an explicit graphical unlock during autologin,
+then logs out and signs in through agreety/greetd with a public fixture password.
+It checks that Secret Service already has a bus owner without activating it,
+that login is unlocked, that repeated requests retain the same owner, and that
+no prompt window appears. The final VM check passed, including the existing
+input, monitor mode/hotplug, VT and logout checks. The packaged nested trial
+passed launcher/logout and parent environment preservation; all-system flake
+evaluation passed. No installed OS activation or fresh physical login was done.
+
+Fixture pitfall: creating a login collection with --unlock after the already
+initialized service starts can leave its collection skeleton missing and make
+the graphical test fail. Seed the VM-only file before starting the session.
+Use /dev/vcs1 prompt checks for agreety; OCR requires a separate test dependency.

@@ -8,6 +8,7 @@ let
   cfg = config.ohmansy.compositor;
   session = import ./compositor-session-package.nix {
     inherit pkgs;
+    enableKeyring = config.services.gnome.gnome-keyring.enable;
     terminal = "${config.ohmansy.terminal.launcher}/bin/ohmansy-terminal";
     xkb = config.services.xserver.xkb;
   };

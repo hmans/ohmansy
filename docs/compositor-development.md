@@ -33,7 +33,9 @@ reach the login keyring. Once its Wayland socket is ready, Shine publishes the
 display and desktop environment for D-Bus and systemd activation. It also
 inherits the user's SSH agent, using the user manager's agent socket or GCR
 when the login environment did not supply one. On logout, it clears its display
-settings if they still belong to that session.
+settings if they still belong to that session. When GNOME Keyring is enabled,
+Shine completes the PAM-started daemon's initialization before starting desktop
+applications, retaining the keyring unlock from password login.
 
 Nested previews use a separate private bus and preserve the parent desktop's
 activation environment. Keyring unlock dialogs can appear in a normal login;

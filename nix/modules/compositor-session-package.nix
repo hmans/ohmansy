@@ -1,6 +1,7 @@
 {
   pkgs,
   terminal ? "${pkgs.foot}/bin/foot",
+  enableKeyring ? true,
   xkb ? {
     layout = "us";
   },
@@ -22,11 +23,18 @@ let
     fi
   '';
   setup = pkgs.writeShellScript "ohmansy-compositor-session-environment" ''
+    set -eu
     if [ "$OHMANSY_COMPOSITOR_SESSION_KIND" = login ]; then
       printf '%s\n' "$WAYLAND_DISPLAY" > "$OHMANSY_COMPOSITOR_SESSION_STATE"
-      exec ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd \
+      ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd \
         DISPLAY= WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
         XDG_SESSION_TYPE SSH_AUTH_SOCK
+      ${pkgs.lib.optionalString enableKeyring ''
+        # PAM unlocks a login-mode daemon. Finish its initialization before
+        # applications activate a replacement daemon with a locked keyring.
+        ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon --start --components=secrets,pkcs11 >/dev/null
+      ''}
+      exit 0
     fi
     # A preview must never replace the parent desktop's activation environment.
     exec ${pkgs.dbus}/bin/dbus-update-activation-environment \
