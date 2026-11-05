@@ -92,6 +92,24 @@ def run():
             assert control()['workspace'] == 1
             control('resize', 80)
             assert window(ruled['id'])['width'] == 800
+            trial.send_keys([13], modifier)  # US equal: fine scale increase.
+            assert control()['display_scale'] == 1.30
+            trial.send_keys([13], (*modifier, 'shift'))  # US plus needs Shift.
+            assert control()['display_scale'] == 1.35
+            trial.send_keys([12], modifier)
+            assert control()['display_scale'] == 1.30
+            assert window(ruled['id'])['width'] == 800
+            trial.send_keys([13], (*modifier, 'ctrl'))
+            assert window(ruled['id'])['width'] == 880
+            trial.send_keys([12], (*modifier, 'ctrl'))
+            assert window(ruled['id'])['width'] == 800
+            control('scale', 198)
+            trial.send_keys([13, 13], modifier)
+            assert control()['display_scale'] == 2.0, 'Increase must clamp, not wrap'
+            control('scale', 52)
+            trial.send_keys([12, 12], modifier)
+            assert control()['display_scale'] == 0.5, 'Decrease must clamp'
+            control('scale', 125)
             assert capture_character('us') == 'y'
 
             config.write_text(configuration(layout='de', gap=32, pixels=500, rule=900, resize=True))
@@ -99,6 +117,10 @@ def run():
             assert window(ruled['id'])['width'] == 800, 'Reload must preserve a manually resized column'
             assert window(ordinary['id'])['width'] == 480
             assert capture_character('de') == 'z'
+            trial.send_keys([27], modifier)  # German plus does not need Shift.
+            assert control()['display_scale'] == 1.30
+            trial.send_keys([53], modifier)  # German minus.
+            assert control()['display_scale'] == 1.25
             control('focus', ruled['id'])
             trial.send_keys([28], modifier)
             assert window(ruled['id'])['width'] == 880, 'Reloaded custom action must replace the old binding'

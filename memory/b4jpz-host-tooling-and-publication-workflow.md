@@ -464,3 +464,17 @@ A long-lived agent can retain a dead Niri IPC path after login even while its
 Wayland socket belongs to Shine. The test helper now falls back, after Niri IPC
 fails, to a unique live Shine control socket matching the inherited Wayland
 display. It never assumes the desktop label alone identifies the active server.
+
+## Shine fine scale shortcuts (2026-11-04)
+
+Default Mod+minus and Mod+plus/equal adjust the focused monitor by five
+percentage points, clamped to 50–200%; Mod+S retains its 25-point cycle.
+Shift+plus/equal supports layouts needing Shift for plus. Column resizing moves
+to Mod+Ctrl+minus/equal. The configurable scale-adjust action takes a signed,
+nonzero percentage point value. It uses the existing output configuration path
+so neighbour positioning and pointer anchoring follow normal scale changes.
+Rust tests (21), formatting and strict Clippy passed. The nested preference
+trial verified US equal/Shift-plus, German plus/minus, both clamps, unchanged
+column widths during scaling and the new resize chords, preserving parent
+windows. The development binary was built; the live session was not replaced
+or restarted. Install a new build before using the new action in live config.

@@ -31,6 +31,8 @@ default_column_width = { proportion = 0.62 }
 "Mod+Shift+Right" = { action = "move-next" }
 "Mod+1" = { action = "workspace", value = 1 }
 "Mod+F" = { action = "fullscreen" }
+"Mod+minus" = { action = "scale-adjust", value = -5 }
+"Mod+equal" = { action = "scale-adjust", value = 5 }
 
 # Exact app_id matches. Last matching rule wins. Defaults affect new windows.
 [[window_rules]]

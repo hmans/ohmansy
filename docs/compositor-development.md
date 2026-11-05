@@ -85,7 +85,8 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+Shift+H/L or Left/Right | Move column left/right |
 | Mod+comma/period | Focus previous/next monitor |
 | Mod+Shift+comma/period | Move window to previous/next monitor |
-| Mod+minus/equal | Narrow/widen the focused column |
+| Mod+minus/plus (or equal) | Decrease/increase the focused monitor's scale by 5 percentage points (50–200%) |
+| Mod+Ctrl+minus/equal | Narrow/widen the focused column |
 | Mod+1–4 | Switch workspace |
 | Mod+Shift+1–4 | Move the focused window to a workspace |
 | Mod+Enter | Open a terminal |
@@ -217,9 +218,10 @@ for VT switching. Key releases stay paired with intercepted presses across reloa
 
 Actions include terminal, launcher, logout, close, fullscreen, focus-prev/next,
 move-prev/next, focus-output-prev/next, move-output-prev/next, resize, workspace,
-move-workspace, output, scale, launch, reload-config and save-config. Resize
+move-workspace, output, scale, scale-adjust, launch, reload-config and save-config. Resize
 uses `value` in logical pixels; workspace/move-workspace use 1–4, output is
-1-based, and scale uses a percentage. Launch executes the program and argument
+1-based, scale uses a percentage, and scale-adjust uses a signed percentage point
+delta (for example, `{ action = "scale-adjust", value = 5 }`). Launch executes the program and argument
 array directly. The configured terminal action still honors the OS launcher.
 
 Window rules match an exact, case-sensitive `app_id` from status. The last

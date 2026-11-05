@@ -176,6 +176,9 @@ pub enum Action {
     Scale {
         value: Option<i64>,
     },
+    ScaleAdjust {
+        value: i64,
+    },
     Launch {
         program: String,
         #[serde(default)]
@@ -199,6 +202,10 @@ impl Action {
             Self::Scale { value: Some(v) } if !(50..=200).contains(v) => {
                 Err("Binding scale must be 50 to 200 percent".into())
             }
+            Self::ScaleAdjust { value } if *value == 0 || !(-150..=150).contains(value) => Err(
+                "Binding scale-adjust must be a nonzero percentage point delta from -150 to 150"
+                    .into(),
+            ),
             Self::Launch { program, args }
                 if program.is_empty()
                     || program.contains('\0')
@@ -224,6 +231,7 @@ impl Action {
             MoveWorkspace { value } => ("move-workspace", Some(*value as i64)),
             Output { value } => ("output", Some(*value as i64)),
             Scale { value } => ("scale", *value),
+            ScaleAdjust { value } => ("scale-adjust", Some(*value)),
             action => (
                 match action {
                     FocusPrev => "focus-prev",
@@ -323,10 +331,13 @@ pub fn bindings(
         ("Mod+Shift+Left".into(), MovePrev),
         ("Mod+Shift+L".into(), MoveNext),
         ("Mod+Shift+Right".into(), MoveNext),
-        ("Mod+minus".into(), Resize { value: -80 }),
-        ("Mod+equal".into(), Resize { value: 80 }),
-        ("Mod+Shift+minus".into(), Resize { value: -80 }),
-        ("Mod+Shift+equal".into(), Resize { value: 80 }),
+        ("Mod+minus".into(), ScaleAdjust { value: -5 }),
+        ("Mod+equal".into(), ScaleAdjust { value: 5 }),
+        ("Mod+plus".into(), ScaleAdjust { value: 5 }),
+        ("Mod+Shift+plus".into(), ScaleAdjust { value: 5 }),
+        ("Mod+Shift+equal".into(), ScaleAdjust { value: 5 }),
+        ("Mod+Ctrl+minus".into(), Resize { value: -80 }),
+        ("Mod+Ctrl+equal".into(), Resize { value: 80 }),
         ("Mod+F".into(), Fullscreen),
         ("Mod+Q".into(), Close),
         (

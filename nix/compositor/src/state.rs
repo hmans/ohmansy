@@ -561,7 +561,17 @@ impl Smallvil {
                 self.layout.focus_monitor(index as usize - 1);
             }
             "vt" if self.native_mode => self.vt_request = value.map(|v| v as i32),
-            "scale" => {
+            "scale" | "scale-adjust" => {
+                let value = if action == "scale-adjust" {
+                    let delta = value.ok_or("scale-adjust needs a percentage point delta")?;
+                    Some(
+                        ((self.ui_scale * 100.0).round() as i64)
+                            .saturating_add(delta)
+                            .clamp(50, 200),
+                    )
+                } else {
+                    value
+                };
                 let scale = match value {
                     Some(percent) if (50..=200).contains(&percent) => percent as f64 / 100.0,
                     Some(_) => return Err("Scale must be 50 to 200 percent".into()),
