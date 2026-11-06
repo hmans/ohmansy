@@ -13,12 +13,14 @@ in
       tmux
       mise
       herdr
+      alpine # Includes the pico text editor.
       vim
       neovim
       vscodium
       zed-editor
       curl
       wget
+      glib.bin # Includes gio.
       fzf
       ripgrep
       eza
