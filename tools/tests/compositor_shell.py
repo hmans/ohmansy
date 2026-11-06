@@ -86,6 +86,17 @@ def run():
             click(second, 260)
             trial.wait_for(lambda: len(control()['windows']) == 2, description='panel terminal')
             assert next(w for w in control()['windows'] if w['id'] != window['id'])['output'] == second['name']
+            # The real monitor panel must open from Shine and read its outputs.
+            click(first, 340)
+            display_window = trial.wait_for(lambda: next((w for w in control()['windows']
+                if w['title'] == 'ohmansy displays' and w['surface_size']), None),
+                description='Displays button opens monitor settings')
+            time.sleep(1)  # Let the controller read the real monitor list.
+            capture('display-settings')
+            control('focus', display_window['id'])
+            control('close')
+            trial.wait_for(lambda: all(w['id'] != display_window['id'] for w in control()['windows']),
+                           description='monitor settings close')
             control('focus', window['id'])
             control('fullscreen')
             assert trial.window_for(control, 'shine-shell-test')['geometry'] == [
@@ -117,7 +128,8 @@ def run():
             trial.wait_for(layers_ready, description='panels and wallpapers restart')
             # An empty part of the bar must show the wallpaper without a tint.
             scale = control()['outputs'][0]['scale']
-            bar_pixel = (round(360 * scale), round(22 * scale))
+            blank_x = control()['outputs'][0]['logical_size'][0] * .65
+            bar_pixel = (round(blank_x * scale), round(22 * scale))
             trial.wait_for(lambda: all(abs(a - b) <= 2 for a, b in zip(
                 capture('transparent-bar').getpixel(bar_pixel), background)),
                 description='transparent panel background')

@@ -10,10 +10,11 @@ Item {
     readonly property var selected: controller.outputs.find(output => output.name === selectedName) || null
     property real draftScale: 1
     property string draftMode: ""
+    property real maximumScale: 4
     readonly property var scales: {
         const values = [0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3];
         if (selected && !values.includes(selected.scale)) values.push(selected.scale);
-        return values.sort((a, b) => a - b);
+        return values.filter(value => value <= maximumScale).sort((a, b) => a - b);
     }
     readonly property bool changed: selected !== null &&
         (Math.abs(draftScale - selected.scale) > 0.001 || draftMode !== selected.mode)

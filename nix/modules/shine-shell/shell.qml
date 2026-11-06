@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
 import Ohmansy.Ui
+import Ohmansy.Displays as Displays
 
 ShellRoot {
     id: root
@@ -16,6 +17,22 @@ ShellRoot {
     property string screenshotTitle: ""
     property double screenshotResult: 0
     property string screenshotOutput: ""
+    property bool displaysOpen: false
+    Displays.DisplayState { id: displayState }
+    FloatingWindow {
+        visible: root.displaysOpen
+        title: "ohmansy displays"
+        implicitWidth: 600
+        implicitHeight: 610
+        color: displayColors.surfaceBase
+        ColorPalette { id: displayColors; dark: Qt.styleHints.colorScheme === Qt.ColorScheme.Dark }
+        onClosed: root.displaysOpen = false
+        Displays.DisplayView {
+            anchors { fill: parent; margins: 20 }
+            controller: displayState
+            maximumScale: 2
+        }
+    }
     onStateChanged: {
         const shot = state.screenshot;
         if (shot && shot.id !== screenshotResult) {
@@ -99,6 +116,10 @@ ShellRoot {
                     }
                 }
                 BarButton { text: "Terminal"; onClicked: root.request("terminal", bar.modelData.name, null) }
+                BarButton {
+                    text: "Displays"
+                    onClicked: { root.displaysOpen = true; displayState.refresh(); }
+                }
             }
             Text {
                 anchors.centerIn: parent

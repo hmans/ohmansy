@@ -65,6 +65,14 @@ The session package also supports an explicit nested preview:
 nix run .#compositor-session -- --nested
 ```
 
+Choose **Displays** in Shine's bar to change a monitor's UI scale or refresh
+rate at its current resolution. **Apply** previews the change for 15 seconds;
+choose **Keep changes** to save it, or **Revert** to restore the previous settings.
+Unconfirmed changes also revert when the preview worker loses its input or
+times out. Shine saves kept choices in `~/.config/shine/config.toml`, alongside
+its other settings, and reads them at login. Shine supports scales up to 200%.
+Nested previews support scale changes; their resolution follows the host window.
+
 The module honors `ohmansy.terminal`; the standalone flake preview uses Foot.
 Close the preview's outer window or use its sign-out confirmation to end it.
 

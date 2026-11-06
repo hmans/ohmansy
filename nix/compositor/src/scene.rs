@@ -354,6 +354,22 @@ impl Smallvil {
                 .owner(id)
                 .is_some_and(|index| self.layout.monitors[index].name == output.name())
             {
+                // Mapped columns can sit entirely outside the scrolled view.
+                // Include popups in the bounds so a visible menu still advances.
+                let visible = self
+                    .space
+                    .element_location(window)
+                    .and_then(|location| {
+                        let mut bounds = window.bbox_with_popups();
+                        bounds.loc += location - window.geometry().loc;
+                        self.space
+                            .output_geometry(output)
+                            .map(|view| bounds.overlaps(view))
+                    })
+                    .unwrap_or(false);
+                if !visible {
+                    continue;
+                }
                 window.send_frame(
                     output,
                     self.start_time.elapsed(),

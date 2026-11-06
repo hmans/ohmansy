@@ -101,7 +101,7 @@ impl Head {
         Ok(())
     }
 }
-struct Native {
+pub(crate) struct Native {
     session: LibSeatSession,
     drm: DrmDevice,
     gbm: GbmDevice<DrmDeviceFd>,
@@ -113,6 +113,7 @@ struct Native {
     rescan: bool,
     devices: Rc<RefCell<(u64, Vec<InputDevice>)>>,
     input_revision: Option<(u64, u64)>,
+    tick: Instant,
 }
 impl Native {
     fn configure_input(&mut self, state: &mut Smallvil) {
@@ -350,6 +351,11 @@ impl Native {
             self.scan(data)?;
         }
         let state = &mut data.state;
+        let now = Instant::now();
+        if state.layout.tick((now - self.tick).as_secs_f64()) {
+            state.apply_positions();
+        }
+        self.tick = now;
         state.import_buffers(&mut self.renderer);
         state.space.refresh();
         state.maintain_scene();
@@ -503,9 +509,11 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
         rescan: true,
         devices,
         input_revision: None,
+        tick: Instant::now(),
     };
     native.scan(data)?;
     let native = Rc::new(RefCell::new(native));
+    data.native = Some(native.clone());
     let backend = native.clone();
     event_loop
         .handle()
@@ -575,45 +583,58 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
             }
         })
         .map_err(|e| anyhow::anyhow!("{}", e.error))?;
-    let mut tick = Instant::now();
     event_loop
         .handle()
-        .insert_source(Timer::immediate(), move |_, _, data| {
-            let now = Instant::now();
-            if data.state.layout.tick((now - tick).as_secs_f64()) {
-                data.state.apply_positions();
-            }
-            tick = now;
-            let mut backend = native.borrow_mut();
-            if let Some(vt) = data.state.vt_request.take() {
-                if let Err(e) = backend.session.change_vt(vt) {
-                    eprintln!("Switch VT: {e}");
-                } else {
-                    // The kernel may revoke DRM ownership before the libseat
-                    // pause callback is dispatched. Yield before drawing again.
-                    return TimeoutAction::ToDuration(Duration::from_millis(16));
-                }
-            }
-            if let Err(e) = backend.draw(data) {
-                let temporarily_inactive = e.chain().any(|cause| {
-                    match cause.downcast_ref::<smithay::backend::drm::DrmError>() {
-                        Some(smithay::backend::drm::DrmError::DeviceInactive) => true,
-                        Some(smithay::backend::drm::DrmError::Access(access)) => {
-                            access.source.kind() == std::io::ErrorKind::PermissionDenied
-                        }
-                        _ => false,
-                    }
-                });
-                if temporarily_inactive {
-                    // An externally initiated VT switch can race a page flip too.
-                    data.state.needs_redraw = true;
-                } else {
-                    data.state.runtime_error = Some(format!("Render displays: {e:#}"));
-                    data.state.loop_signal.stop();
-                }
-            }
-            TimeoutAction::ToDuration(Duration::from_millis(16))
+        .insert_source(Timer::immediate(), move |_, _, _| {
+            // Keep animations and live configuration moving without imposing a
+            // polling delay on input, client commits, or page-flip completion.
+            let backend = native.borrow();
+            let refresh = backend
+                .heads
+                .iter()
+                .filter_map(|h| h.output.current_mode())
+                .map(|m| m.refresh)
+                .max()
+                .unwrap_or(60_000)
+                .max(1);
+            TimeoutAction::ToDuration(Duration::from_secs_f64(1000.0 / refresh as f64))
         })
         .map_err(|e| anyhow::anyhow!("{}", e.error))?;
     Ok(())
+}
+
+/// Render after dispatching events, so client commits and completed page flips
+/// can use the next refresh instead of waiting for an unrelated 16 ms timer.
+pub(crate) fn dispatch(data: &mut CalloopData) {
+    if let Some(native) = data.native.clone() {
+        let mut backend = native.borrow_mut();
+        if let Some(vt) = data.state.vt_request.take() {
+            if let Err(e) = backend.session.change_vt(vt) {
+                eprintln!("Switch VT: {e}");
+            } else {
+                // Yield so libseat can report a pause before drawing again.
+                // Do not mark the seat inactive here: switching to the current
+                // VT succeeds without a later activation event.
+                return;
+            }
+        }
+        if let Err(e) = backend.draw(data) {
+            let temporarily_inactive = e.chain().any(|cause| match cause
+                .downcast_ref::<smithay::backend::drm::DrmError>(
+            ) {
+                Some(smithay::backend::drm::DrmError::DeviceInactive) => true,
+                Some(smithay::backend::drm::DrmError::Access(access)) => {
+                    access.source.kind() == std::io::ErrorKind::PermissionDenied
+                }
+                _ => false,
+            });
+            if temporarily_inactive {
+                // An externally initiated VT switch can race a page flip too.
+                data.state.needs_redraw = true;
+            } else {
+                data.state.runtime_error = Some(format!("Render displays: {e:#}"));
+                data.state.loop_signal.stop();
+            }
+        }
+    }
 }

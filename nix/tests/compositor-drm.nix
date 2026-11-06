@@ -119,6 +119,17 @@ pkgs.testers.runNixOSTest {
     state = control()
     assert state["backend"] == "drm", state
     assert len(state["outputs"]) == 2, state
+    # Requesting the current VT must not leave rendering suspended waiting for
+    # an activation event that will never arrive.
+    frames = state['rendered_frames']
+    machine.send_key('ctrl-alt-f1')
+    for attempt in range(100):
+        state = control()
+        if state['rendered_frames'] > frames:
+            break
+        import time
+        time.sleep(.1)
+    assert state['rendered_frames'] > frames, state
     import shlex
     def as_user(command):
         return machine.succeed("runuser -u alice -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus sh -ec " + shlex.quote(command))

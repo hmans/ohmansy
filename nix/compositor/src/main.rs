@@ -31,6 +31,7 @@ use std::{
 pub struct CalloopData {
     state: Smallvil,
     display_handle: DisplayHandle,
+    native: Option<std::rc::Rc<std::cell::RefCell<native::Native>>>,
 }
 
 fn asset_path(name: &str) -> PathBuf {
@@ -312,6 +313,7 @@ fn main() -> Result<()> {
     let mut data = CalloopData {
         state,
         display_handle,
+        native: None,
     };
     match backend.as_str() {
         "winit" => crate::winit::init_winit(&mut event_loop, &mut data)?,
@@ -375,6 +377,7 @@ fn main() -> Result<()> {
     }
     let started = Instant::now();
     event_loop.run(Some(Duration::from_millis(50)), &mut data, |data| {
+        native::dispatch(data);
         // Protocol replies must reach clients even when no frame is drawn.
         let _ = data.display_handle.flush_clients();
         if close_after.is_some_and(|duration| started.elapsed() >= duration) {

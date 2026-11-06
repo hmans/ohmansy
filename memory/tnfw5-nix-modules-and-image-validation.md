@@ -9,6 +9,36 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine monitor controls (2026-11-06)
+
+Shine's bar has a Displays button opening the existing DisplayView/DisplayState
+in a floating window. `quickshell-ui.nix` exports their shared source as the
+Ohmansy.Displays QML module; Niri retains its existing controller and helper.
+`shine-shell.nix` supplies the Shine helper and a transient systemd user-service
+relay so the preview worker survives shell reloads. Relative control sockets
+are made absolute before launching that service.
+
+`desktop/shine-displays.py` reads Shine IPC and previews per-monitor scale and
+refresh rate at the current resolution. Keep uses the compositor's validated,
+comment-preserving save-config path; it does not write Niri's displays.json.
+Revert restores all matching monitors' original positions, scales, primary
+selection and modes because scaling may reposition neighbours. Native rollback
+restores the requested mode even when hardware already fell back. Replacement
+monitor identities are excluded. EOF, timeout, interrupted preview and failed
+saves revert without persisting. Nested outputs omit unchanged mode requests
+because their resolution is controlled by the host window. UI presets stop at
+Shine's 200% scale limit.
+
+23 combined Niri/Shine backend tests passed, including exact rate choices,
+partial failure, timeout/EOF/interruption, save conflicts and replacement
+monitor rollback. Headless real-client trials passed scale preview/revert/keep,
+configuration comment retention and opening the populated UI from the bar.
+The displays-ui check, session package and native DRM VM check passed too.
+The shell was gracefully replaced in the running installed session and both
+physical monitors were enumerated read-only; no physical scale or mode change
+was applied. Login compositor and application windows were preserved. Source
+changes still require an installed-system rebuild for persistence across login.
+
 ## Shine universal clipboard shortcuts (2026-11-06)
 
 Shine defaults Mod+C/V to typed copy/paste actions. Ordinary apps receive

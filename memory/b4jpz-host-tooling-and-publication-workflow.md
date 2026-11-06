@@ -9,6 +9,34 @@ title: Host tooling and publication workflow
 ---
 # Host development, build, and release tools
 
+## Shine rendering and monitor controls (2026-11-06)
+
+Native DRM rendering now runs after event-loop dispatch, allowing input, client
+commits and page-flip completion to trigger drawing without an unrelated 16 ms
+polling delay. Per-head pending/dirty gates remain in place. The maintenance
+timer follows the fastest connected output's current refresh rate. Same-VT
+requests yield without marking the seat inactive; a successful request for the
+current VT need not produce another activation event.
+
+Frame callbacks now skip mapped columns whose complete surface/popup bounds
+miss their owning output. Coordinates subtract window geometry before applying
+the space location. Inactive workspaces were already unmapped; the new saving
+is for columns outside the active workspace's scrolled view. Scrolling back
+causes normal redraws and resumes callbacks.
+
+`tools/tests/compositor_performance.py` runs on the private headless display.
+Its animated Qt client submitted 59 frames in a visible one-second sample,
+zero fully offscreen, resumed at 61 on return, and remained idle on an inactive
+workspace. The test also verifies real Shine display preview/revert/EOF/keep
+and comment-preserving configuration saves. The shell trial opens Displays
+from the bar and captures its populated monitor list. Full Firefox/GTK
+integration, 36 Rust tests, formatting and strict Clippy passed. The native
+two-monitor DRM VM test booted and passed, including current-VT and normal VT
+switching. The displays-ui check passed its simulated flows/render variants.
+These are test results, not measurements of reduced physical-GPU utilization.
+The running login compositor was preserved; only Quickshell was replaced to
+load the new controls, preserving every application window ID. No OS activation.
+
 Read [root instructions](../AGENTS.md). Run commands from the
 repository root unless the tool explicitly supports another working directory.
 
