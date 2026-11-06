@@ -31,7 +31,7 @@ in {
       color-scheme = "prefer-dark";
       cursor-theme = cursor.name;
       cursor-size = lib.gvariant.mkInt32 cursor.size;
-      font-name = lib.mkDefault "Source Sans 3 11";
+      font-name = "Source Sans 3 11";
     };
   }];
   # NixOS enables speech synthesis for graphical desktops by default, pulling

@@ -47,6 +47,7 @@ pkgs.runCommand "ohmansy-live-pc-policy" {
   test "$(dconf read /org/gnome/desktop/interface/color-scheme)" = "'prefer-dark'"
   test "$(dconf read /org/gnome/desktop/interface/cursor-theme)" = "'Bibata-Modern-Classic'"
   test "$(dconf read /org/gnome/desktop/interface/cursor-size)" = 24
+  test "$(dconf read /org/gnome/desktop/interface/font-name)" = "'Source Sans 3 11'"
   dbus-run-session --config-file=${pkgs.dbus}/share/dbus-1/session.conf -- bash -eu <<'CHECK'
   dconf write /org/gnome/desktop/interface/color-scheme "'prefer-light'"
   test "$(dconf read /org/gnome/desktop/interface/color-scheme)" = "'prefer-light'"
@@ -56,6 +57,10 @@ pkgs.runCommand "ohmansy-live-pc-policy" {
   test "$(dconf read /org/gnome/desktop/interface/cursor-theme)" = "'Adwaita'"
   dconf reset /org/gnome/desktop/interface/cursor-theme
   test "$(dconf read /org/gnome/desktop/interface/cursor-theme)" = "'Bibata-Modern-Classic'"
+  dconf write /org/gnome/desktop/interface/font-name "'Inter 12'"
+  test "$(dconf read /org/gnome/desktop/interface/font-name)" = "'Inter 12'"
+  dconf reset /org/gnome/desktop/interface/font-name
+  test "$(dconf read /org/gnome/desktop/interface/font-name)" = "'Source Sans 3 11'"
   CHECK
   '') appearanceConfigs}
   touch "$out"

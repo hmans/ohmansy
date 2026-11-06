@@ -79,6 +79,17 @@ and app windows. No installed-system activation or image build.
 
 ## Source Sans browser font defaults (2026-11-06)
 
+Dconf database settings are raw GVariant values: keep font-name as a plain
+string there. Nesting lib.mkDefault inside that raw settings attrset leaves an
+override attrset for the serializer and breaks full system evaluation with
+"Cannot construct GVariant value from an attribute set". User preferences still
+override the unlocked database default. The live-pc-policy check now builds
+the actual databases and verifies font read, user override and reset across
+the live/installed/factory configurations. It and the native customization
+check passed after the fix, and the full reusable NVIDIA system drvPath
+evaluated successfully. The user confirmed the corrected os-boot workflow
+works. No installed system activation was performed by the agent.
+
 Source Sans 3 is the accepted browser/application system-ui default, replacing
 the Inter defaults from `6dd3bf1`: desktop.nix adds source-sans
 3.052 and changes Fontconfig/GTK/dconf defaults to Source Sans 3 (GTK size 11).
