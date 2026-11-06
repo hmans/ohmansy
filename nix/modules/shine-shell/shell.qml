@@ -6,10 +6,12 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Ohmansy.Ui
 import Ohmansy.Displays as Displays
 import Ohmansy.Launcher as Launcher
+import Ohmansy.Desktop as Desktop
 
 ShellRoot {
     id: root
@@ -21,6 +23,9 @@ ShellRoot {
     property string screenshotOutput: ""
     property bool displaysOpen: false
     property string launcherScreen: ""
+    Desktop.AudioState { id: audio }
+    Desktop.AppearanceState { id: appearance }
+    ColorPalette { id: barColors; dark: appearance.effectivePreference === "prefer-dark" }
     function toggleLauncher() {
         const output = state.outputs.find(output => output.focused) || state.outputs[0];
         launcherScreen = launcherScreen ? "" : (output ? output.name : Quickshell.screens[0].name);
@@ -46,7 +51,7 @@ ShellRoot {
                 if (command === "displays") { root.displaysOpen = true; displayState.refresh(); }
                 else if (command === "terminal") root.request("terminal", modelData.name, null);
                 else if (command === "prefer-dark" || command === "prefer-light")
-                    Quickshell.execDetached([Quickshell.env("OHMANSY_APPEARANCE"), command]);
+                    appearance.select(command);
             }
         }
     }
@@ -128,16 +133,66 @@ ShellRoot {
             WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
             component BarButton: GlassButton {
+                id: workspaceButton
                 implicitHeight: 32
                 padding: 9
                 font.pixelSize: 13
                 font.weight: Font.DemiBold
                 actionRole: "secondary"
+                contentItem: Text {
+                    text: workspaceButton.text
+                    font: workspaceButton.font
+                    color: barColors.text
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    opacity: workspaceButton.dimmed ? 0.45 : 1
+                }
+                background: GlassSurface {
+                    colors: barColors
+                    primary: workspaceButton.actionRole === "primary"
+                    tint: primary ? barColors.selection : barColors.control
+                    highlighted: workspaceButton.hovered
+                    pressed: workspaceButton.down
+                    focused: workspaceButton.visualFocus
+                }
+            }
+            component BarIcon: Button {
+                implicitWidth: 30
+                implicitHeight: 32
+                padding: 6
+                display: AbstractButton.IconOnly
+                icon { width: 18; height: 18; color: barColors.text }
+                hoverEnabled: true
+                Accessible.name: text
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: text
+                HoverHandler { cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor }
+                background: Rectangle {
+                    radius: Theme.radius
+                    color: parent.checked || parent.down ? barColors.selection
+                        : parent.hovered || parent.visualFocus ? barColors.hover : "transparent"
+                    border.width: parent.visualFocus ? 1 : 0
+                    border.color: barColors.focusBorder
+                }
             }
             RowLayout {
                 anchors { left: parent.left; verticalCenter: parent.verticalCenter; leftMargin: 10 }
                 spacing: 6
-                BarButton { text: "ohmansy"; onClicked: root.launcherScreen = root.launcherScreen ? "" : bar.modelData.name }
+                Button {
+                    text: "ohmansy"
+                    implicitHeight: 32
+                    padding: 9
+                    background: Item {}
+                    contentItem: Text {
+                        text: parent.text
+                        color: barColors.text
+                        font { family: Theme.fontFamily; pixelSize: 13; weight: Font.DemiBold }
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    onClicked: root.launcherScreen = root.launcherScreen ? "" : bar.modelData.name
+                }
                 Repeater {
                     model: root.state.workspaces || [
                         { name: "1" }, { name: "2" }, { name: "3" }, { name: "4" }
@@ -150,28 +205,83 @@ ShellRoot {
                         onClicked: root.request("workspace", bar.modelData.name, index + 1)
                     }
                 }
-                BarButton { text: "Terminal"; onClicked: root.request("terminal", bar.modelData.name, null) }
-                BarButton {
-                    text: "Displays"
-                    onClicked: { root.displaysOpen = true; displayState.refresh(); }
-                }
             }
             Text {
                 anchors.centerIn: parent
                 visible: bar.width > 700
                 text: "Shine"
-                color: Theme.secondary
+                color: barColors.secondary
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
                 font.weight: Font.DemiBold
             }
-            Text {
+            RowLayout {
                 anchors { right: parent.right; verticalCenter: parent.verticalCenter; rightMargin: 14 }
-                text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 13
-                font.weight: Font.DemiBold
+                spacing: 6
+                BarIcon {
+                    text: "Light mode"
+                    icon.name: "weather-clear-symbolic"
+                    Accessible.description: appearance.error
+                    checkable: true
+                    checked: appearance.effectivePreference === "prefer-light"
+                    enabled: !appearance.busy
+                    onClicked: appearance.select("prefer-light")
+                }
+                BarIcon {
+                    text: "Dark mode"
+                    icon.name: "weather-clear-night-symbolic"
+                    Accessible.description: appearance.error
+                    checkable: true
+                    checked: appearance.effectivePreference === "prefer-dark"
+                    enabled: !appearance.busy
+                    onClicked: appearance.select("prefer-dark")
+                }
+                BarIcon {
+                    text: !audio.available ? "No audio output" : audio.muted ? "Unmute" : "Mute"
+                    icon.name: !audio.available || audio.muted || audio.volume <= 0.01
+                        ? "audio-volume-muted-symbolic" : audio.volume > 0.66
+                        ? "audio-volume-high-symbolic" : "audio-volume-low-symbolic"
+                    enabled: audio.available
+                    onClicked: audio.toggleMute()
+                }
+                Slider {
+                    id: volumeSlider
+                    Layout.preferredWidth: 80
+                    implicitHeight: 32
+                    from: 0; to: 1; stepSize: 0.01
+                    value: audio.volume
+                    enabled: audio.available
+                    wheelEnabled: true
+                    Accessible.name: "Output volume"
+                    onMoved: audio.setVolume(value)
+                    background: Rectangle {
+                        x: volumeSlider.leftPadding
+                        y: (volumeSlider.height - height) / 2
+                        width: volumeSlider.availableWidth
+                        height: 3; radius: 1.5
+                        color: barColors.border
+                        Rectangle {
+                            width: volumeSlider.visualPosition * parent.width
+                            height: parent.height; radius: 1.5
+                            color: audio.muted ? barColors.muted : barColors.text
+                        }
+                    }
+                    handle: Rectangle {
+                        x: volumeSlider.leftPadding + volumeSlider.visualPosition * (volumeSlider.availableWidth - width)
+                        y: (volumeSlider.height - height) / 2
+                        width: 9; height: 9; radius: 4.5
+                        color: barColors.text
+                        opacity: volumeSlider.enabled ? 1 : 0.4
+                    }
+                }
+                Text {
+                    text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
+                    color: barColors.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                    Layout.leftMargin: 8
+                }
             }
         }
     }
