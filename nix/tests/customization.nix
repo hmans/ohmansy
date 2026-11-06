@@ -40,6 +40,28 @@ let
   ];
   terminalLauncher = lib.findFirst (package: lib.getName package == "ohmansy-terminal")
     (throw "No terminal launcher installed") custom.environment.systemPackages;
+  niriShell = import ../modules/desktop-package.nix { inherit pkgs; };
+  shineShell = import ../modules/shine-shell.nix { inherit pkgs; };
+  pathProbe = pkgs.writeText "session-path-probe.qml" ''
+    import QtQuick
+    import Quickshell
+    import Quickshell.Io
+    ShellRoot {
+      Process {
+        running: true
+        command: ["ohmansy-path-probe"]
+        stdout: StdioCollector {
+          onStreamFinished: {
+            if (Quickshell.env("PATH") === Quickshell.env("OHMANSY_TEST_PATH")
+                && text.trim() === Quickshell.env("OHMANSY_TEST_PATH"))
+              console.log("SESSION_PATH_TEST passed");
+            Qt.quit();
+          }
+        }
+      }
+      Timer { running: true; interval: 10000; onTriggered: Qt.quit() }
+    }
+  '';
 in
 assert hostOwnedState.system.stateVersion == "25.11";
 assert defaults.programs.firefox.enable && defaults.programs.fish.enable;
@@ -86,6 +108,15 @@ assert builtins.elem herdrPackage defaults.environment.systemPackages;
 assert builtins.elem herdrPackage softwareOnly.environment.systemPackages;
 assert builtins.elem misePackage defaults.environment.systemPackages;
 assert builtins.elem misePackage softwareOnly.environment.systemPackages;
+assert lib.hasInfix "$HOME/.local/share/mise/shims" defaults.environment.sessionVariables.PATH;
+assert lib.hasInfix "$HOME/.local/share/mise/shims" softwareOnly.environment.sessionVariables.PATH;
+assert !(lib.hasInfix "$HOME/.local/share/mise/shims" (custom.environment.sessionVariables.PATH or ""));
+assert lib.hasInfix "@{HOME}/.local/share/mise/shims" defaults.environment.etc."pam/environment".text;
+assert lib.hasInfix "$HOME/.local/share/mise/shims" defaults.environment.etc."environment.d/50-systemd-path.conf".text;
+assert !defaults.systemd.user.services.quickshell.enableDefaultPath;
+assert defaults.systemd.user.services.quickshell.path == [];
+assert !(defaults.systemd.user.services.quickshell.environment ? PATH);
+assert !(custom.systemd.user.services.quickshell.environment ? PATH);
 assert !(builtins.any (package: lib.getName package == "codex") defaults.environment.systemPackages);
 assert lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getExe misePackage} activate fish | source") defaults.programs.fish.interactiveShellInit;
 assert lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getExe misePackage} activate bash") noFish.programs.bash.interactiveShellInit;
@@ -122,6 +153,33 @@ pkgs.runCommand "ohmansy-customization" {
   export XDG_DATA_HOME="$TMPDIR/data"
   export XDG_DATA_DIRS="${pkgs.kitty}/share"
   mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
+  # Both wrappers must preserve the caller's PATH and resolve child commands
+  # from it. No windows or access to the running desktop are needed.
+  mkdir -p "$TMPDIR/probe-bin" "$TMPDIR/runtime"
+  chmod 700 "$TMPDIR/runtime"
+  cat > "$TMPDIR/probe-bin/ohmansy-path-probe" <<'EOF'
+  #!${pkgs.runtimeShell}
+  printf '%s\n' "$PATH"
+  EOF
+  chmod +x "$TMPDIR/probe-bin/ohmansy-path-probe"
+  for wrapper in ${niriShell}/bin/ohmansy-quickshell ${shineShell}/bin/ohmansy-shine-shell; do
+    case "$wrapper" in
+      */ohmansy-shine-shell) set -- ;;
+      *) set -- --path ${pathProbe} ;;
+    esac
+    ${pkgs.coreutils}/bin/env PATH="$TMPDIR/probe-bin" \
+      OHMANSY_TEST_PATH="$TMPDIR/probe-bin" XDG_RUNTIME_DIR="$TMPDIR/runtime" \
+      QT_QPA_PLATFORM=offscreen QSG_RHI_BACKEND=software \
+      OHMANSY_SHINE_QML=${pathProbe} \
+      ${pkgs.coreutils}/bin/timeout 15s \
+      ${pkgs.dbus}/bin/dbus-run-session --dbus-daemon=${pkgs.dbus}/bin/dbus-daemon \
+      --config-file=${pkgs.dbus}/share/dbus-1/session.conf \
+      -- "$wrapper" "$@" > path-probe.log 2>&1 || {
+        cat path-probe.log
+        exit 1
+      }
+    grep -F 'SESSION_PATH_TEST passed' path-probe.log || { cat path-probe.log; exit 1; }
+  done
   cp ${custom.environment.etc."xdg/xdg-terminals.list".source} "$XDG_CONFIG_HOME/xdg-terminals.list"
   test "$(${terminalLauncher}/bin/ohmansy-terminal --print-id)" = kitty.desktop
   # Read the whole command before matching: grep -q can close a pipe early

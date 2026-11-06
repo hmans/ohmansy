@@ -122,8 +122,12 @@ To update it when maintaining ohmansy, change the version and archive hashes in
 `nix/modules/mise-package.nix`. It updates with ohmansy through Nix.
 Use `nix run .#mise -- --version` to try it separately. When the utility bundle
 includes mise, ohmansy automatically activates it in interactive Fish, Bash,
-and Zsh shells. Open a new terminal after rebuilding. Repository tasks also
-work without shell activation.
+and Zsh shells. It also adds `~/.local/share/mise/shims` to the session `PATH`,
+so graphical apps can find mise tools. Desktop launchers inherit that environment;
+the Niri panel uses explicit paths for its own helpers instead of overriding it.
+Rebuild and log in again to update the full desktop environment. To try an app
+immediately, launch it from an activated terminal; existing apps keep their old
+environment. Repository tasks also work without shell activation.
 
 Codex is installed by the user through mise, rather than bundled with ohmansy:
 

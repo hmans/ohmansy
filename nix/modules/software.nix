@@ -75,6 +75,10 @@ in
     programs.firefox.enable = lib.mkDefault true;
     programs.chromium.enable = lib.mkDefault true;
     programs.fish.enable = lib.mkDefault true;
+    # GUI apps inherit the login environment without interactive shell hooks.
+    environment.sessionVariables.PATH = lib.mkIf
+      (builtins.elem pkgs.mise config.ohmansy.software.packages)
+      [ "$HOME/.local/share/mise/shims" ];
     # Keep activation with the optional bundle, including when a host replaces it.
     programs.bash.interactiveShellInit = lib.mkIf (builtins.elem pkgs.mise config.ohmansy.software.packages) ''
       eval "$(${lib.getExe pkgs.mise} activate bash)"

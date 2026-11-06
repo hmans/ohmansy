@@ -534,13 +534,14 @@ Installed build and Niri validation passed on 2026-11-02. Search, empty results,
 Enter launch, and outside-click dismissal were checked in the live desktop.
 The new generation was staged and its QML hot-loaded; no reboot or ISO build.
 
-The Quickshell user service must include standard system and per-user profile
-bin directories in its path. A helper-only service PATH silently prevented
-desktop entries with bare Exec names (nautilus and nixos-help) from starting.
-Use systemd %h and %u specifiers, not account-specific paths. On 2026-11-02
-the installed build passed, the new unit was hot-loaded, its process PATH
-resolved both commands, and menu launches created Nautilus Home and Firefox
-NixOS Manual windows. Updating QML alone cannot fix a service environment.
+The Quickshell user service must inherit the session PATH so desktop entries
+with bare Exec names can find system, profile, and user tools. A helper-only
+service PATH previously prevented nautilus and nixos-help from starting.
+The initial 2026-11-02 fix listed profile paths in the service and passed live
+menu-launch checks. It was replaced on 2026-11-06 by `enableDefaultPath = false`
+and removal of the explicit service path list, following NixOS's Niri service.
+Panel helpers use explicit package paths. Updating QML alone cannot fix a
+service environment; see the desktop tool discovery verification below.
 
 Launcher activation delegates desktop IDs to gtk-launch/GIO through the packaged
 OHMANSY_APP_LAUNCHER helper. Do not run DesktopEntry.command manually: GIO
@@ -655,6 +656,25 @@ the system defaults; users can install it with `mise use --global codex@latest`.
 The native customization check passed, including activation and omission
 assertions. Direct Fish and Bash activation checks passed; Zsh was evaluated
 only. No OS activation, image build, or boot was performed.
+
+Desktop tool discovery (2026-11-06): when the optional bundle includes mise,
+`software.nix` also adds `$HOME/.local/share/mise/shims` to
+`environment.sessionVariables.PATH`. This reaches PAM logins and the systemd
+user environment. Niri's Quickshell service disables the default service PATH
+and supplies no replacement. Its wrapper preserves the inherited PATH and
+exports explicit Niri, configured terminal, and nmtui executable paths to QML.
+Shine's shell also preserves the inherited environment. Keep interactive activation too;
+the shims let graphical apps resolve tools without running shell prompt hooks.
+The native customization check passed for inclusion, omission, PAM HOME
+translation, environment.d output, and absence of a panel service PATH override.
+Both wrappers built and passed private D-Bus/offscreen Quickshell tests with a
+PATH containing only a test command directory. Both the shells and their child
+commands retained that exact PATH. A clean non-interactive environment also
+resolved the Codex shim and returned its version. The old sessionPath wrapper
+parameter and PATH reconstruction were removed.
+No OS activation, graphical app relaunch, or login-session verification was
+performed. Existing processes need a relaunch from the updated environment;
+rebuild and log in again for the full desktop to inherit the change.
 
 Both archive hashes matched upstream GitHub release metadata. The native x86
 package built and returned 2026.11.0; an isolated task verified environment

@@ -3,6 +3,8 @@ let
   shell = import ./desktop-package.nix {
     inherit pkgs;
     syncFootTheme = lib.getName config.ohmansy.terminal.package == "foot";
+    niri = config.programs.niri.package;
+    terminal = "${config.ohmansy.terminal.launcher}/bin/ohmansy-terminal";
   };
   wallpaper = import ./wallpaper-package.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
@@ -127,17 +129,9 @@ in {
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
     partOf = [ "niri.service" ];
-    # Desktop entries often use bare command names. Include the user's and
-    # system's installed apps, not just the panel's own helper programs.
-    path = [
-      "/run/wrappers"
-      "%h/.nix-profile"
-      "/nix/profile"
-      "%h/.local/state/nix/profile"
-      "/etc/profiles/per-user/%u"
-      "/nix/var/nix/profiles/default"
-      "/run/current-system/sw"
-    ] ++ (with pkgs; [ niri networkmanager ]);
+    # Launch desktop apps with the user manager's session environment. The
+    # wrapper names panel helpers explicitly, so no service PATH is needed.
+    enableDefaultPath = false;
     serviceConfig = {
       ExecStart = "${shell}/bin/ohmansy-quickshell --path /etc/xdg/quickshell/ohmansy/shell.qml";
       Restart = "on-failure";

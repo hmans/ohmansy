@@ -6,7 +6,7 @@ import "Niri.js" as Niri
 Scope {
     id: root
     property var state: ({ workspaces: [], windows: [] })
-    readonly property string command: "niri"
+    readonly property string command: Quickshell.env("OHMANSY_NIRI") || "niri"
     readonly property string focusedOutput: {
         var focused = state.workspaces.find(w => w.is_focused);
         return focused ? focused.output || "" : "";

@@ -116,7 +116,7 @@ PanelWindow {
                     color: theme.secondary
                     font { family: theme.fontFamily; pixelSize: theme.barFontSize; weight: theme.barFontWeight }
                 }
-                onClicked: Quickshell.execDetached(["niri", "msg", "action", "toggle-overview"])
+                onClicked: Quickshell.execDetached([bar.niriState.command, "msg", "action", "toggle-overview"])
             }
         }
         BarButton {
@@ -130,7 +130,10 @@ PanelWindow {
             BarButton {
                 visible: bar.networkText !== ""
                 text: bar.networkText
-                onClicked: Quickshell.execDetached(["ohmansy-terminal", "nmtui"])
+                onClicked: Quickshell.execDetached([
+                    Quickshell.env("OHMANSY_TERMINAL") || "ohmansy-terminal",
+                    Quickshell.env("OHMANSY_NMTUI") || "nmtui"
+                ])
             }
             BarIcon {
                 id: appearanceButton

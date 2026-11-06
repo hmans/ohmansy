@@ -1,4 +1,5 @@
-{ pkgs, syncFootTheme ? true }:
+{ pkgs, syncFootTheme ? true, niri ? pkgs.niri,
+  terminal ? "${pkgs.xdg-terminal-exec}/bin/xdg-terminal-exec" }:
 let
   ui = import ./quickshell-ui.nix { inherit pkgs; };
   desktop = import ./desktop-actions.nix { inherit pkgs; };
@@ -69,6 +70,8 @@ in pkgs.writeShellScriptBin "ohmansy-quickshell" ''
   export OHMANSY_DESKTOP="${desktop}/bin/ohmansy-desktop"
   export OHMANSY_DISPLAYS="${displays}/bin/ohmansy-displays"
   export OHMANSY_DISPLAY_PREVIEW="${previewDisplay}"
-  export PATH="${pkgs.xdg-terminal-exec}/bin:$PATH"
+  export OHMANSY_NIRI="${niri}/bin/niri"
+  export OHMANSY_TERMINAL="${terminal}"
+  export OHMANSY_NMTUI="${pkgs.networkmanager}/bin/nmtui"
   exec ${pkgs.quickshell}/bin/quickshell "$@"
 ''
