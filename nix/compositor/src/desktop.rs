@@ -13,6 +13,7 @@ pub struct Monitor {
 pub struct Desktop {
     pub monitors: Vec<Monitor>,
     pub active_monitor: usize,
+    pub workspace_ids: Vec<String>,
 }
 
 impl Default for Desktop {
@@ -26,6 +27,7 @@ impl Default for Desktop {
                 layout: Layout::default(),
             }],
             active_monitor: 0,
+            workspace_ids: (1..=4).map(|n| n.to_string()).collect(),
         }
     }
 }
@@ -43,6 +45,67 @@ impl DerefMut for Desktop {
 }
 
 impl Desktop {
+    pub fn configure_workspaces(&mut self, ids: Vec<String>) {
+        if self.workspace_ids == ids {
+            return;
+        }
+        for monitor in &mut self.monitors {
+            let layout = &mut monitor.layout;
+            layout.finish_movements();
+            let active_id = &self.workspace_ids[layout.active];
+            let mut old: Vec<_> = self
+                .workspace_ids
+                .iter()
+                .cloned()
+                .zip(std::mem::take(&mut layout.workspaces))
+                .collect();
+            for id in &ids {
+                let workspace = old
+                    .iter()
+                    .position(|(key, _)| key == id)
+                    .map(|index| old.remove(index).1)
+                    .unwrap_or_default();
+                layout.workspaces.push(workspace);
+            }
+            layout.active = ids.iter().position(|id| id == active_id).unwrap_or(0);
+            // Removed tasks keep their windows, appended to the active task.
+            for (_, workspace) in old {
+                let target = &mut layout.workspaces[layout.active];
+                target.columns.extend(workspace.columns);
+                if target.focused.is_none() {
+                    target.focused = workspace.focused;
+                }
+            }
+            layout.set_size(layout.size);
+        }
+        self.workspace_ids = ids;
+    }
+
+    pub fn place_window(&mut self, id: WindowId, monitor: usize, workspace: usize) {
+        let Some(owner) = self.owner(id) else { return };
+        let source = self.monitors[owner]
+            .layout
+            .workspaces
+            .iter()
+            .position(|w| w.columns.iter().any(|c| c.id == id))
+            .unwrap();
+        if owner == monitor && source == workspace {
+            return;
+        }
+        let column = self.monitors[owner].layout.workspaces[source]
+            .columns
+            .iter()
+            .find(|c| c.id == id)
+            .unwrap()
+            .clone();
+        self.monitors[owner].layout.remove(id);
+        let target = &mut self.monitors[monitor].layout.workspaces[workspace];
+        target.columns.push(column);
+        if target.focused.is_none() {
+            target.focused = Some(id);
+        }
+    }
+
     pub fn current(&self) -> &Monitor {
         &self.monitors[self.active_monitor]
     }
@@ -74,7 +137,14 @@ impl Desktop {
                     origin: (0, 0),
                     physical_size,
                     scale,
-                    layout: Layout::default(),
+                    layout: Layout {
+                        workspaces: self
+                            .workspace_ids
+                            .iter()
+                            .map(|_| Default::default())
+                            .collect(),
+                        ..Layout::default()
+                    },
                 }
             };
             monitor.origin = (x, 0);
@@ -271,6 +341,44 @@ impl Desktop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn task_reordering_removal_and_hotplug_preserve_windows() {
+        let mut d = two();
+        d.configure_workspaces(vec!["dev".into(), "chat".into()]);
+        d.insert(1);
+        d.set_width(1, 430);
+        d.switch_workspace(1);
+        d.insert(2);
+        d.configure_workspaces(vec!["chat".into(), "dev".into(), "music".into()]);
+        assert_eq!(d.active, 0);
+        assert_eq!(d.focused(), Some(2));
+        assert_eq!(d.workspaces[1].columns[0].width, 430);
+        d.configure_workspaces(vec!["dev".into()]);
+        assert_eq!(d.workspace().columns.len(), 2);
+        d.sync(vec![("NEW".into(), (1920, 1080), 1.0)]);
+        assert_eq!(d.workspaces.len(), 1);
+        assert_eq!(d.workspace().columns.len(), 2);
+    }
+
+    #[test]
+    fn background_placement_preserves_focus_fullscreen_and_manual_moves() {
+        let mut d = two();
+        d.configure_workspaces(vec!["dev".into(), "chat".into()]);
+        d.insert(1);
+        d.toggle_fullscreen();
+        d.insert_unfocused(2);
+        assert_eq!(d.focused(), Some(1));
+        assert_eq!(d.workspace().fullscreen, Some(1));
+        d.place_window(2, 1, 1);
+        assert_eq!(d.active_monitor, 0);
+        assert_eq!(d.active, 0);
+        assert_eq!(d.focused(), Some(1));
+        assert_eq!(d.monitors[1].layout.workspaces[1].columns[0].id, 2);
+        d.focus(2);
+        d.move_to_workspace(0);
+        d.configure_workspaces(vec!["chat".into(), "dev".into()]);
+        assert_eq!(d.workspaces[1].columns[0].id, 2);
+    }
     fn two() -> Desktop {
         let mut d = Desktop::default();
         d.sync(vec![

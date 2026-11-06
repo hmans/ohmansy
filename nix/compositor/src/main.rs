@@ -18,6 +18,7 @@ mod scene;
 mod screencopy;
 mod screenshot;
 mod state;
+mod tasks;
 mod winit;
 
 use anyhow::{Context, Result};
@@ -165,6 +166,19 @@ pub fn spawn_terminal(socket: &std::ffi::OsStr, demo: bool) -> Result<()> {
 
 fn main() -> Result<()> {
     let initial: Vec<String> = std::env::args().skip(1).collect();
+    if initial
+        .first()
+        .is_some_and(|arg| arg == "validate-workspaces")
+    {
+        anyhow::ensure!(
+            initial.len() == 2,
+            "Usage: ohmansy-compositor validate-workspaces PATH"
+        );
+        tasks::Settings::parse(&std::fs::read_to_string(&initial[1])?)
+            .map_err(anyhow::Error::msg)?;
+        println!("Workspace configuration is valid.");
+        return Ok(());
+    }
     if initial.first().is_some_and(|arg| arg == "validate") {
         anyhow::ensure!(
             initial.len() == 2,
@@ -197,6 +211,7 @@ fn main() -> Result<()> {
     let mut outputs = 1;
     let mut backend = "winit".to_owned();
     let mut config_path = None;
+    let mut workspaces_path = None;
     let mut close_after = None;
     let mut socket_file: Option<PathBuf> = None;
     let mut screenshot = None;
@@ -212,6 +227,7 @@ fn main() -> Result<()> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" => {
+                println!("Task workspaces: --workspaces PATH overrides workspaces.toml beside the compositor config.\nvalidate-workspaces PATH validates that file without starting a session.\nmsg --socket PATH task ID selects a named workspace.\n");
                 println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--backend winit|drm] [--outputs 2] [--scale 1.25] [--config PATH] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+comma/period: focus monitor; add Shift to move window\nMod+minus/plus (or equal): scale by 5 percentage points; Mod+0: reset to 100%; Mod+Ctrl+minus/equal: resize column\nMod+Up/Down: cycle workspaces; add Shift to move window; Mod+1..4: workspace\nMod+Enter: terminal; F: toggle full width; Shift+F: fullscreen; W: close\nMod+Space: applications; Mod+R: cycle 33/50/66% column widths; add Shift to reverse; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|cycle-width [1|-1]|workspace-prev|workspace-next|workspace INDEX|move-workspace INDEX|move-workspace-prev|move-workspace-next|maximize|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\noutput position NAME X Y; output layout NAME X Y [NAME X Y...]; output scale NAME PERCENT; output primary NAME; output mode NAME WIDTHxHEIGHT[@HZ]; output reset NAME\nconfig reload|save; edits to ~/.config/shine/config.toml reload automatically.\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
                 println!("\nPrint / Ctrl+Print / Mod+Shift+4: save and copy the focused monitor; Shift+Print: also open Satty.\nmsg --socket PATH screenshot-screen [PNG] [--annotate] queues a native or nested capture; poll status for its screenshot result.");
                 return Ok(());
@@ -227,6 +243,11 @@ fn main() -> Result<()> {
             "--config" => {
                 config_path = Some(PathBuf::from(
                     args.next().context("--config needs a TOML path")?,
+                ))
+            }
+            "--workspaces" => {
+                workspaces_path = Some(PathBuf::from(
+                    args.next().context("--workspaces needs a TOML path")?,
                 ))
             }
             "--close-after" => {
@@ -308,6 +329,7 @@ fn main() -> Result<()> {
         input::ShortcutModifier::SuperAlt
     });
     state.init_output_config(config_path)?;
+    state.init_task_config(workspaces_path);
     std::env::set_var(
         "OHMANSY_COMPOSITOR_MODIFIER",
         state.shortcut_modifier.label(),
@@ -367,8 +389,11 @@ fn main() -> Result<()> {
             status.success(),
             "Initialize the desktop session environment"
         );
-        if !no_clients {
+        if !no_clients && data.state.task_settings.workspaces.is_empty() {
             spawn_session_tool(&data.state.socket_name, "TERMINAL")?;
+        }
+        if !no_clients {
+            data.state.launch_task_apps();
         }
     } else if desktop {
         desktop_demo(&data.state.socket_name)?;

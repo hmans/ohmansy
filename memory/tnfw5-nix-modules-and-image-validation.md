@@ -41,6 +41,42 @@ through the 100–200% scale cycle.
 The corrected full private-display Firefox/GTK integration passed, including
 GPU imports, subsurface menus, cursors, input, clipboard and idle rendering.
 
+## Named task workspaces (2026-11-06)
+
+Shine accepts opt-in `[[workspaces]]` tables in a separate
+`~/.config/shine/workspaces.toml`, with stable IDs, display names and app
+command/match entries. `config.toml` retains compositor preferences and bindings.
+The default workspace file is beside the selected compositor config;
+`--workspaces PATH` overrides it, and `validate-workspaces PATH` checks it.
+Both files load and reload independently. Invalid task files retain the last
+working task list without blocking compositor edits, and vice versa; task errors
+and revisions are separate IPC fields. Missing or empty task files restore the
+default workspaces without losing windows. Display saves never write the task
+file. Named shortcut IDs are resolved when invoked, so changing or removing tasks
+does not invalidate compositor preferences. `tasks.rs` owns validation,
+startup and one-time placement; `Desktop::configure_workspaces` reconciles IDs on
+reload and preserves windows, including when tasks disappear or monitors unplug.
+Startup runs once after session environment setup, on the primary monitor; reload
+and shell replacement do not launch apps. Empty configuration keeps the legacy
+four workspaces and default terminal. New windows preserve existing focus when
+tasks are configured. Placement matches app ID and optional title at the first
+buffer commit, never again after title changes or manual moves. No process/token
+association or late-title matching is implemented. See the compositor guide and
+`nix/compositor/tasks.example.toml` for configuration and matching limits.
+
+Verified 42 Rust tests, strict Clippy, the packaged compositor-session build,
+and private headless `compositor_tasks.py` and existing `compositor_preferences.py`.
+The task trial covers startup failure isolation, routing, named shortcuts, six
+workspaces, the shell, manual moves, reload/removal, independent invalid-file
+recovery, task-file deletion/recreation, save isolation and explicit path overrides.
+A settled headless screenshot showed the named buttons. This was built and run
+nested, not activated or booted as a new login desktop. The live session remained
+running. Machine-specific dev/chat config stays in ignored local notes/artifacts.
+
+The headless runner uses an explicit private session policy rather than relying
+on `/etc/dbus-1/session.conf`, which can be an empty compatibility stub. This
+retains the upstream fix for the same test-bus startup failure encountered during
+task development. No host bus configuration was changed.
 
 ## NetBird defaults (2026-11-06)
 

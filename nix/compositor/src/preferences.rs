@@ -261,6 +261,9 @@ pub enum Action {
     Workspace {
         value: u8,
     },
+    Task {
+        id: String,
+    },
     MoveWorkspace {
         value: u8,
     },
@@ -284,10 +287,11 @@ pub enum Action {
 impl Action {
     fn validate(&self) -> Result<(), String> {
         match self {
-            Self::Workspace { value } | Self::MoveWorkspace { value }
-                if !(1..=4).contains(value) =>
-            {
-                Err("Binding workspace must be 1 to 4".into())
+            Self::Task { id } if !crate::tasks::valid_id(id) => {
+                Err("Task bindings need a workspace ID containing letters, digits, - or _".into())
+            }
+            Self::Workspace { value } | Self::MoveWorkspace { value } if *value == 0 => {
+                Err("Binding workspace must be 1-based".into())
             }
             Self::Output { value } if *value == 0 => Err("Binding output is 1-based".into()),
             Self::Resize { value } if !(-2000..=2000).contains(value) => {
@@ -314,6 +318,7 @@ impl Action {
         use Action::*;
         let (name, value) = match self {
             None => return Ok(()),
+            Task { id } => return state.focus_task(id),
             Copy => return state.send_clipboard_shortcut(true),
             Paste => return state.send_clipboard_shortcut(false),
             Screenshot { annotate } => return state.request_screenshot(Option::None, *annotate),
@@ -544,6 +549,16 @@ impl Smallvil {
         Ok(())
     }
     pub fn apply_layout_preferences(&mut self) {
+        let ids = if self.task_settings.workspaces.is_empty() {
+            (1..=4).map(|n| n.to_string()).collect()
+        } else {
+            self.task_settings
+                .workspaces
+                .iter()
+                .map(|task| task.id.clone())
+                .collect()
+        };
+        self.layout.configure_workspaces(ids);
         for monitor in &mut self.layout.monitors {
             let layout = &mut monitor.layout;
             layout.gap = self.output_settings.layout.gap;

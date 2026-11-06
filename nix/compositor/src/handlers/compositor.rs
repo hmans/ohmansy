@@ -94,6 +94,7 @@ impl CompositorHandler for Smallvil {
             }
         };
 
+        self.apply_task_placement(surface);
         if self.apply_window_preferences() {
             self.apply_positions();
         }
