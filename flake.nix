@@ -1,5 +1,5 @@
 {
-  description = "Ohmansy — a portable Niri desktop, persistent VM, and live images";
+  description = "ohmansy — a portable Shine desktop, persistent VM, and live images";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
   inputs.herdr.url = "github:herdrdev/herdr/v0.9.5";
@@ -274,7 +274,7 @@
         live-policy = assert !live.config.services.openssh.enable;
           assert live.config.services.greetd.settings.initial_session.user == "nixos";
           assert !live.config.services.desktopManager.gnome.enable;
-          assert live.config.services.displayManager.defaultSession == "niri";
+          assert live.config.services.displayManager.defaultSession == "ohmansy";
           assert !(builtins.hasAttr "hmans" live.config.users.users);
           pkgs.runCommand "ohmansy-live-policy" { } ''touch "$out"'';
       };

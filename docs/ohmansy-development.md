@@ -255,7 +255,8 @@ signals apply only when the selected terminal package is Foot.
 `nix/modules/greeter.nix` configures greetd and a separate Niri compositor for
 the Quickshell login screen. This compositor has no desktop shortcuts or user
 panel services. It exits after greetd accepts the authenticated session; the
-user's `niri-session` then starts the desktop and its services.
+selected user session then starts the desktop. Shine is the default; Niri
+remains available in the session picker.
 
 PAM handles authentication and unlocks GNOME Keyring. The greeter clears its
 response field after submission, failure, or account changes. It supports

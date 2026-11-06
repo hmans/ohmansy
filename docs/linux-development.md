@@ -29,7 +29,7 @@ For a live browser, editor, and terminal with fixed 2x rendering, run
 [spatial lab](spatial-lab.md), launched with `mise run spatial`, explores 3D
 presentation using window captures. Both run inside the current desktop without
 rebuilding or activating the OS.
-Shine is also available as **Shine (experimental)** in the updated
+Shine is selected by default as **Shine (experimental)** in the updated
 login screen. `nix run .#compositor-session -- --nested` previews that packaged
 session, including its normal terminal, app picker, and sign-out confirmation.
 

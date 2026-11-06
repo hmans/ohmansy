@@ -37,7 +37,9 @@ in {
   # in the full MBROLA voice collection. Keep it opt-in for Ohmansy; a host's
   # ordinary services.speechd.enable = true still overrides this default.
   services.speechd.enable = lib.mkOverride 900 false;
-  services.displayManager.defaultSession = lib.mkDefault "niri";
+  services.displayManager.defaultSession = lib.mkDefault (
+    if config.ohmansy.compositor.enable then "ohmansy" else "niri"
+  );
   security.polkit.enable = true;
   security.rtkit.enable = true;
   security.pam.services.swaylock = {};

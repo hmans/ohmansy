@@ -430,10 +430,17 @@ titles, demo content, CLI heading, package descriptions, and user guides use
 Shine. The distribution remains ohmansy. Existing command names, package paths,
 and session identifiers are retained for configuration compatibility.
 
-Alternative sessions (2026-11-04): the shared desktop imports
+Login sessions (reviewed 2026-11-06): the shared desktop imports
 `compositor.nix`, which offers **Shine (experimental)** alongside
-**ohmansy (Niri)**. Niri remains the default; hosts can set
-`ohmansy.compositor.enable = false`. The session is also registered with
+**ohmansy (Niri)**. `desktop.nix` defaults to Shine's existing `ohmansy`
+session ID with `lib.mkDefault`, covering the greeter and live autologin.
+Setting `ohmansy.compositor.enable = false` restores the Niri default;
+`services.displayManager.defaultSession = "niri"` keeps both sessions and
+defaults to Niri. The native customization check passed the shared default,
+generated greeter JSON, disabled-Shine fallback and explicit host override.
+All-system flake evaluation passed for ARM and x86 outputs and policies.
+No installed-system activation or login restart was performed.
+The session is also registered with
 `services.displayManager.sessionPackages`. It runs Shine's native DRM/KMS and libinput backend directly, with independent
 workspaces on connected outputs of the primary GPU. Cage has been removed. Niri's panel and services
 remain scoped to Niri. The terminal module exposes its launcher internally so

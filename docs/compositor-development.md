@@ -4,10 +4,10 @@ Shine is ohmansy's experimental scrolling Wayland compositor.
 
 ## Login session
 
-The shared ohmansy desktop includes an alternative session. At the login screen,
-choose **Shine (experimental)** in **Session**, then sign in normally.
-**ohmansy (Niri)** remains the default. Installed systems need a rebuild to get
-the session package and updated greeter; an existing boot image stays unchanged.
+The shared ohmansy desktop defaults to **Shine (experimental)** at login and
+for live-image autologin. **ohmansy (Niri)** is also available in **Session**.
+Installed systems need a rebuild to get the updated default; an existing boot
+image stays unchanged.
 Follow [the installed-system workflow](linux-development.md) and plan a reboot
 for login-manager updates rather than restarting greetd from a running desktop.
 Use `mise run os-boot` to build this checkout for the next boot, then reboot
@@ -33,7 +33,7 @@ Niri's panel, wallpaper service, and other services remain tied to Niri.
 
 This session is experimental: it has no screen locking, screen sharing, IME,
 X11 support, or complete desktop portal integration. Keep Niri available as the
-regular desktop. Normal logins use the regular user D-Bus, so applications can
+alternative desktop. Normal logins use the regular user D-Bus, so applications can
 reach the login keyring. Once its Wayland socket is ready, Shine publishes the
 display and desktop environment for D-Bus and systemd activation. It also
 inherits the user's SSH agent, using the user manager's agent socket or GCR
@@ -50,6 +50,13 @@ To omit it from a host configuration:
 
 ```nix
 ohmansy.compositor.enable = false;
+```
+
+Disabling Shine restores Niri as the default. To keep both sessions and default
+to Niri, set this in the host configuration:
+
+```nix
+services.displayManager.defaultSession = "niri";
 ```
 
 The session package also supports an explicit nested preview:
