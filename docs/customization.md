@@ -31,6 +31,27 @@ release tag or full commit ID. See [Updating Ohmansy](updates.md).
 `preferences.nix` belong to the installed machine. Its `system.stateVersion`
 stays in local configuration; it is not the Ohmansy release number.
 
+## EurKEY keyboard layout
+
+ohmansy includes EurKEY through its standard XKB keyboard data. In Shine, add
+this to `~/.config/shine/config.toml`:
+
+```toml
+[input.keyboard]
+layout = "eu"
+variant = ""
+options = "lv3:ralt_switch"
+```
+
+Save the file to apply it immediately and keep it for future logins. Right Alt
+with **A**, **O**, **U**, **S**, or **5** types **ä**, **ö**, **ü**, **ß**, or **€**.
+Add Shift for uppercase letters. This changes your user's keyboard preference;
+the ohmansy default remains US.
+
+For a Mac keyboard without right Option, use `options = "lv3:lalt_switch"`
+to type these characters with left **Option (⌥)**. That key becomes the
+EurKEY character modifier instead of ordinary Alt; Command keeps its role.
+
 ## NVIDIA graphics
 
 For Turing and newer NVIDIA GPUs, including the RTX 3060 Ti, import

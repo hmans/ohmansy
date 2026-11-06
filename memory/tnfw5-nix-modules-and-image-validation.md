@@ -191,6 +191,19 @@ that path while overriding QML_IMPORT_PATH lets shared component updates apply
 without a compositor restart or personal shortcut override. No OS activation;
 an installed rebuild is needed to persist the new package across logins.
 
+## EurKEY availability (2026-11-06)
+
+EurKEY ships in the standard xkeyboard-config data used by libxkbcommon;
+no extra layout package is needed. Its XKB layout name is `eu`. Shine can
+select it per user through live `[input.keyboard]` configuration; see
+`docs/customization.md`. Keep the shared US default unchanged.
+
+Verified the installed compositor accepted layout `eu`, empty variant and
+`lv3:ralt_switch` via live IPC with no config error. The installed libxkbcommon
+compiled that keymap and returned ä/ö/ü/ß/€ on the expected third-level keys.
+This verifies keymap data and live application, not physical typing in an app.
+No compositor restart or system rebuild was needed.
+
 # Official Ohmansy configuration
 
 ## Crane source evaluation in CI (2026-11-06)
