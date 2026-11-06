@@ -120,6 +120,8 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                 } else if action == "quit" {
                     data.state.loop_signal.stop();
                     Ok(())
+                } else if action == "task" {
+                    data.state.focus_task(request["id"].as_str().unwrap_or(""))
                 } else if action == "launch" {
                     let program = request["program"].as_str().unwrap_or("");
                     let args: Vec<String> = request["args"]
@@ -267,6 +269,12 @@ pub fn send(path: &str, command: &[String]) -> Result<()> {
             changes.push(change);
         }
         request = json!({"action":"configure-outputs","outputs":changes});
+    } else if action == "task" {
+        request["id"] = command
+            .get(1)
+            .context("task needs a workspace ID")?
+            .clone()
+            .into();
     } else if action == "launch" {
         request["program"] = command
             .get(1)

@@ -61,6 +61,15 @@ impl Default for Layout {
 }
 
 impl Layout {
+    pub fn insert_unfocused(&mut self, id: WindowId) {
+        let focused = self.focused();
+        let fullscreen = self.workspace().fullscreen;
+        self.insert(id);
+        self.workspaces[self.active].focused = focused.or(Some(id));
+        self.workspaces[self.active].fullscreen = fullscreen;
+        self.reveal();
+    }
+
     pub fn workspace(&self) -> &Workspace {
         &self.workspaces[self.active]
     }
