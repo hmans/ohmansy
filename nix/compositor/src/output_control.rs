@@ -90,6 +90,9 @@ impl Smallvil {
         if let Err(error) = self.read_output_config(false) {
             self.config_error = Some(error);
         }
+        if let Err(error) = self.read_task_config(false) {
+            self.task_config_error = Some(error);
+        }
     }
     pub fn output_request(&mut self, action: &str, request: &Value) -> Result<(), String> {
         match action {
@@ -98,7 +101,12 @@ impl Smallvil {
                 if let Err(e) = &result {
                     self.config_error = Some(e.clone());
                 }
-                result
+                // Reload both files even when one is invalid.
+                let tasks = self.read_task_config(true);
+                if let Err(error) = &tasks {
+                    self.task_config_error = Some(error.clone());
+                }
+                result.and(tasks)
             }
             "save-config" => self.save_output_config(),
             "configure-outputs" => {

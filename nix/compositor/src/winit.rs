@@ -281,6 +281,7 @@ impl Smallvil {
             self.sync_focus();
         }
         self.maintain_capture_sources();
+        let effect_changed = self.update_inactive();
         if matches!(&self.cursor_image,smithay::input::pointer::CursorImageStatus::Surface(s) if !s.alive())
         {
             self.cursor_image = smithay::input::pointer::CursorImageStatus::default_named();
@@ -289,7 +290,7 @@ impl Smallvil {
         let pointer = self.seat.get_pointer().unwrap();
         let position = pointer.current_location();
         let under = self.surface_under(position).map(|(s, _)| s);
-        if !pointer.is_grabbed() && pointer.current_focus() != under {
+        if effect_changed || (!pointer.is_grabbed() && pointer.current_focus() != under) {
             self.process_motion(position, self.start_time.elapsed().as_millis() as u32);
         }
     }

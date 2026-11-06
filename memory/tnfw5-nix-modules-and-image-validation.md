@@ -9,6 +9,127 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine unfocused window effects (2026-11-06)
+
+Shine defaults to 0.985 visual scale, 0.85 saturation and 0.05 neutral fog for
+unfocused windows, with a reversible 160 ms transition. Live TOML controls are
+under `decorations.inactive`; see `docs/compositor-development.md`. The effect
+uses the layout-selected app, so desktop overlays do not mute the selected app.
+Fullscreen windows are exempt. Client sizes and layout slots do not change.
+
+`inactive.rs` shares the transition and inverse transform with pointer input.
+`scene.rs` transforms window surfaces, popups and decorations before output
+clipping. The rounded texture shader applies premultiplied-alpha color muting;
+its mask follows the visual transform. Uniform changes invalidate cached mask
+identities so static clients repaint. Settled transitions repaint their exact
+endpoint once and then stop scheduling frames. `grabs/scaled_click.rs` updates
+the implicit click grab's coordinates during focus animation and beyond window
+bounds; existing popup and drag grabs retain their ownership.
+
+Individual-window capture remains unscaled and unmuted; embedded cursor
+coordinates use the inverse transform. Whole-output capture includes the effect.
+
+Verification: 41 Rust tests, formatting, strict Clippy and the packaged session
+build passed. Private headless inactive-window pixel/input/drag/reversal/reload/
+idle trials passed at 100–200% display scaling, as did existing corner, shadow
+and movement trials. The real private PipeWire portal trial passed isolated
+window colors, popups, resize, hidden-workspace animation and display capture.
+The packaged session headless login/launcher/logout trial passed using an
+ignored wrapper that selects the packaged D-Bus session config explicitly:
+this machine's system session.conf is an empty stub. No OS activation or login
+compositor replacement was performed. A separate interactive preview was
+closed after the user clarified that remaining verification must stay headless.
+
+Long checkout paths exceed Linux's Unix-socket path limit. The shared test
+Control helper uses a private temporary directory alias for long socket paths,
+keeping the actual socket with its test artifacts. The movement fixture pins
+its expected ring color instead of assuming a historical desktop default.
+
+## Shine GPU synchronization (2026-11-06)
+
+Shine waits for implicit DMA-BUF write fences before applying surface commits.
+`handlers/compositor.rs` installs a pre-commit hook for every surface, including
+subsurfaces and cursors. Smithay's readiness source runs in the existing calloop
+loop and clears the client's transaction blocker when ready. Already-ready and
+shared-memory buffers continue immediately. This follows Smithay 0.7 Anvil's
+`anvil/src/shell/mod.rs`. Keep this before commit application so synchronized
+subsurface transactions remain atomic; waiting only in the commit handler is too
+late. This does not add the explicit-sync Wayland protocol.
+
+`native.rs` checks `RenderFrameResult::needs_sync()` and waits on the swapchain
+render fence before queueing a nonempty frame when KMS cannot synchronize it.
+Smithay documents this as the caller's responsibility on `queue_frame`; skipping
+it can submit incomplete rendering. Drivers with usable fences keep asynchronous
+submission. Niri's native backend uses the same conditional completion check.
+
+The investigation followed reported single-frame black rectangles in Electron
+apps on a native NVIDIA Wayland session. These two missing waits are verified
+source defects, but their connection to the reported flicker remains a hypothesis
+until tested in an updated physical login session. Preserve the running compositor
+and application windows; applying Rust compositor changes needs a new session.
+
+Validation: all 40 Rust tests, formatting, strict Clippy and the packaged native
+two-monitor DRM VM check passed. Physical desktop activation was not performed.
+The browser integration initially failed its custom-cursor scale assertion on
+both patched and unchanged source: its fixed physical pointer could leave the
+browser after reconfiguration. The fixture now uses a point inside the client
+through the 100–200% scale cycle.
+The corrected full private-display Firefox/GTK integration passed, including
+GPU imports, subsurface menus, cursors, input, clipboard and idle rendering.
+
+## Named task workspaces (2026-11-06)
+
+Shine accepts opt-in `[[workspaces]]` tables in a separate
+`~/.config/shine/workspaces.toml`, with stable IDs, display names and app
+command/match entries. `config.toml` retains compositor preferences and bindings.
+The default workspace file is beside the selected compositor config;
+`--workspaces PATH` overrides it, and `validate-workspaces PATH` checks it.
+Both files load and reload independently. Invalid task files retain the last
+working task list without blocking compositor edits, and vice versa; task errors
+and revisions are separate IPC fields. Missing or empty task files restore the
+default workspaces without losing windows. Display saves never write the task
+file. Named shortcut IDs are resolved when invoked, so changing or removing tasks
+does not invalidate compositor preferences. `tasks.rs` owns validation,
+startup and one-time placement; `Desktop::configure_workspaces` reconciles IDs on
+reload and preserves windows, including when tasks disappear or monitors unplug.
+Startup runs once after session environment setup, on the primary monitor; reload
+and shell replacement do not launch apps. Empty configuration keeps the legacy
+four workspaces and default terminal. New windows preserve existing focus when
+tasks are configured. Placement matches app ID and optional title at the first
+buffer commit, never again after title changes or manual moves. No process/token
+association or late-title matching is implemented. See the compositor guide and
+`nix/compositor/tasks.example.toml` for configuration and matching limits.
+
+Verified 42 Rust tests, strict Clippy, the packaged compositor-session build,
+and private headless `compositor_tasks.py` and existing `compositor_preferences.py`.
+The task trial covers startup failure isolation, routing, named shortcuts, six
+workspaces, the shell, manual moves, reload/removal, independent invalid-file
+recovery, task-file deletion/recreation, save isolation and explicit path overrides.
+A settled headless screenshot showed the named buttons. This was built and run
+nested, not activated or booted as a new login desktop. The live session remained
+running. Machine-specific dev/chat config stays in ignored local notes/artifacts.
+
+The headless runner uses an explicit private session policy rather than relying
+on `/etc/dbus-1/session.conf`, which can be an empty compatibility stub. This
+retains the upstream fix for the same test-bus startup failure encountered during
+task development. No host bus configuration was changed.
+
+## NetBird defaults (2026-11-06)
+
+`nix/modules/netbird.nix` is imported by the shared default module and enables
+NetBird's service, CLI, and desktop app with overridable NixOS defaults.
+Desktop-only and software-only imports do not enable it. Hosts can disable
+`services.netbird.enable` or omit just the UI with `services.netbird.ui.enable`.
+Enrollment remains interactive; images contain no keys or account configuration.
+See `docs/customization.md` for user instructions.
+
+PC and ARM live configurations evaluated with the service and UI enabled.
+Native evaluation also verified that disabling the service removes its default
+client and systemd unit, while disabling only the UI preserves the service.
+The native wrapper and both upstream packages were realized from the binary
+cache; its CLI reported v0.71.4. No image boot, desktop sign-in, network enrollment,
+or installed-system activation was performed.
+
 ## Shine individual-window capture (2026-11-06)
 
 Shine now exposes ext-foreign-toplevel-list-v1, ext-image-capture-source-v1
@@ -1408,3 +1529,27 @@ service diagnostics, updates and recovery. Skill validation, native customizatio
 checks (shared sources and opt-out), and native flake evaluation passed. A
 standalone module's `/etc` output built successfully. These checks do not prove
 live client discovery; no OS activation or desktop restart was performed.
+
+## Shine menu bar controls (2026-11-06)
+
+Shine's bar uses plain clickable ohmansy text to open the launcher. Terminal
+and Displays remain launcher commands rather than left-side shortcuts. Sun and
+moon icons select appearance; a speaker icon and slider control the default
+PipeWire sink. The shell imports the existing AudioState and AppearanceState
+components through Ohmansy.Desktop, packaged by quickshell-ui.nix. The bar uses
+an appearance-aware ColorPalette for text, workspace surfaces, icons and the
+volume slider; the fixed Ui.Theme foreground stays light for other glass UIs.
+The private shell trial checks actual brand text pixels in both light and dark
+mode after changing the appearance preference.
+
+The compositor-session package built and the private headless compositor_shell.py
+trial passed with terminal/display access through the launcher, wallpaper,
+focus, scaling and clean shutdown checks. The running physical session loaded
+the checkout bar on both monitors without replacing the compositor or apps.
+This was a live runtime preview, not an OS activation or new boot.
+
+For runtime shell replacement from a sandboxed agent, a transient systemd user
+service can preserve native graphics and session assets. Direct launch from the
+agent environment selected llvmpipe and missed the installed wallpaper; the
+same wrapper launched with systemd-run --user used NVIDIA and the wallpaper.
+Verify the actual environment and rendering after replacement.

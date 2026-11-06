@@ -14,6 +14,9 @@ uniform float alpha;
 uniform vec2 draw_origin;
 uniform vec4 mask_rect;
 uniform float radius;
+uniform float saturation;
+uniform float fog;
+uniform vec3 fog_color;
 varying vec2 v_coords;
 #if defined(DEBUG_FLAGS)
 uniform float tint;
@@ -34,6 +37,10 @@ void main() {
 #if defined(NO_ALPHA)
     color.a = 1.0;
 #endif
+    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    color.rgb = mix(vec3(luma), color.rgb, saturation);
+    // Textures use premultiplied alpha: preserve translucent client content.
+    color.rgb = mix(color.rgb, fog_color * color.a, fog);
     color *= alpha * coverage;
 #if defined(DEBUG_FLAGS)
     if (tint == 1.0) color = vec4(0.0, 0.2, 0.0, 0.2) * coverage + color * 0.8;

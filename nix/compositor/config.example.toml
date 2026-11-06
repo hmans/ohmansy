@@ -42,6 +42,14 @@ spread = 2 # Expand the shadow before softening (0–64)
 offset = [0, 6] # Horizontal and vertical logical pixels (−128–128)
 color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
 
+[decorations.inactive]
+enabled = true
+scale = 0.985 # Visual scale only; app sizes and layout stay unchanged (0.8–1)
+saturation = 0.85 # 0 is grayscale, 1 preserves colors
+fog = 0.05 # Mix toward fog_color without changing opacity (0–1)
+fog_color = [0.5, 0.5, 0.55] # RGB, each from 0 to 1
+duration_ms = 160 # Focus transition; respects animations.enabled
+
 # Mod is Super in a login and Super+Alt in a nested preview.
 # Omitted bindings keep their defaults. Use action="none" to remove one.
 [bindings]

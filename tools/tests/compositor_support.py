@@ -5,6 +5,7 @@ from pathlib import Path
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -93,6 +94,15 @@ def focus_parent_window(ident):
 class Control:
     def __init__(self, path):
         self.path = str(path)
+        self._socket_alias = None
+        # Linux Unix-domain sockets have a 108-byte path limit. Worktree
+        # artifact paths can exceed it; keep the socket in the artifacts but
+        # bind and connect through a short, private directory alias.
+        if len(os.fsencode(self.path)) >= 104:
+            self._socket_alias = tempfile.TemporaryDirectory(prefix='shine-ipc-')
+            alias = Path(self._socket_alias.name) / 'artifacts'
+            alias.symlink_to(Path(path).parent.resolve(), target_is_directory=True)
+            self.path = str(alias / Path(path).name)
 
     def send_keys(self, keycodes, modifiers=()):
         """Send data key events only to this compositor's private test socket."""

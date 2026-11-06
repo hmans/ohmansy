@@ -120,8 +120,10 @@ impl crate::Smallvil {
                 .is_some_and(|(w, _)| w == &window)
             {
                 if let Some(mapped) = self.space.element_location(&window) {
-                    let local = pointer - mapped.to_f64() + window.geometry().loc.to_f64()
-                        - bounds.loc.to_f64();
+                    let local = self.window_input_point(
+                        &window,
+                        pointer - mapped.to_f64() + window.geometry().loc.to_f64(),
+                    ) - bounds.loc.to_f64();
                     match &self.cursor_image {
                         CursorImageStatus::Surface(surface) => {
                             let hotspot = with_states(surface, |states| {

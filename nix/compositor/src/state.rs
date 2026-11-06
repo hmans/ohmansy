@@ -4,7 +4,9 @@ use smithay::{
     desktop::{PopupManager, Space, Window, WindowSurfaceType},
     input::{Seat, SeatState},
     reexports::{
-        calloop::{generic::Generic, EventLoop, Interest, LoopSignal, Mode, PostAction},
+        calloop::{
+            generic::Generic, EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction,
+        },
         wayland_server::{
             backend::{ClientData, ClientId, DisconnectReason},
             protocol::wl_surface::WlSurface,
@@ -31,6 +33,7 @@ use crate::layout::WindowId;
 use crate::CalloopData;
 
 pub struct Smallvil {
+    pub inactive: crate::inactive::Effects,
     pub image_capture: crate::image_capture::CaptureState,
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
@@ -49,6 +52,12 @@ pub struct Smallvil {
     pub configured_bindings: Vec<(crate::preferences::Chord, crate::preferences::Action)>,
     pub applied_keyboard: crate::preferences::Keyboard,
     pub window_preferences_applied: std::collections::BTreeSet<WindowId>,
+    pub task_placement_applied: std::collections::BTreeSet<WindowId>,
+    pub task_startup_errors: Vec<String>,
+    pub task_settings: crate::tasks::Settings,
+    pub task_config_file: Option<crate::output_config::ConfigFile>,
+    pub task_config_error: Option<String>,
+    pub task_config_revision: u64,
     pub input_devices: Vec<serde_json::Value>,
     pub nested_canvas_size: Option<(i32, i32)>,
     pub virtual_outputs: usize,
@@ -89,6 +98,7 @@ pub struct Smallvil {
 
     pub space: Space<Window>,
     pub loop_signal: LoopSignal,
+    pub loop_handle: LoopHandle<'static, CalloopData>,
 
     // Smithay State
     pub compositor_state: CompositorState,
@@ -107,7 +117,7 @@ pub struct Smallvil {
 }
 
 impl Smallvil {
-    pub fn new(event_loop: &mut EventLoop<CalloopData>, display: Display<Self>) -> Self {
+    pub fn new(event_loop: &mut EventLoop<'static, CalloopData>, display: Display<Self>) -> Self {
         let start_time = std::time::Instant::now();
 
         let dh = display.handle();
@@ -145,6 +155,7 @@ impl Smallvil {
         let loop_signal = event_loop.get_signal();
 
         Self {
+            inactive: Default::default(),
             image_capture: crate::image_capture::CaptureState::new(&dh),
             start_time,
             display_handle: dh.clone(),
@@ -154,6 +165,7 @@ impl Smallvil {
 
             space,
             loop_signal,
+            loop_handle: event_loop.handle(),
             socket_name,
             ui_scale: 1.25,
             client_surfaces: Vec::new(),
@@ -170,6 +182,12 @@ impl Smallvil {
             configured_bindings: Vec::new(),
             applied_keyboard: Default::default(),
             window_preferences_applied: Default::default(),
+            task_placement_applied: Default::default(),
+            task_startup_errors: Default::default(),
+            task_settings: Default::default(),
+            task_config_file: None,
+            task_config_error: None,
+            task_config_revision: 0,
             input_devices: Vec::new(),
             nested_canvas_size: None,
             virtual_outputs: 1,
@@ -288,8 +306,9 @@ impl Smallvil {
         self.layer_under(pos, &[Layer::Overlay, Layer::Top])
             .or_else(|| {
                 self.window_under(pos).and_then(|(window, location)| {
-                    self.window_surface_at(window, pos - location.to_f64())
-                        .map(|(s, p)| (s, (p + location).to_f64()))
+                    let local = self.window_input_point(window, pos - location.to_f64());
+                    self.window_surface_at(window, local)
+                        .map(|(s, p)| (s, pos - (local - p.to_f64())))
                 })
             })
             .or_else(|| self.layer_under(pos, &[Layer::Bottom, Layer::Background]))
@@ -303,8 +322,11 @@ impl Smallvil {
                 return None;
             }
             let location = self.space.element_location(window)? - window.geometry().loc;
-            self.window_surface_at(window, pos - location.to_f64())
-                .map(|_| (window, location))
+            self.window_surface_at(
+                window,
+                self.window_input_point(window, pos - location.to_f64()),
+            )
+            .map(|_| (window, location))
         })
     }
 
@@ -386,6 +408,7 @@ impl Smallvil {
             self.windows.remove(&id);
             self.configured.remove(&id);
             self.window_preferences_applied.remove(&id);
+            self.task_placement_applied.remove(&id);
         }
         let specs = outputs
             .iter()
@@ -464,7 +487,11 @@ impl Smallvil {
         let id = self.next_window;
         self.next_window += 1;
         self.windows.insert(id, window);
-        self.layout.insert(id);
+        if self.task_settings.workspaces.is_empty() {
+            self.layout.insert(id);
+        } else {
+            self.layout.insert_unfocused(id);
+        }
         self.relayout();
         self.sync_focus();
     }
@@ -607,16 +634,16 @@ impl Smallvil {
             "move-workspace-prev" => self.layout.move_to_adjacent_workspace(true),
             "move-workspace-next" => self.layout.move_to_adjacent_workspace(false),
             "workspace" => {
-                let index = value.ok_or("workspace needs an index from 1 to 4")?;
-                if !(1..=4).contains(&index) {
-                    return Err("Workspace must be from 1 to 4".into());
+                let index = value.ok_or("workspace needs a 1-based index")?;
+                if !(1..=self.layout.workspaces.len() as i64).contains(&index) {
+                    return Err("Workspace index is out of range".into());
                 }
                 self.layout.switch_workspace(index as usize - 1);
             }
             "move-workspace" => {
-                let index = value.ok_or("move-workspace needs an index from 1 to 4")?;
-                if !(1..=4).contains(&index) {
-                    return Err("Workspace must be from 1 to 4".into());
+                let index = value.ok_or("move-workspace needs a 1-based index")?;
+                if !(1..=self.layout.workspaces.len() as i64).contains(&index) {
+                    return Err("Workspace index is out of range".into());
                 }
                 self.layout.move_to_workspace(index as usize - 1);
             }
@@ -722,7 +749,7 @@ impl Smallvil {
                 });
                 let geometry = self.layout.geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
                 let target_geometry = self.layout.target_geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
-                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"target_geometry":target_geometry,"moving":layout.is_some_and(|l| l.is_moving(*id)),"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
+                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"target_geometry":target_geometry,"moving":layout.is_some_and(|l| l.is_moving(*id)),"inactive_amount":self.inactive_amount(*id),"visual_scale":self.window_visual_scale(*id),"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
             })
         }).collect();
         let keyboard_focus = self
@@ -745,7 +772,18 @@ impl Smallvil {
             }).collect();
             serde_json::json!({"name":m.name,"id":info.map(|i|&i.id),"make":info.map(|i|&i.make),"model":info.map(|i|&i.model),"modes":info.map(|i|&i.modes),"mode":mode.map(|m|serde_json::json!({"width":m.size.w,"height":m.size.h,"refresh":m.refresh})),"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"work_area":m.layout.work_area,"layers":layers,"scale":m.scale,"workspace":m.layout.active+1,"primary":self.primary_output().as_deref()==Some(&m.name),"focused":i==self.layout.active_monitor})
         }).collect();
-        serde_json::json!({"preferences":{"clipboard":self.output_settings.clipboard,"decorations":self.output_settings.decorations,"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+        let workspaces: Vec<_> = if self.task_settings.workspaces.is_empty() {
+            (1..=4)
+                .map(|n| serde_json::json!({"id":n.to_string(),"name":n.to_string()}))
+                .collect()
+        } else {
+            self.task_settings
+                .workspaces
+                .iter()
+                .map(|task| serde_json::json!({"id":task.id,"name":task.name}))
+                .collect()
+        };
+        serde_json::json!({"workspaces":workspaces,"task_startup_errors":self.task_startup_errors,"task_config_path":self.task_config_file.as_ref().map(|f|f.path.to_string_lossy()),"task_config_error":self.task_config_error,"task_config_revision":self.task_config_revision,"preferences":{"clipboard":self.output_settings.clipboard,"decorations":self.output_settings.decorations,"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }
 }
 

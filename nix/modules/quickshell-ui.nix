@@ -25,4 +25,13 @@ in pkgs.runCommand "ohmansy-quickshell-ui" {} ''
   module Ohmansy.Launcher
   CommandLauncher 1.0 CommandLauncher.qml
   EOF
+  mkdir -p "$out/lib/qt-6/qml/Ohmansy/Desktop"
+  for component in AudioState AppearanceState; do
+    cp ${./desktop/quickshell}/"$component.qml" "$out/lib/qt-6/qml/Ohmansy/Desktop/"
+  done
+  cat > "$out/lib/qt-6/qml/Ohmansy/Desktop/qmldir" <<'EOF'
+  module Ohmansy.Desktop
+  AudioState 1.0 AudioState.qml
+  AppearanceState 1.0 AppearanceState.qml
+  EOF
 ''
