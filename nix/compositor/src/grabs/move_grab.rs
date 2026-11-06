@@ -39,7 +39,7 @@ impl PointerGrab<Smallvil> for MoveSurfaceGrab {
                         new_location.x.round() as i32 - origin.0,
                         new_location.y.round() as i32 - origin.1,
                     );
-                    data.apply_positions();
+                    data.queue_window_positions();
                     return;
                 }
             }
@@ -53,7 +53,7 @@ impl PointerGrab<Smallvil> for MoveSurfaceGrab {
             if let Some(id) = data.window_id(self.window.toplevel().unwrap().wl_surface()) {
                 data.layout.focus(id);
                 data.layout.reorder(if difference > 0.0 { 1 } else { -1 });
-                data.relayout();
+                data.queue_window_positions();
                 self.start_data.location = event.location;
                 self.initial_window_location = data
                     .space

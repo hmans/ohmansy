@@ -155,7 +155,7 @@ impl PointerGrab<Smallvil> for ResizeSurfaceGrab {
                 data.layout.set_width(id, self.last_window_size.w);
                 self.last_window_size.h = (data.layout.size.1 - data.layout.gap * 2).max(1);
             }
-            data.relayout();
+            data.queue_window_positions();
         }
 
         let xdg = self.window.toplevel().unwrap();

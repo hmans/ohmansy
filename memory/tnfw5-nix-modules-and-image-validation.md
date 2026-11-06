@@ -7,6 +7,31 @@ data:
 id: tnfw5
 title: Nix modules and image validation
 ---
+## Pointer-lock deadlock during client drags (2026-11-06)
+
+A real GTK Wayland drag with an icon reproducibly stalls the previously installed
+Shine package on a private Mesa llvmpipe display. Its main thread waits in
+`futex_do_wait` and status IPC stops responding. The owner reported native freezes
+while selecting text in Chrome; the earlier native hang monitor captured the
+same wait channel. The isolated reproduction establishes a compositor bug without
+requiring NVIDIA or Chrome, but does not prove every reported freeze has this cause.
+
+Smithay 0.7 clears pointer focus under its pointer mutex when starting a drag.
+That invokes `SeatHandler::cursor_image`. Shine synchronously refreshed drag-icon
+scale, which called `PointerHandle::current_location` and locked the same mutex.
+`handlers/mod.rs` now defers scale refresh through a calloop idle callback.
+Move/resize grabs also defer window-position application, avoiding pointer reads
+and recursive pointer motion through `relayout` while inside the grab lock.
+
+`tools/tests/compositor_drag.py` creates real GTK drags, checks continued rendering
+and IPC, repeats three times, and records wait-state diagnostics on failure.
+The old installed package failed with the lock wait; the fixed Git-backed Nix
+package passed. Both ran on private software-rendered displays. The isolated
+fix also passed 57 Rust tests, formatting, strict Clippy, and the existing window
+policy trial, including floating titlebar movement. Concurrent frame-decoration
+work was excluded from that validation. No installed activation or live
+compositor replacement was performed; sudo required local authentication.
+
 ## Preview shortcuts with EurKEY and Option-as-AltGr (2026-11-06)
 
 Hosts using `eu` with `lv3:lalt_switch` can map both physical Alt/Option keys

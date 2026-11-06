@@ -500,6 +500,15 @@ impl Smallvil {
         self.sync_focus();
     }
 
+    /// Pointer grabs run with Smithay's pointer lock held. Applying positions
+    /// updates cursor scales, so perform that work after the grab returns.
+    pub fn queue_window_positions(&self) {
+        self.loop_handle.insert_idle(|data| {
+            data.state.apply_positions();
+            data.state.needs_redraw = true;
+        });
+    }
+
     pub fn apply_positions(&mut self) {
         self.apply_window_preferences();
         self.update_client_scales();

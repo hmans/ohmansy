@@ -36,7 +36,12 @@ impl SeatHandler for Smallvil {
         image: smithay::input::pointer::CursorImageStatus,
     ) {
         self.cursor_image = image;
-        self.update_pointer_scales();
+        // Smithay can invoke this while holding the pointer lock (for example
+        // when a drag clears focus). Scale lookup reads the pointer position,
+        // so wait until dispatch has released that lock.
+        self.loop_handle.insert_idle(|data| {
+            data.state.update_pointer_scales();
+        });
         self.needs_redraw = true;
     }
 
