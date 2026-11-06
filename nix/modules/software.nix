@@ -13,7 +13,6 @@ in
       tmux
       mise
       herdr
-      alpine # Includes the pico text editor.
       vim
       neovim
       vscodium
