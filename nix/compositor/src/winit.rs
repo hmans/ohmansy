@@ -93,7 +93,7 @@ pub fn init_winit(
             None,
             Some(Transform::Normal),
             Some(Scale::Custom {
-                advertised_integer: 2,
+                advertised_integer: data.state.ui_scale.ceil() as i32,
                 fractional: data.state.ui_scale,
             }),
             Some((0, 0).into()),
@@ -141,6 +141,7 @@ pub fn init_winit(
                     state.import_buffers(backend.renderer());
                     state.space.refresh();
                     state.maintain_scene();
+                    state.copy_images(backend.renderer(), &mut decorations);
                     for output in &outputs {
                         state.capture_output(backend.renderer(), output, &mut decorations);
                         state.copy_output(backend.renderer(), output, &mut decorations);
@@ -279,6 +280,7 @@ impl Smallvil {
             self.relayout();
             self.sync_focus();
         }
+        self.maintain_capture_sources();
         if matches!(&self.cursor_image,smithay::input::pointer::CursorImageStatus::Surface(s) if !s.alive())
         {
             self.cursor_image = smithay::input::pointer::CursorImageStatus::default_named();

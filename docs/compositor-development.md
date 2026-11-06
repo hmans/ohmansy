@@ -51,13 +51,20 @@ autologin does not provide a password to unlock an encrypted keyring.
 
 ### Screen sharing
 
-Shine exposes whole displays through `wlr-screencopy` and
-`xdg-desktop-portal-wlr`. The `ohmansy-portals.conf` configuration selects wlr
+Shine exposes displays and individual windows through the standard
+`ext-image-copy-capture-v1`, `ext-image-capture-source-v1` and
+`ext-foreign-toplevel-list-v1` protocols, retaining `wlr-screencopy` for existing
+display-capture clients. The `ohmansy-portals.conf` configuration selects wlr
 for ScreenCast, GTK for file choosers and other general portals, and GNOME
 Keyring for secrets when enabled. Niri keeps its own GNOME capture backend.
-The system picker lists connected displays; Escape cancels without starting
-capture. Individual-window and region sharing are not supported by Shine's
-capture protocol. Capture uses shared memory, with a default limit of 30 FPS.
+The system picker lists displays and windows according to the application's
+request; Escape cancels without starting capture. Window capture renders only
+the selected window, its subsurfaces and popups. It continues on hidden
+workspaces, follows resize and monitor-scale changes, and ends when the app
+closes. Transparent pixels composite against black, without revealing the
+desktop or other windows. Region sharing and separate cursor-metadata streams
+are unsupported. Capture uses shared memory, with hidden or embedded cursors
+and a default limit of 30 FPS.
 
 Rebuild the installed machine configuration with the updated sources, preserving
 its hardware and account configuration. Then log out and back in: the running
@@ -78,16 +85,16 @@ Restarting portals interrupts active portal requests and screen shares.
 Verify the application-facing interface after login:
 
 ```sh
-busctl --user introspect \
+busctl --user get-property \
   org.freedesktop.portal.Desktop \
   /org/freedesktop/portal/desktop \
-  org.freedesktop.portal.ScreenCast
+  org.freedesktop.portal.ScreenCast AvailableSourceTypes
 ```
 
-The result must include `CreateSession`, `SelectSources` and `Start`. Open
-screen sharing in an application, highlight a display in the system picker,
-then press Escape. No capture should start. The separate Chatto capture-denial
-callback bug is outside this system configuration.
+The result should be `u 3` (monitors and windows). Then verify actual video
+frames from a selected window in an application, resizing, closing the window,
+repeated sharing and cancellation. The bitmask alone does not verify capture.
+Application handling of a canceled request remains application work.
 
 For the automated private-display trial, build the development compositor with
 the normal compositor build task, then run:
@@ -100,9 +107,13 @@ OHMANSY_PORTAL_TOOLS="$PWD/.local/portal-test-tools" \
 ```
 
 This checks a real shared-memory output image, the public ScreenCast methods,
-the retained file chooser, picker cancellation, and selecting a display then
-closing the session before `Start`. Its private PipeWire server and D-Bus
-session do not change the logged-in desktop's services or activation environment.
+the retained file chooser, and a GStreamer consumer receiving actual PipeWire
+frames. It verifies isolated window pixels, popups, resize, animation on a hidden
+workspace, app closure, repeated sharing, display capture and cancellation.
+Its private PipeWire server, WirePlumber policy (hardware monitors disabled) and
+D-Bus session do not change the logged-in desktop's services or activation
+environment. Test Chatto's own sharing flow after activating the installed
+configuration; the private trial does not use the running Chatto instance.
 
 To omit it from a host configuration:
 
@@ -315,12 +326,16 @@ snapshots. Those transforms are not applied to live clients.
 
 ## Rendering and application support
 
-The compositor requests a fixed 2× render density through integer and fractional
-scale protocols. A separate display scale controls the final presentation.
-Wayland clients choose their buffers: a modern client can submit a 2× image
-using `buffer_scale=1` and a viewporter destination. Inspect `render_density`,
-rather than just `buffer_scale`, in the status report. Native trials verified
-Foot, Firefox, and GTK at 2×, including at 150% presentation scale.
+The compositor requests a render density matching each surface's monitor.
+The existing 5-percentage-point scale controls change both desktop size and
+the preferred app density, including when a window moves between monitors.
+Popups and subsurfaces inherit their owner's scale, panels use their assigned
+monitor, and cursor surfaces follow the pointer. Clients without fractional
+scaling receive the monitor scale rounded up to the next integer.
+Wayland clients choose their buffers: a modern client can use `buffer_scale=1`
+and a viewporter destination for fractional rendering. Inspect `render_density`,
+rather than just `buffer_scale`, in the status report. It accounts for the
+sampled source crop, so padded buffer allocations do not inflate the result.
 
 The compositor supports GPU DMA-BUF imports, viewporter, fractional scale,
 client decorations, popup grabs, cursor surfaces, and clipboard and primary

@@ -35,6 +35,65 @@ pub struct Pending {
     damage: bool,
 }
 
+pub fn valid_shm_buffer(buffer: &WlBuffer, size: (i32, i32)) -> bool {
+    with_buffer_contents_mut(buffer, |_, len, spec| shm_range(spec, len, size).is_some())
+        .unwrap_or(false)
+}
+
+fn shm_range(
+    spec: smithay::wayland::shm::BufferData,
+    len: usize,
+    size: (i32, i32),
+) -> Option<(usize, usize)> {
+    let (w, h) = size;
+    if spec.format != wl_shm::Format::Xrgb8888
+        || spec.width != w
+        || spec.height != h
+        || w <= 0
+        || h <= 0
+        || spec.offset < 0
+        || spec.stride < w.checked_mul(4)?
+    {
+        return None;
+    }
+    let offset = spec.offset as usize;
+    let stride = spec.stride as usize;
+    let end = offset
+        .checked_add(stride.checked_mul((h - 1) as usize)?)?
+        .checked_add(w as usize * 4)?;
+    (end <= len).then_some((offset, stride))
+}
+
+pub fn write_shm_image(buffer: &WlBuffer, image: image::RgbaImage) -> bool {
+    let size = (image.width() as i32, image.height() as i32);
+    with_buffer_contents_mut(buffer, |ptr, len, spec| {
+        let Some((offset, stride)) = shm_range(spec, len, size) else {
+            return false;
+        };
+        let mut pixels = image.into_raw();
+        for pixel in pixels.chunks_exact_mut(4) {
+            let value = (255_u32 << 24)
+                | ((pixel[0] as u32) << 16)
+                | ((pixel[1] as u32) << 8)
+                | pixel[2] as u32;
+            pixel.copy_from_slice(&value.to_ne_bytes());
+        }
+        for (y, row) in pixels.chunks_exact(size.0 as usize * 4).enumerate() {
+            // Validate the full range first; do not create references into
+            // memory that another process can modify concurrently.
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    row.as_ptr(),
+                    ptr.add(offset + y * stride),
+                    row.len(),
+                );
+            }
+        }
+        true
+    })
+    .unwrap_or(false)
+}
+
 pub fn init(dh: &DisplayHandle) {
     dh.create_global::<Smallvil, ZwlrScreencopyManagerV1, _>(3, ());
 }
@@ -168,44 +227,9 @@ impl Smallvil {
                 continue;
             }
             let result = self.render_capture(renderer, output, decorations, data.cursor);
-            let copied = result.ok().is_some_and(|image| {
-                let (w, h) = data.size;
-                with_buffer_contents_mut(&request.buffer, |ptr, len, spec| {
-                    let bytes = (w as usize) * (h as usize) * 4;
-                    if spec.format != wl_shm::Format::Xrgb8888
-                        || spec.width != w
-                        || spec.height != h
-                        || spec.stride != w * 4
-                        || spec.offset < 0
-                        || (spec.offset as usize)
-                            .checked_add(bytes)
-                            .is_none_or(|end| end > len)
-                    {
-                        return false;
-                    }
-                    // XRGB8888 is B,G,R,X in memory on little-endian hosts.
-                    // Never make a Rust reference into client-owned shared memory.
-                    let mut pixels = image.into_raw();
-                    for pixel in pixels.chunks_exact_mut(4) {
-                        let value = (255_u32 << 24)
-                            | ((pixel[0] as u32) << 16)
-                            | ((pixel[1] as u32) << 8)
-                            | pixel[2] as u32;
-                        pixel.copy_from_slice(&value.to_ne_bytes());
-                    }
-                    // The checked shm range is live for this callback. Copying
-                    // raw bytes avoids aliasing client-owned memory with a slice.
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(
-                            pixels.as_ptr(),
-                            ptr.add(spec.offset as usize),
-                            bytes,
-                        );
-                    }
-                    true
-                })
-                .unwrap_or(false)
-            });
+            let copied = result
+                .ok()
+                .is_some_and(|image| write_shm_image(&request.buffer, image));
             request.buffer.release();
             if copied {
                 request.frame.flags(frame::Flags::empty());
@@ -224,5 +248,42 @@ impl Smallvil {
                 request.frame.failed();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn spec() -> smithay::wayland::shm::BufferData {
+        smithay::wayland::shm::BufferData {
+            offset: 4,
+            width: 3,
+            height: 2,
+            stride: 16,
+            format: wl_shm::Format::Xrgb8888,
+        }
+    }
+
+    #[test]
+    fn capture_shm_range_accepts_row_padding_and_checks_last_row() {
+        assert_eq!(shm_range(spec(), 32, (3, 2)), Some((4, 16)));
+        assert_eq!(shm_range(spec(), 31, (3, 2)), None);
+        let mut invalid = spec();
+        invalid.stride = 8;
+        assert_eq!(shm_range(invalid, 32, (3, 2)), None);
+    }
+
+    #[test]
+    fn capture_shm_range_rejects_invalid_metadata_and_overflow() {
+        let mut invalid = spec();
+        invalid.offset = -1;
+        assert_eq!(shm_range(invalid, usize::MAX, (3, 2)), None);
+        let mut invalid = spec();
+        invalid.format = wl_shm::Format::Argb8888;
+        assert_eq!(shm_range(invalid, usize::MAX, (3, 2)), None);
+        assert_eq!(shm_range(spec(), usize::MAX, (i32::MAX, 2)), None);
+        assert_eq!(shm_range(spec(), usize::MAX, (3, 0)), None);
+        assert_eq!(shm_range(spec(), usize::MAX, (4, 2)), None);
     }
 }

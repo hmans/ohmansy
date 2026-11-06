@@ -253,7 +253,13 @@ pkgs.testers.runNixOSTest {
             break
         time.sleep(.1)
     assert state["active_output"] == state["outputs"][1]["name"], state
-    assert all(w["render_density"] == 2 for w in state["windows"]), state
+    scales = {o['name']: o['scale'] for o in state['outputs']}
+    for attempt in range(100):
+        state = control()
+        if all(abs(w['render_density'] - scales[w['output']]) < .01 for w in state['windows']):
+            break
+        time.sleep(.1)
+    assert all(abs(w['render_density'] - scales[w['output']]) < .01 for w in state['windows']), state
     identities = {w['id'] for w in state['windows']}
     first_name, second_name = [o['name'] for o in state['outputs']]
     alternate = next(m for m in state['outputs'][1]['modes'] if m['width'] == 1024 and m['height'] == 768)
@@ -314,7 +320,9 @@ pkgs.testers.runNixOSTest {
     assert first in [w["id"] for w in state["windows"]], state
     # Animate a same-output reorder through native libinput, including its
     # interruption by the reverse shortcut. Client dimensions must stay fixed.
-    script = 'from pathlib import Path; p=Path("/run/user/1000/shine-test.toml"); s=p.read_text(); assert "enabled=false" in s; p.write_text(s.replace("enabled=false", "enabled=true\\nduration_ms=1000"))'
+    # QMP key delivery plus a serial IPC round trip can consume most of one
+    # second on a loaded builder. Keep the in-progress animation observable.
+    script = 'from pathlib import Path; p=Path("/run/user/1000/shine-test.toml"); s=p.read_text(); assert "enabled=false" in s; p.write_text(s.replace("enabled=false", "enabled=true\\nduration_ms=3000"))'
     as_user('python3 -c ' + shlex.quote(script))
     for attempt in range(100):
         if control()['preferences']['animations']['enabled']:
@@ -331,7 +339,21 @@ pkgs.testers.runNixOSTest {
     assert moving_window
     ident = moving_window['id']
     control('focus', ident)
+    # The first buffer can precede the final tiled-size configure. Compare
+    # reorder dimensions only after the client has acknowledged that size.
+    stable_size = None
+    stable_samples = 0
+    for attempt in range(100):
+        moving_window = next(w for w in control()['windows'] if w['id'] == ident)
+        size = moving_window['client_geometry'][2:]
+        stable_samples = stable_samples + 1 if size == stable_size else 0
+        stable_size = size
+        if size == moving_window['target_geometry'][2:] and stable_samples >= 3:
+            break
+        time.sleep(.1)
+    assert moving_window['client_geometry'][2:] == moving_window['target_geometry'][2:], moving_window
     dimensions = moving_window['client_geometry'][2:]
+    print('Reorder initial dimensions and outputs:', dimensions, control()['outputs'])
     machine.send_key('meta_l-shift-left', delay=.15)
     for attempt in range(30):
         state = control()
@@ -349,11 +371,20 @@ pkgs.testers.runNixOSTest {
     assert not any(w['moving'] for w in state['windows']), state
     assert state['viewport'] == state['viewport_target'], state
     assert state['focused'] == state['keyboard_focus'] == ident
-    assert next(w for w in state['windows'] if w['id'] == ident)['client_geometry'][2:] == dimensions
+    if next(w for w in state['windows'] if w['id'] == ident)['client_geometry'][2:] != dimensions:
+        print(machine.succeed('cat /run/user/1000/shine-session.log'))
+        print(machine.succeed('journalctl -b --no-pager -n 80'))
+    assert next(w for w in state['windows'] if w['id'] == ident)['client_geometry'][2:] == dimensions, (dimensions, state)
     time.sleep(.5)
     machine.screenshot("shine-two-monitors")
     as_user('systemctl --user start xdg-desktop-portal.service')
     assert as_user('systemctl --user is-active xdg-desktop-portal.service').strip() == 'active'
+    # This VM uses a portal-readiness fixture, not the real D-Bus backend.
+    # The separate private portal trial verifies bitmask and PipeWire frames.
+    protocols = as_user('WAYLAND_DISPLAY=' + shlex.quote(control()['wayland_display']) + ' ${pkgs.wayland-utils}/bin/wayland-info')
+    assert all(name in protocols for name in ['ext_image_copy_capture_manager_v1',
+        'ext_output_image_capture_source_manager_v1',
+        'ext_foreign_toplevel_image_capture_source_manager_v1', 'ext_foreign_toplevel_list_v1'])
     control("quit")
     machine.wait_until_succeeds('test ! -e /run/user/1000/shine.sock', timeout=15)
     for attempt in range(100):

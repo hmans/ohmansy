@@ -118,14 +118,14 @@ def run():
             browser = wait_for(lambda: Marionette(port), timeout=20, description="isolated browser automation")
             browser.command("WebDriver:Navigate", {"url": page})
             wait_for(lambda: browser.script("return document.querySelector('#clipboard') !== null"), description="browser page")
-            assert browser.script("return window.devicePixelRatio") == 2
+            wait_for(lambda: browser.script("return window.devicePixelRatio") == control()['display_scale'], description='monitor-matched Firefox density')
             control("focus", firefox["id"])
             browser.script("document.querySelector('#clipboard').value='';document.querySelector('#clipboard').focus();return true")
             keys(control, process.pid, firefox["id"], [35], gui_only=True)
             wait_for(lambda: browser.script("return document.querySelector('#clipboard').value") == "h", timeout=3, description="initial native browser typing")
             wait_for(lambda: control()["dmabuf_imports"] > 0, description="GPU buffer imports")
             assert window_for(control, "ohmansy-nested-client")["width"] == terminal_width
-            checks.append("Firefox, GTK editor, terminal, GPU imports, and 2x rendering")
+            checks.append("Firefox, GTK editor, terminal, GPU imports, and monitor-matched rendering")
 
             widths = {window["id"]: window["width"] for window in control()["windows"]}
             control("terminal")
@@ -160,8 +160,8 @@ def run():
             wait_for(lambda: control()['cursor']['kind'] == 'surface' and control()['cursor_rendered_elements'] > 0, description='custom browser cursor')
             old = control()
             cursor_pixels = [value * old['display_scale'] for value in old['pointer_position']]
-            keys(control, process.pid, firefox["id"], [31], ("super", "alt"))
-            assert control()["display_scale"] == 1.5, "Super+Alt+S must cycle display scale"
+            control('scale', 150)
+            assert control()["display_scale"] == 1.5
             wait_for(lambda: abs(control()["viewport"] - control()["viewport_target"]) < 1, description="viewport animation")
             scaled = control()
             control('screenshot', path=str(artifacts / 'scaled-cursor.png'))
@@ -172,10 +172,14 @@ def run():
             if scaled['cursor']['kind'] == 'surface':
                 assert scaled['cursor']['alive'] and scaled['cursor_rendered_elements'] > 0
             for expected in [1.75, 2.0, 1.0, 1.25, 1.5]:
-                keys(control, process.pid, firefox['id'], [31], ('super', 'alt'))
+                control('scale', round(expected * 100))
                 wait_for(lambda: control()['display_scale'] == expected
                          and all(abs(position * expected - pixel) < 2 for position, pixel in zip(control()['pointer_position'], cursor_pixels)),
                          description='cursor remains at the same pixel across scale cycle')
+                wait_for(lambda: abs(browser.script("return window.devicePixelRatio") - expected) < .02,
+                         description=f'browser finishes rendering at {expected}')
+                print('Scale cycle:', expected, 'cursor:', control()['cursor'],
+                      'elements:', control()['cursor_rendered_elements'], flush=True)
                 wait_for(lambda: control()['cursor']['kind'] == 'surface'
                          and control()['cursor']['alive'] and control()['cursor_rendered_elements'] > 0,
                          description='custom cursor remains rendered')
@@ -188,8 +192,17 @@ def run():
             checks.append('custom cursor stays visible and physically stationary through 100–200% scale cycles; intentional hiding is preserved')
             browser.script('document.getElementById("cursor-test").remove();return true')
             control('fullscreen')
-            assert browser.script("return window.devicePixelRatio") == 2
-            checks.append("workspaces, fullscreen, and 150% presentation with 2x browser content")
+            wait_for(lambda: browser.script("return window.devicePixelRatio") == 1.5, description='150% browser density')
+            # Exercise the real keyboard binding and retain the existing 5% steps.
+            keys(control, process.pid, firefox['id'], [12], ('super', 'alt'))
+            wait_for(lambda: control()['display_scale'] == 1.45, description='5% scale decrease')
+            # Firefox quantizes CSS devicePixelRatio through its layout units.
+            # Check that it follows the change without requiring exact CSS DPR.
+            wait_for(lambda: 1.4 < browser.script("return window.devicePixelRatio") < 1.5, description='145% browser density')
+            print('145% Firefox CSS DPR:', browser.script("return window.devicePixelRatio"), flush=True)
+            keys(control, process.pid, firefox['id'], [13], ('super', 'alt'))
+            wait_for(lambda: control()['display_scale'] == 1.5 and browser.script("return window.devicePixelRatio") == 1.5, description='5% scale increase')
+            checks.append("workspaces, fullscreen, and 5% keyboard steps update browser density")
 
             keys(control, process.pid, firefox["id"], [], gui_only=True)
             browser.script("document.querySelector('#choice').focus(); return true")

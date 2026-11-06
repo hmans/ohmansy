@@ -24,10 +24,14 @@ in
     # DMA-BUF feedback. Keep its shared-memory screencopy path available.
     nixpkgs.overlays = [ (_final: prev: {
       xdg-desktop-portal-wlr = prev.xdg-desktop-portal-wlr.overrideAttrs (old: {
-        patches = (old.patches or []) ++ lib.optional (old.version == "0.8.2") ./portal-wlr-shm.patch;
+        patches = (old.patches or []) ++ lib.optionals (old.version == "0.8.2") [
+          ./portal-wlr-shm.patch
+          ./portal-wlr-capture-lifetime.patch
+        ];
       });
     }) ];
-    # Shine implements wlr-screencopy. GTK remains responsible for file
+    # Shine implements standard display/window capture and wlr-screencopy.
+    # GTK remains responsible for file
     # choosers, settings and the other desktop portals.
     xdg.portal = {
       extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
@@ -41,7 +45,7 @@ in
         settings.screencast = {
           max_fps = 30;
           chooser_type = "dmenu";
-          chooser_cmd = "${pkgs.wofi}/bin/wofi --normal-window --dmenu --prompt 'Share a display'";
+          chooser_cmd = "${pkgs.wofi}/bin/wofi --normal-window --dmenu --prompt 'Share a display or window'";
         };
       };
     };

@@ -9,6 +9,51 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine individual-window capture (2026-11-06)
+
+Shine now exposes ext-foreign-toplevel-list-v1, ext-image-capture-source-v1
+(output and foreign-toplevel factories), and ext-image-copy-capture-v1.
+The pinned xdg-desktop-portal-wlr 0.8.2 already understands these protocols;
+its runtime ScreenCast source mask becomes 3 when they are present. Changing
+portal routing or installing a different backend alone cannot supply compositor
+capture support. Retain wlr for ScreenCast, GTK for general portals, and existing
+session-environment import/nonblocking startup behavior.
+
+`nix/compositor/src/image_capture.rs` manages window identifiers, title/app-id
+updates, source closure, size/scale constraints, one outstanding frame per
+session, and shared-memory frame delivery. `screenshot.rs` renders a selected
+window's surface tree and popups directly, even on hidden workspaces; it never
+crops the desktop to approximate a window. Transparency composites against black.
+The damage tracker must use the monitor's fractional scale, or the correctly
+sized target contains an unscaled image with black padding. Captured hidden
+windows receive callbacks so animation continues. Output capture retains the
+old wlr-screencopy path as well as standard capture. Capture currently supports
+XRGB shared memory, hidden/embedded cursors and full damage; no region, DMA-BUF
+capture or cursor-metadata streams. The portal defaults to 30 FPS.
+
+`portal-wlr-capture-lifetime.patch` is scoped to 0.8.2: a PipeWire PAUSED transition
+must not queue a buffer still owned by a pending Wayland capture. The previous
+behavior could send incomplete video buffers or create a second ext frame before
+the first was destroyed on resume. Keep Shine's duplicate-frame protocol error;
+do not hide the backend race by weakening it. The existing null-GBM patch stays.
+
+The expanded `tools/tests/compositor_portals.py` runs a private PipeWire server,
+WirePlumber with hardware monitors disabled, real wlr/GTK portals and the normal
+system picker. GStreamer consumes actual portal-authorized video through its
+remote fd. Tests verify mask 3, window dimensions and far-edge pixels, no green
+pixels from an unrelated window, popup pixels, resizing, hidden-workspace
+animation, cancellation, repeated sharing, captured-app closure and whole-display
+capture. A grim image verifies legacy output capture. FileChooser remains exposed.
+38 Rust tests (including shared-memory bounds/padding), formatting and strict
+Clippy pass, and the packaged session builds and passes its private login/logout
+trial. The native two-monitor DRM VM also booted and passed capture-global
+inspection, output hotplug, VT switching, reorder and password relogin. Its
+portal-readiness service is a fixture; actual PipeWire video is verified by the
+separate private portal trial. These tests do not operate the owner's running
+Chatto instance or prove
+its application-specific behavior. Rebuild the installed machine and start a new
+login to load the new compositor; service restarts alone cannot add protocols.
+
 ## Shine ScreenCast portals (2026-11-06)
 
 Portal restarts in session setup must use `systemctl --user --no-block`.

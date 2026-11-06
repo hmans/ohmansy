@@ -36,6 +36,7 @@ impl SeatHandler for Smallvil {
         image: smithay::input::pointer::CursorImageStatus,
     ) {
         self.cursor_image = image;
+        self.update_pointer_scales();
         self.needs_redraw = true;
     }
 
@@ -82,6 +83,7 @@ impl ClientDndGrabHandler for Smallvil {
         _seat: Seat<Self>,
     ) {
         self.drag_icon = icon;
+        self.update_pointer_scales();
         self.needs_redraw = true;
     }
     fn dropped(&mut self, _target: Option<WlSurface>, _validated: bool, _seat: Seat<Self>) {

@@ -1,10 +1,12 @@
 #![allow(irrefutable_let_patterns)]
 
+mod client_scale;
 mod clipboard;
 mod decoration;
 mod desktop;
 mod grabs;
 mod handlers;
+mod image_capture;
 mod input;
 mod ipc;
 mod layout;
@@ -334,7 +336,7 @@ fn main() -> Result<()> {
         data.state.socket_name.to_string_lossy()
     );
     eprintln!(
-        "Client render scale: 2x; display scale: {scale}x. {}+Enter terminal; H/L focus; S scale.",
+        "Client render scale follows its monitor; display scale: {scale}x. {}+Enter terminal; H/L focus; S scale.",
         data.state.shortcut_modifier.label()
     );
     if let Some(path) = &socket_file {

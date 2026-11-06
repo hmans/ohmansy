@@ -81,6 +81,134 @@ pub struct State {
 }
 
 impl crate::Smallvil {
+    pub fn render_window_capture(
+        &mut self,
+        renderer: &mut GlesRenderer,
+        id: crate::layout::WindowId,
+        cursor: bool,
+    ) -> Result<image::RgbaImage> {
+        use crate::scene::SceneElement;
+        use smithay::backend::renderer::element::{
+            memory::MemoryRenderBufferRenderElement,
+            surface::{render_elements_from_surface_tree, WaylandSurfaceRenderElement},
+            AsRenderElements, Kind,
+        };
+        use smithay::input::pointer::{CursorImageAttributes, CursorImageStatus};
+        use smithay::wayland::compositor::with_states;
+        let window = self.windows.get(&id).context("Window closed")?.clone();
+        let monitor = self.layout.owner(id).context("Window has no monitor")?;
+        let scale = self.layout.monitors[monitor].scale;
+        let output = self
+            .space
+            .outputs()
+            .find(|o| o.name() == self.layout.monitors[monitor].name)
+            .cloned()
+            .context("Monitor disconnected")?;
+        let bounds = window.bbox_with_popups();
+        let size = bounds.size.to_physical_precise_round(scale);
+        let location = smithay::utils::Point::<i32, smithay::utils::Logical>::from((
+            -bounds.loc.x,
+            -bounds.loc.y,
+        ))
+        .to_physical_precise_round(scale);
+        let mut elements: Vec<SceneElement> = Vec::new();
+        if cursor {
+            let pointer = self.seat.get_pointer().unwrap().current_location();
+            // A hidden window must not expose pointer activity elsewhere.
+            if self
+                .window_under(pointer)
+                .is_some_and(|(w, _)| w == &window)
+            {
+                if let Some(mapped) = self.space.element_location(&window) {
+                    let local = pointer - mapped.to_f64() + window.geometry().loc.to_f64()
+                        - bounds.loc.to_f64();
+                    match &self.cursor_image {
+                        CursorImageStatus::Surface(surface) => {
+                            let hotspot = with_states(surface, |states| {
+                                states
+                                    .data_map
+                                    .get::<std::sync::Mutex<CursorImageAttributes>>()
+                                    .map(|a| a.lock().unwrap().hotspot)
+                                    .unwrap_or_default()
+                            });
+                            let rendered: Vec<WaylandSurfaceRenderElement<GlesRenderer>> =
+                                render_elements_from_surface_tree(
+                                    renderer,
+                                    surface,
+                                    (local - hotspot.to_f64()).to_physical_precise_round(scale),
+                                    scale,
+                                    1.0,
+                                    Kind::Cursor,
+                                );
+                            elements.extend(rendered.into_iter().map(SceneElement::Surface));
+                        }
+                        CursorImageStatus::Named(icon) => {
+                            let (image, hotspot) = self.capture.cursors.image(*icon, scale);
+                            let hotspot =
+                                smithay::utils::Point::<f64, smithay::utils::Logical>::from((
+                                    hotspot.0 as f64,
+                                    hotspot.1 as f64,
+                                ));
+                            let element = MemoryRenderBufferRenderElement::from_buffer(
+                                renderer,
+                                (local - hotspot).to_physical_precise_round(scale),
+                                image,
+                                None,
+                                None,
+                                None,
+                                Kind::Cursor,
+                            )?;
+                            elements.push(SceneElement::Cursor(element));
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+        elements.extend(
+            window
+                .render_elements::<WaylandSurfaceRenderElement<GlesRenderer>>(
+                    renderer,
+                    location,
+                    scale.into(),
+                    1.0,
+                )
+                .into_iter()
+                .map(SceneElement::Surface),
+        );
+        let mut texture: GlesTexture =
+            renderer.create_buffer(Fourcc::Abgr8888, (size.w, size.h).into())?;
+        let mut framebuffer = renderer.bind(&mut texture)?;
+        let mut damage = OutputDamageTracker::new(size, scale, Transform::Flipped180);
+        // Composite transparency against black, never against the desktop.
+        damage.render_output(
+            renderer,
+            &mut framebuffer,
+            0,
+            &elements,
+            [0.0, 0.0, 0.0, 1.0],
+        )?;
+        let mapping = renderer.copy_framebuffer(
+            &framebuffer,
+            Rectangle::from_size((size.w, size.h).into()),
+            Fourcc::Abgr8888,
+        )?;
+        let bytes = renderer.map_texture(&mapping)?;
+        let mut image = image::RgbaImage::from_raw(size.w as u32, size.h as u32, bytes.to_vec())
+            .context("Invalid window capture")?;
+        if mapping.flipped() {
+            image::imageops::flip_vertical_in_place(&mut image);
+        }
+        // Captured windows keep animating even on hidden workspaces.
+        window.send_frame(
+            &output,
+            self.start_time.elapsed(),
+            Some(Duration::ZERO),
+            |_, _| Some(output.clone()),
+        );
+        Ok(image)
+    }
+
     pub fn request_screenshot(
         &mut self,
         path: Option<PathBuf>,

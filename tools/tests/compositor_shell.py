@@ -150,7 +150,9 @@ def run():
             # An empty part of the bar must show the wallpaper without a tint.
             scale = control()['outputs'][0]['scale']
             blank_x = control()['outputs'][0]['logical_size'][0] * .65
-            bar_pixel = (round(blank_x * scale), round(22 * scale))
+            # Sample the top padding: at fractional scales the old mid-height
+            # point can land on the Displays button instead of empty bar space.
+            bar_pixel = (round(blank_x * scale), round(2 * scale))
             trial.wait_for(lambda: all(abs(a - b) <= 2 for a, b in zip(
                 capture('transparent-bar').getpixel(bar_pixel), background)),
                 description='transparent panel background')

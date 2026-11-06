@@ -33,6 +33,7 @@ impl WlrLayerShellHandler for Smallvil {
         });
         if let Some(output) = output {
             let _ = layer_map_for_output(&output).map_layer(&LayerSurface::new(surface, namespace));
+            self.update_client_scales();
         } else {
             surface.send_close();
         }

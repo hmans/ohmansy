@@ -43,7 +43,7 @@ pub struct Cursors {
     images: HashMap<(String, u32), (MemoryRenderBuffer, (i32, i32))>,
 }
 impl Cursors {
-    fn image(
+    pub(crate) fn image(
         &mut self,
         icon: ::winit::window::CursorIcon,
         scale: f64,

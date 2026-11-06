@@ -67,6 +67,7 @@ impl Smallvil {
             },
         );
         pointer.frame(self);
+        self.update_pointer_scales();
     }
 
     pub fn process_button(&mut self, button: u32, button_state: ButtonState, time: u32) {

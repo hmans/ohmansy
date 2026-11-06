@@ -7,9 +7,8 @@ use smithay::{
         wayland_server::protocol::wl_surface::WlSurface,
     },
     wayland::{
-        compositor::with_states,
         dmabuf::{DmabufGlobal, DmabufHandler, DmabufState, ImportNotifier},
-        fractional_scale::{with_fractional_scale, FractionalScaleHandler},
+        fractional_scale::FractionalScaleHandler,
         shell::xdg::{decoration::XdgDecorationHandler, ToplevelSurface},
     },
 };
@@ -33,9 +32,7 @@ delegate_dmabuf!(Smallvil);
 
 impl FractionalScaleHandler for Smallvil {
     fn new_fractional_scale(&mut self, surface: WlSurface) {
-        with_states(&surface, |states| {
-            with_fractional_scale(states, |scale| scale.set_preferred_scale(2.0))
-        });
+        self.update_client_scale(&surface);
     }
 }
 delegate_fractional_scale!(Smallvil);

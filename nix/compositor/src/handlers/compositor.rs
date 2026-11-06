@@ -9,8 +9,8 @@ use smithay::{
     wayland::{
         buffer::BufferHandler,
         compositor::{
-            get_parent, is_sync_subsurface, send_surface_state, with_states, CompositorClientState,
-            CompositorHandler, CompositorState,
+            get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler,
+            CompositorState,
         },
         shm::{ShmHandler, ShmState},
     },
@@ -20,9 +20,16 @@ use super::xdg_shell;
 
 impl CompositorHandler for Smallvil {
     fn new_surface(&mut self, surface: &WlSurface) {
-        with_states(surface, |data| {
-            send_surface_state(surface, data, 2, smithay::utils::Transform::Normal)
-        });
+        self.client_surfaces.push(surface.clone());
+        self.update_client_scale(surface);
+    }
+
+    fn new_subsurface(&mut self, surface: &WlSurface, _parent: &WlSurface) {
+        self.update_client_scale(surface);
+    }
+
+    fn destroyed(&mut self, surface: &WlSurface) {
+        self.client_surfaces.retain(|known| known != surface);
     }
     fn compositor_state(&mut self) -> &mut CompositorState {
         &mut self.compositor_state
@@ -35,6 +42,7 @@ impl CompositorHandler for Smallvil {
     fn commit(&mut self, surface: &WlSurface) {
         self.commits += 1;
         self.needs_redraw = true;
+        self.update_client_scale(surface);
         on_commit_buffer_handler::<Self>(surface);
         if !is_sync_subsurface(surface) {
             let mut root = surface.clone();

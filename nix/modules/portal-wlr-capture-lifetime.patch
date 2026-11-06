@@ -1,0 +1,9 @@
+--- a/src/screencast/pipewire_screencast.c
++++ b/src/screencast/pipewire_screencast.c
+@@ -364 +364,5 @@
+-		if (old == PW_STREAM_STATE_STREAMING) {
++		// A pause during negotiation must not return an in-flight capture
++		// buffer. Its ready/failed callback still owns it. Returning it here
++		// can expose incomplete pixels and start a second ext capture frame
++		// before the first has been destroyed when streaming resumes.
++		if (old == PW_STREAM_STATE_STREAMING && cast->current_frame.completed) {

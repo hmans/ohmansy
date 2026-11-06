@@ -24,6 +24,12 @@ def main():
             '--test-input', '--config', str(config), '--control-socket', str(path), '--close-after', '120'],
             cwd=ROOT, stdout=log, stderr=log)
         control = Control(path)
+        def matched_density():
+            state = control()
+            scales = {o['name']: o['scale'] for o in state['outputs']}
+            return state if all(w['render_density'] is not None and
+                               abs(w['render_density'] - scales[w['output']]) < .01
+                               for w in state['windows']) else None
         def msg(*args, success=True):
             result = subprocess.run([str(BINARY), 'msg', '--socket', str(path), *map(str, args)],
                                     text=True, capture_output=True)
@@ -43,6 +49,7 @@ def main():
             control('launch', program='foot', args=['--app-id=shine-monitor-two', 'sleep', '90'])
             state = wait_for(lambda: (s if len((s := control())['windows']) == 2 else None))
             assert {w['output'] for w in state['windows']} == {first, second}, state
+            wait_for(matched_density, description='both terminals match their monitors')
             control('workspace', 2)
             assert control()['focused'] is None
             control('output', 1)
@@ -56,7 +63,19 @@ def main():
             control('scale', 175)
             state = control()
             assert [o['scale'] for o in state['outputs']] == [1.25, 1.75], state
+            # Hidden clients can defer rendering until callbacks resume. Reveal
+            # both workspaces before checking their submitted buffer densities.
+            control('workspace', 1)
+            wait_for(lambda: abs(next(w for w in control()['windows'] if w['app_id'] == 'shine-monitor-two')['render_density'] - 1.75) < .01,
+                     description='hidden terminal renders at 175% after workspace reveal')
+            control('workspace', 2)
+            wait_for(matched_density, description='both terminals use their monitor scale')
             control('move-output-prev')
+            wait_for(matched_density, description='moved terminal returns to 125%')
+            control('scale', 135)
+            wait_for(matched_density, description='135% fractional terminal density')
+            control('scale', 125)
+            wait_for(matched_density, description='125% fractional terminal density restored')
             control('output', 2)
             control('workspace', 1)
             time.sleep(1)

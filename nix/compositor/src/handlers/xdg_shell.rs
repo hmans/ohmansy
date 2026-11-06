@@ -44,6 +44,7 @@ impl XdgShellHandler for Smallvil {
         self.popup_events += 1;
         self.unconstrain_popup(&surface);
         let _ = self.popups.track_popup(PopupKind::Xdg(surface));
+        self.update_client_scales();
     }
 
     fn reposition_request(

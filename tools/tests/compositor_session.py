@@ -71,7 +71,8 @@ def run():
                 raise AssertionError('No launcher IPC for the packaged session')
             trial.wait_for(lambda: not launcher_status()['opened'], description='launcher ready')
             terminal = trial.wait_for(lambda: next((window for window in control()['windows'] if window['app_id'] == 'foot'), None), description='normal session terminal')
-            trial.wait_for(lambda: next(window for window in control()['windows'] if window['id'] == terminal['id'])['render_density'] == 2, description='2x session terminal')
+            # Pixel dimensions round fractional products to whole pixels.
+            trial.wait_for(lambda: abs(next(window for window in control()['windows'] if window['id'] == terminal['id'])['render_density'] - control()['display_scale']) < .01, description='monitor-matched session terminal')
             if original_focus is not None:
                 trial.focus_parent_window(original_focus)
             trial.keys(control, pid, terminal['id'], [32], shortcut)
@@ -113,7 +114,7 @@ def run():
         'parent_activation_environment_preserved': True,
         'private_bus_and_inherited_agent': True,
     }, indent=2) + '\n')
-    print('PASS: packaged session, 2x terminal, application picker, cancel/confirm sign-out, parent desktop preservation')
+    print('PASS: packaged session, monitor-matched terminal, application picker, cancel/confirm sign-out, parent desktop preservation')
 
 
 if __name__ == '__main__':

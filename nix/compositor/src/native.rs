@@ -297,7 +297,7 @@ impl Native {
                 Some(wlmode),
                 Some(Transform::Normal),
                 Some(Scale::Custom {
-                    advertised_integer: 2,
+                    advertised_integer: data.state.ui_scale.ceil() as i32,
                     fractional: data.state.ui_scale,
                 }),
                 Some((0, 0).into()),
@@ -359,6 +359,7 @@ impl Native {
         state.import_buffers(&mut self.renderer);
         state.space.refresh();
         state.maintain_scene();
+        state.copy_images(&mut self.renderer, &mut self.decorations);
         self.configure_input(state);
         if state.needs_redraw {
             for h in &mut self.heads {

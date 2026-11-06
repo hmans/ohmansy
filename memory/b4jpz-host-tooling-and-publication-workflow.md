@@ -9,6 +9,58 @@ title: Host tooling and publication workflow
 ---
 # Host development, build, and release tools
 
+## Monitor-matched client rendering (2026-11-06)
+
+After applying the installed configuration and rebooting, the owner confirmed
+that scaling works well. Read-only runtime checks also observed Foot rendering
+at approximately 1.20x on a 120% monitor, with both monitors' shell layers
+present. This is installed-runtime evidence beyond the private test display.
+
+Shine now requests each surface's owning monitor scale through fractional
+scale and integer preferred-buffer-scale protocols. Integer-only clients and
+wl_output advertisement use ceil(scale). The existing 5-percentage-point
+keyboard controls and output geometry are unchanged. This replaces the fixed
+2x preference; clients still choose their buffers and can quantize density.
+Firefox reports about 1.4634 CSS DPR at a requested 1.45, while Foot buffer
+sizes can differ by a pixel from the exact fractional product.
+
+`nix/compositor/src/client_scale.rs` resolves windows through layout ownership
+(including inactive workspaces), popups through their root, subsurfaces through
+ancestry, layers through their mapped output, and cursor/drag surfaces through
+the pointer's output. Preferences refresh on role assignment, commits, layout
+changes and pointer movement. Surface destruction removes tracked handles.
+Resolve ownership before locking surface state to avoid recursive locking.
+Hidden clients may defer repainting until frame callbacks resume; test submitted
+buffer density after revealing their workspace. Status render_density now uses
+the viewporter source crop rather than a padded allocation's full dimensions.
+
+Verified 36 Rust tests, formatting and strict Clippy; private headless mixed-
+monitor trials cover window moves, hidden-workspace return and 135% buffers.
+Full Firefox/GTK integration covers real 5% shortcut steps, 100–200% density
+changes, custom cursors, popup/subsurface interaction and clipboard. The shell
+trial covers panels, wallpapers, monitor controls, alpha and scale changes.
+The session package built and the two-monitor native DRM VM booted and passed.
+This does not activate the installed system or replace the login compositor.
+
+## Measuring client render scale (2026-11-06)
+
+Measure forced 2x versus display-matched scale before changing the production
+policy. A private headless hardware-rendered display can run fresh Chrome
+profiles against an ignored experimental compositor with fixed requested client
+density. Keep display resolution, logical window geometry, page and workload
+identical. Verify devicePixelRatio and the attached surface's active crop, then
+compare idle, scrolling, and a pixel-heavy workload separately. Per-draw GPU
+timer queries can reveal extra raster work while both cases remain frame-capped.
+Whole-GPU power also includes the nested compositor and ordinary desktop work;
+do not treat it as isolated application power or infer a universal FPS gain.
+
+Chrome can attach an oversized buffer and crop it with viewporter. Computing
+density from total buffer allocation overstates the displayed density in that
+case. Use RendererSurfaceState.view().src.size times buffer_scale divided by
+view().dst, alongside the client's reported DPR. Production status still uses
+the whole-buffer formula; the measurement-only probe corrected it locally.
+Buffer pixel ratios alone do not establish total browser RAM savings.
+
 ## Wallpaper GPU profiling (2026-11-06)
 
 For an animation A/B comparison, freeze `RibbonScene.moving` in a temporary

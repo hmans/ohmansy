@@ -31,10 +31,12 @@ use crate::layout::WindowId;
 use crate::CalloopData;
 
 pub struct Smallvil {
+    pub image_capture: crate::image_capture::CaptureState,
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
     pub ui_scale: f64,
     pub windows: BTreeMap<WindowId, Window>,
+    pub client_surfaces: Vec<WlSurface>,
     pub layout: Desktop,
     pub output_info: BTreeMap<String, crate::output_config::OutputInfo>,
     pub output_settings: crate::output_config::Settings,
@@ -143,6 +145,7 @@ impl Smallvil {
         let loop_signal = event_loop.get_signal();
 
         Self {
+            image_capture: crate::image_capture::CaptureState::new(&dh),
             start_time,
             display_handle: dh.clone(),
             layer_shell_state: smithay::wayland::shell::wlr_layer::WlrLayerShellState::new::<Self>(
@@ -153,6 +156,7 @@ impl Smallvil {
             loop_signal,
             socket_name,
             ui_scale: 1.25,
+            client_surfaces: Vec::new(),
             windows: BTreeMap::new(),
             layout: Desktop::default(),
             output_info: BTreeMap::new(),
@@ -366,7 +370,7 @@ impl Smallvil {
                 None,
                 None,
                 Some(smithay::output::Scale::Custom {
-                    advertised_integer: 2,
+                    advertised_integer: placement.scale.ceil() as i32,
                     fractional: placement.scale,
                 }),
                 None,
@@ -467,6 +471,7 @@ impl Smallvil {
 
     pub fn apply_positions(&mut self) {
         self.apply_window_preferences();
+        self.update_client_scales();
         use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel::State;
         for (id, window) in &self.windows {
             let (min, max) = window_width_limits(window);
@@ -709,7 +714,12 @@ impl Smallvil {
                 let layout=owner.map(|i|&self.layout.monitors[i].layout);
                 let workspace = layout.and_then(|l|l.workspaces.iter().position(|workspace| workspace.columns.iter().any(|column| column.id == *id)));
                 let width = workspace.and_then(|index| layout.unwrap().workspaces[index].columns.iter().find(|column| column.id == *id)).map(|column| column.width);
-                let density = size.zip(surface_size).filter(|(_, surface)| surface.0 > 0).map(|(buffer, surface)| buffer.0 as f64 * scale as f64 / surface.0 as f64);
+                // Viewporter clients can crop a padded allocation. Report the
+                // sampled region's density, not the whole buffer's width.
+                let density = states.data_map.get::<RendererSurfaceStateUserData>().and_then(|state| {
+                    let state = state.lock().unwrap();
+                    state.view().filter(|view| view.dst.w > 0).map(|view| view.src.size.w * scale as f64 / view.dst.w as f64)
+                });
                 let geometry = self.layout.geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
                 let target_geometry = self.layout.target_geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
                 serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"target_geometry":target_geometry,"moving":layout.is_some_and(|l| l.is_moving(*id)),"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
