@@ -498,12 +498,6 @@ pub fn bindings(
         ("Mod+F".into(), Maximize),
         ("Mod+Shift+F".into(), Fullscreen),
         ("Mod+W".into(), Close),
-        (
-            "Mod+S".into(),
-            Scale {
-                value: Option::None,
-            },
-        ),
         ("Mod+comma".into(), FocusOutputPrev),
         ("Mod+period".into(), FocusOutputNext),
         ("Mod+Shift+comma".into(), MoveOutputPrev),

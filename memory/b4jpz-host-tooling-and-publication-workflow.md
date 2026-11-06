@@ -565,7 +565,9 @@ display. It never assumes the desktop label alone identifies the active server.
 ## Shine fine scale shortcuts (2026-11-04)
 
 Default Mod+minus and Mod+plus/equal adjust the focused monitor by five
-percentage points, clamped to 50–200%; Mod+S retains its 25-point cycle.
+percentage points, clamped to 50–200%. The former Mod+S 25-point cycle binding
+was removed on 2026-11-06 in both shortcut profiles; CLI help, the demo overlay
+and the shortcut guide no longer advertise it. Fine scaling and Mod+0 remain.
 Shift+plus/equal supports layouts needing Shift for plus. Column resizing moves
 to Mod+Ctrl+minus/equal. The configurable scale-adjust action takes a signed,
 nonzero percentage point value. It uses the existing output configuration path
@@ -744,7 +746,8 @@ width changes underneath it. Widths remain stored in logical pixels.
 
 The configurable action is `{ action="cycle-width", reverse=true }`; reverse
 defaults false. IPC `cycle-width` defaults to forward, or accepts direction
-1/-1. The existing Mod+S scale cycle and fine-scale shortcuts are unchanged.
+1/-1. Fine-scale shortcuts are unchanged. The Mod+S scale cycle binding was
+subsequently removed on 2026-11-06.
 CLI help, example TOML, demo and compositor guide describe the new shortcuts.
 
 Twenty-six Rust tests, formatting and strict Clippy passed. Real clients in the
