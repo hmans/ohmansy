@@ -18,6 +18,37 @@ impl smithay::wayland::shell::xdg::dialog::XdgDialogHandler for Smallvil {
 smithay::delegate_xdg_dialog!(Smallvil);
 
 impl Smallvil {
+    pub fn activate_app(&mut self, app_ids: &[String]) -> bool {
+        let names: Vec<_> = app_ids
+            .iter()
+            .map(|s| s.trim_end_matches(".desktop").to_lowercase())
+            .collect();
+        let id = self.windows.iter().rev().find_map(|(id, window)| {
+            if !self.mapped_windows.contains(id) {
+                return None;
+            }
+            with_states(window.toplevel().unwrap().wl_surface(), |states| {
+                let metadata = states
+                    .data_map
+                    .get::<smithay::wayland::shell::xdg::XdgToplevelSurfaceData>()?
+                    .lock()
+                    .unwrap();
+                metadata
+                    .app_id
+                    .as_ref()
+                    .filter(|app| names.contains(&app.trim_end_matches(".desktop").to_lowercase()))
+                    .map(|_| *id)
+            })
+        });
+        if let Some(id) = id {
+            self.layout.focus(id);
+            self.sync_focus();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn focus_modal_descendant(&mut self) {
         use smithay::wayland::shell::xdg::XdgToplevelSurfaceData;
         for _ in 0..self.windows.len() {

@@ -9,6 +9,40 @@ pub fn is_default<T: Default + PartialEq>(value: &T) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Browser {
+    pub program: String,
+    pub args: Vec<String>,
+    pub app_ids: Vec<String>,
+}
+impl Default for Browser {
+    fn default() -> Self {
+        Self {
+            program: "firefox".into(),
+            args: Vec::new(),
+            app_ids: vec!["firefox".into(), "org.mozilla.firefox".into()],
+        }
+    }
+}
+impl Browser {
+    pub fn validate(&self) -> Result<(), String> {
+        Action::Launch {
+            program: self.program.clone(),
+            args: self.args.clone(),
+        }
+        .validate()?;
+        if self
+            .app_ids
+            .iter()
+            .any(|id| id.trim().is_empty() || id.contains('\0'))
+        {
+            return Err("Browser app IDs must be nonempty and NUL-free".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Width {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -335,6 +369,7 @@ pub enum Action {
     Maximize,
     ToggleFloating,
     Terminal,
+    Browser,
     Launcher,
     Logout,
     Screenshot {
@@ -417,6 +452,18 @@ impl Action {
         use Action::*;
         let (name, value) = match self {
             None => return Ok(()),
+            Browser => {
+                let browser = state.output_settings.browser.clone();
+                if state.activate_app(&browser.app_ids) {
+                    return Ok(());
+                }
+                return crate::spawn_application(
+                    &state.socket_name,
+                    &browser.program,
+                    &browser.args,
+                )
+                .map_err(|e| e.to_string());
+            }
             Task { id } => return state.focus_task(id),
             Copy => return state.send_clipboard_shortcut(true),
             Paste => return state.send_clipboard_shortcut(false),
@@ -568,6 +615,7 @@ pub fn bindings(
         ("Ctrl+Print".into(), Screenshot { annotate: false }),
         ("Shift+Print".into(), Screenshot { annotate: true }),
         ("Mod+Return".to_owned(), Terminal),
+        ("Mod+Shift+Return".to_owned(), Browser),
         ("Mod+Space".into(), Launcher),
         ("Mod+Shift+Space".into(), ToggleFloating),
         (
@@ -731,6 +779,7 @@ mod tests {
                     .map(|(_, a)| a)
             };
             assert!(matches!(action("Mod+Space"), Some(Action::Launcher)));
+            assert!(matches!(action("Mod+Shift+Return"), Some(Action::Browser)));
             assert!(matches!(action("Mod+C"), Some(Action::Copy)));
             assert!(matches!(action("Mod+V"), Some(Action::Paste)));
             assert!(matches!(action("Mod+Tab"), Some(Action::FocusNextWrap)));

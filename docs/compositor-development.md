@@ -494,6 +494,29 @@ Validation checks syntax, preferences, keymaps and shortcut profiles. Supported
 display modes and monitor geometry are checked against connected outputs when
 the configuration is applied.
 
+### Favorite browser
+
+Press **Mod+Shift+Enter** (Command+Shift+Enter on a Mac keyboard) to focus an
+existing browser window, including on another workspace or monitor, or launch
+the browser if none matches. Configure it in `~/.config/shine/config.toml`:
+
+```toml
+[browser]
+program = "firefox"
+args = []
+app_ids = ["firefox", "org.mozilla.firefox"]
+```
+
+These are the defaults. For Chromium, for example, set `program = "chromium"`
+and `app_ids = ["chromium"]`. Use the window's `app_id` from IPC status if its
+name differs. Matching ignores case and a trailing `.desktop`; an empty list
+always launches the command. Arguments are passed directly without a shell,
+so Flatpak browsers can use `program = "flatpak"` and
+`args = ["run", "org.mozilla.firefox"]`. Edits reload live once the updated
+compositor is installed. The shortcut can be overridden with
+`"Mod+Shift+Return" = { action = "browser" }` in `[bindings]`, or disabled with
+`action = "none"`.
+
 ### Input, layout and animations
 
 ```toml

@@ -13,6 +13,13 @@ primary = true
 [input.keyboard]
 layout = "us"
 
+# Mod+Shift+Return focuses a matching window, or launches this command.
+# Arguments are passed directly, without a shell. app_ids = [] always launches.
+[browser]
+program = "firefox"
+args = []
+app_ids = ["firefox", "org.mozilla.firefox"]
+
 # Target shortcuts delivered to the focused app. Terminal IDs match exactly;
 # supplying a list replaces the defaults. An empty list treats all apps alike.
 [clipboard]
@@ -61,6 +68,7 @@ easing = "ease-out" # linear, ease-in, ease-out, or ease-in-out
 "Mod+V" = { action = "paste" }
 "Mod+E" = { action = "launch", program = "nautilus" }
 "Mod+Return" = { action = "terminal" }
+"Mod+Shift+Return" = { action = "browser" }
 "Mod+Space" = { action = "launcher" }
 "Mod+R" = { action = "cycle-width" }
 "Mod+Shift+R" = { action = "cycle-width", reverse = true }

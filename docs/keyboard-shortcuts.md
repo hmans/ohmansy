@@ -11,7 +11,7 @@ otherwise intercept.
 | Shortcut | Action |
 | --- | --- |
 | Mod+Return | Open the configured terminal (Foot by default) |
-| Mod+Shift+Return | Open Firefox |
+| Mod+Shift+Return | Open Firefox in Niri; open or focus the configured browser in Shine |
 | Mod+E | Open Files |
 | Mod+Space | Application launcher |
 | Mod+Shift+Space | Search open windows |
@@ -25,6 +25,9 @@ otherwise intercept.
 The launcher supports typing to filter, Up/Down to select, Enter to activate,
 and Escape to close. Opening the same menu again closes it. Power actions that
 end or suspend the session require confirmation, with Cancel selected first.
+
+Shine's favorite browser is configured in its `[browser]` section; see
+[favorite browser](compositor-development.md#favorite-browser).
 
 Clipboard history starts collecting when the desktop service runs. It uses
 Cliphist's per-user database. Quickshell retains the last 100 non-transient

@@ -101,6 +101,8 @@ pub struct OutputRule {
 #[serde(deny_unknown_fields)]
 pub struct Settings {
     #[serde(default, skip_serializing_if = "crate::preferences::is_default")]
+    pub browser: crate::preferences::Browser,
+    #[serde(default, skip_serializing_if = "crate::preferences::is_default")]
     pub clipboard: crate::clipboard::Clipboard,
     #[serde(default)]
     pub outputs: Vec<OutputRule>,
@@ -137,6 +139,7 @@ impl Settings {
         Ok(settings)
     }
     fn validate_preferences(&self) -> Result<(), String> {
+        self.browser.validate()?;
         self.clipboard.validate()?;
         self.decorations.validate()?;
         if !(0..=128).contains(&self.layout.gap) {
@@ -532,6 +535,9 @@ mod tests {
         assert_eq!(settings.input.keyboard.layout.as_deref(), Some("us"));
         assert_eq!(settings.clipboard.terminal_copy, "Ctrl+Shift+C");
         for invalid in [
+            "[browser]\nprogram=''",
+            "[browser]\nprogram='firefox'\napp_ids=['']",
+            "[browser]\nunknown=true",
             "[clipboard]\ncopy='Ctrl+NotAKeyName'",
             "[clipboard]\npaste='Mod+V'",
             "[clipboard]\nterminal_app_ids=['']",

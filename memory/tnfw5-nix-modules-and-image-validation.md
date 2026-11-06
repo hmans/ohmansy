@@ -7,6 +7,24 @@ data:
 id: tnfw5
 title: Nix modules and image validation
 ---
+## Shine favorite browser shortcut (2026-11-06)
+
+`[browser]` in Shine's config selects `program`, direct argv `args`, and
+`app_ids` for Mod+Shift+Return. Defaults launch Firefox and match firefox or
+org.mozilla.firefox. The shared `activate_app` method focuses a mapped matching
+window across workspaces/outputs before spawning; launcher IPC retains its
+display guard and uses the same method. Matching ignores case and a trailing
+.desktop; an empty list always launches. Config edits reload live and effective
+browser settings appear in status. See docs/compositor-development.md.
+
+Verified 54 Rust tests, formatting, strict Clippy and a debug build. The private
+compositor_preferences.py trial exercised launch, duplicate avoidance,
+cross-workspace focus and live argv/app-ID reload using disposable Foot clients.
+The checkout's existing halo test needed a missing Settings import and full
+preference validation instead of output-only validation. No OS activation,
+login compositor restart or personal browser configuration change. The running
+login needs the updated compositor before accepting the new section/action.
+
 ## Launcher open-window search (2026-11-06)
 
 The shared launcher includes individual open windows and ranks matching windows

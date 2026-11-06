@@ -48,39 +48,10 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                         .into_iter()
                         .flatten()
                         .filter_map(|v| v.as_str())
-                        .map(|s| s.trim_end_matches(".desktop").to_lowercase())
+                        .map(str::to_owned)
                         .collect();
-                    let id = data.state.windows.iter().rev().find_map(|(id, w)| {
-                        if request["wayland_display"].as_str() != data.state.socket_name.to_str() {
-                            return None;
-                        }
-                        if !data.state.mapped_windows.contains(id) {
-                            return None;
-                        }
-                        smithay::wayland::compositor::with_states(
-                            w.toplevel().unwrap().wl_surface(),
-                            |states| {
-                                let metadata = states
-                                    .data_map
-                                    .get::<smithay::wayland::shell::xdg::XdgToplevelSurfaceData>()?
-                                    .lock()
-                                    .unwrap();
-                                metadata
-                                    .app_id
-                                    .as_ref()
-                                    .filter(|app| {
-                                        names.contains(
-                                            &app.trim_end_matches(".desktop").to_lowercase(),
-                                        )
-                                    })
-                                    .map(|_| *id)
-                            },
-                        )
-                    });
-                    if let Some(id) = id {
-                        data.state.layout.focus(id);
-                        data.state.sync_focus();
-                        app_activated = true;
+                    if request["wayland_display"].as_str() == data.state.socket_name.to_str() {
+                        app_activated = data.state.activate_app(&names);
                     }
                     Ok(())
                 } else if action == "pointer" {

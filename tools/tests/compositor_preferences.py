@@ -23,6 +23,10 @@ default_column_width = {{ pixels = {pixels} }}
 [animations]
 enabled = false
 duration_ms = 120
+[browser]
+program = "foot"
+args = ["--app-id=shine-pref-browser-{layout}", "sleep", "90"]
+app_ids = ["SHINE-PREF-BROWSER-{layout}.desktop"]
 [bindings]
 "Mod+Return" = {{ {binding} }}
 "Mod+F" = {{ action = "none" }}
@@ -74,6 +78,18 @@ def run():
             stdout=log, stderr=log)
         try:
             trial.wait_for(control, description='configured compositor')
+            def browser_shortcut(layout):
+                control.send_keys([28], (*modifier, 'shift'))
+                browser = trial.wait_for(lambda: trial.window_for(control, f'shine-pref-browser-{layout}'))
+                control('workspace', 2)
+                control.send_keys([28], (*modifier, 'shift'))
+                assert control()['focused'] == browser['id'], 'Browser shortcut must focus across workspaces'
+                assert control()['workspace'] == browser['workspace']
+                assert len([w for w in control()['windows'] if w['app_id'] == browser['app_id']]) == 1
+                control('close')
+                trial.wait_for(lambda: not trial.window_for(control, browser['app_id']))
+
+            browser_shortcut('us')
             control('launch', program='foot', args=['--app-id=shine-pref-default', 'sleep', '90'])
             ordinary = trial.wait_for(lambda: trial.window_for(control, 'shine-pref-default'))
             assert ordinary['width'] == 480, ordinary
@@ -117,6 +133,7 @@ def run():
             assert window(ruled['id'])['width'] == 800, 'Reload must preserve a manually resized column'
             assert window(ordinary['id'])['width'] == 480
             assert capture_character('de') == 'z'
+            browser_shortcut('de')  # Reloaded program arguments and IDs take effect.
             control.send_keys([27], modifier)  # German plus does not need Shift.
             assert control()['display_scale'] == 1.30
             control.send_keys([53], modifier)  # German minus.
