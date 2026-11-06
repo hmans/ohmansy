@@ -8,6 +8,7 @@
     description = "Ohmansy live desktop display scale";
     wantedBy = [ "niri.service" ];
     after = [ "niri.service" ];
+    bindsTo = [ "niri.service" ];
     before = [ "quickshell.service" "ohmansy-wallpaper.service" ];
     partOf = [ "niri.service" ];
     serviceConfig = {
