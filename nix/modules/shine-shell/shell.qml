@@ -139,10 +139,13 @@ ShellRoot {
                 spacing: 6
                 BarButton { text: "ohmansy"; onClicked: root.launcherScreen = root.launcherScreen ? "" : bar.modelData.name }
                 Repeater {
-                    model: 4
+                    model: root.state.workspaces || [
+                        { name: "1" }, { name: "2" }, { name: "3" }, { name: "4" }
+                    ]
                     BarButton {
                         required property int index
-                        text: String(index + 1)
+                        required property var modelData
+                        text: modelData.name
                         actionRole: bar.output.workspace === index + 1 ? "primary" : "secondary"
                         onClicked: root.request("workspace", bar.modelData.name, index + 1)
                     }
