@@ -19,7 +19,15 @@ run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh check"
 
 [tasks.compositor-desktop]
 description = "Try Shine with a browser, editor, and terminal"
-run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run --desktop"
+run = "OHMANSY_REQUIRE_HARDWARE_RENDERER=1 OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run --desktop"
+
+[tasks.shine-dev]
+description = "Watch and rebuild the GPU-only nested Shine desktop"
+run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh dev"
+
+[tasks.shine-check]
+description = "Verify Shine packaging and private GPU trials; --no-graphics skips GPU work"
+run = "bash tools/dev/shine-check.sh"
 
 [tasks.compositor-integration]
 description = "Test disposable browser/editor clients in Shine"

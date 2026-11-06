@@ -5,6 +5,8 @@ mod clipboard;
 mod decoration;
 mod desktop;
 mod grabs;
+mod graphics;
+mod halo;
 mod handlers;
 mod image_capture;
 mod inactive;
@@ -18,6 +20,7 @@ mod preferences;
 mod scene;
 mod screencopy;
 mod screenshot;
+mod shader_reload;
 mod state;
 mod tasks;
 mod window_policy;
@@ -229,7 +232,8 @@ fn main() -> Result<()> {
         match arg.as_str() {
             "--help" => {
                 println!("Task workspaces: --workspaces PATH overrides workspaces.toml beside the compositor config.\nvalidate-workspaces PATH validates that file without starting a session.\nmsg --socket PATH task ID selects a named workspace.\n");
-                println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt] [--backend winit|drm] [--outputs 2] [--scale 1.25] [--config PATH] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+comma/period: focus monitor; add Shift to move window\nMod+minus/plus (or equal): scale by 5 percentage points; Mod+0: reset to 100%; Mod+Ctrl+minus/equal: resize column\nMod+Up/Down: cycle workspaces; add Shift to move window; Mod+1..4: workspace\nMod+Enter: terminal; F: toggle full width; Shift+F: fullscreen; W: close\nMod+Space: applications; Mod+R: cycle 33/50/66% column widths; add Shift to reverse; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|cycle-width [1|-1]|workspace-prev|workspace-next|workspace INDEX|move-workspace INDEX|move-workspace-prev|move-workspace-next|maximize|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\noutput position NAME X Y; output layout NAME X Y [NAME X Y...]; output scale NAME PERCENT; output primary NAME; output mode NAME WIDTHxHEIGHT[@HZ]; output reset NAME\nconfig reload|save; edits to ~/.config/shine/config.toml reload automatically.\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
+                println!("--mod-key ctrl-alt supports previews when Option is AltGr on the host; Mod+Shift+minus/equal resizes columns in this profile.");
+                println!("Shine\n\nUsage: mise run compositor -- [--desktop | --session] [--mod-key super|super-alt|ctrl-alt] [--backend winit|drm] [--outputs 2] [--scale 1.25] [--config PATH] [--control-socket PATH] [--close-after SECONDS] [--socket-file PATH] [--no-clients] [-- COMMAND ARGS...]\n\nMod is Super in login sessions and Super+Alt in nested demos.\nMod+H/L or Left/Right: focus column\nMod+Shift+H/L: move column\nMod+comma/period: focus monitor; add Shift to move window\nMod+minus/plus (or equal): scale by 5 percentage points; Mod+0: reset to 100%; Mod+Ctrl+minus/equal: resize column\nMod+Up/Down: cycle workspaces; add Shift to move window; Mod+1..4: workspace\nMod+Enter: terminal; F: toggle full width; Shift+F: fullscreen; W: close\nMod+Space: applications; Mod+R: cycle 33/50/66% column widths; add Shift to reverse; Mod+Shift+E: sign out (session mode)\n\nmsg --socket PATH status|focus-next|focus-prev|resize DELTA|cycle-width [1|-1]|workspace-prev|workspace-next|workspace INDEX|move-workspace INDEX|move-workspace-prev|move-workspace-next|maximize|fullscreen|scale PERCENT|terminal|close|launch PROGRAM ARGS...|screenshot PNG\n\noutput position NAME X Y; output layout NAME X Y [NAME X Y...]; output scale NAME PERCENT; output primary NAME; output mode NAME WIDTHxHEIGHT[@HZ]; output reset NAME\nconfig reload|save; edits to ~/.config/shine/config.toml reload automatically.\n\n--desktop starts isolated browser/editor clients. --session uses the installed session wrapper. --test-input enables control-socket input for automated trials and ignores parent input.\nClose the outer window to end only this experimental session.");
                 println!("\nPrint / Ctrl+Print / Mod+Shift+4: save and copy the focused monitor; Shift+Print: also open Satty.\nmsg --socket PATH screenshot-screen [PNG] [--annotate] queues a native or nested capture; poll status for its screenshot result.");
                 return Ok(());
             }
@@ -357,9 +361,9 @@ fn main() -> Result<()> {
         "Nested Wayland socket: {}",
         data.state.socket_name.to_string_lossy()
     );
+    let modifier = data.state.shortcut_modifier.label();
     eprintln!(
-        "Client render scale follows its monitor; display scale: {scale}x. {}+Enter terminal; H/L focus; S scale.",
-        data.state.shortcut_modifier.label()
+        "Client render scale follows its monitor; display scale: {scale}x. {modifier}+Enter terminal; {modifier}+Left/Right focus; {modifier}+minus/equal scale."
     );
     if let Some(path) = &socket_file {
         std::fs::write(path, data.state.socket_name.to_string_lossy().as_bytes())?;

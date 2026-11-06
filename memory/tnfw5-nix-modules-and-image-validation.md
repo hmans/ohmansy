@@ -7,6 +7,146 @@ data:
 id: tnfw5
 title: Nix modules and image validation
 ---
+## Preview shortcuts with EurKEY and Option-as-AltGr (2026-11-06)
+
+Hosts using `eu` with `lv3:lalt_switch` can map both physical Alt/Option keys
+to ISO_Level3_Shift. The former chord matcher ignored Level3/Level5 modifiers,
+so Super+Option could be consumed as plain Super by the outer compositor.
+A `super-alt` status flag alone did not prove physical forwarding. The exact
+EurKEY parent configuration reproduced failed nested Super+Alt+Enter while
+the ordinary US routing trial passed.
+
+Chord parsing/matching now treats AltGr/Level3 and Level5 as distinct modifiers.
+Plain Super bindings no longer consume these chords; explicit `AltGr`, `Level3`
+and `Level5` binding names are supported. This host-side fix requires updating
+the running host compositor; changing only the child cannot repair an old host.
+
+For an immediate preview without changing the host layout or restarting its
+session, `shine-dev.py` now selects `ctrl-alt` when the verified parent config
+maps left Alt to Level3. This uses Control+Option on Mac-mode keyboards and
+needs no right Alt key. It prints the actual prefix. `--mod-key ctrl-alt` selects
+it explicitly; `--mod-key super-alt` overrides auto selection. In Ctrl+Alt mode,
+Shift+minus/equal resizes columns because Ctrl is already part of Mod; plain
+minus/equal still changes scale. Demo hints reflect this difference.
+
+Verified 57 Rust tests, formatting, strict Clippy, automatic-profile/lifecycle
+unit tests, and the final Git-backed package build. Private CPU-rendered real
+Wayland trials passed standard nesting, EurKEY Super+Alt with the fixed host,
+and Control+Option (including Shift resizing) against the unchanged old host
+package. The old EurKEY/Super+Alt trial failed before the fix. All diagnostic
+renderers reported llvmpipe; interactive previews retain the strict GPU guard.
+No live keyboard config, installed activation or physical session restart was
+performed. The owner subsequently confirmed that the Control+Option preview
+works on the physical Mac-mode keyboard. Live shader-reload behavior still
+requires its own runtime verification.
+
+## Shine development preview loop (2026-11-06)
+
+`mise run shine-dev` now builds and watches a hardware-only nested desktop.
+`tools/dev/shine-dev.py` uses a private D-Bus session, private config/workspaces,
+and a unique runtime control socket; logs, connection metadata, startup PNG and
+exit status live under ignored `.local/shine-dev/`. Rust/Cargo source changes
+build while the existing preview stays open; only successful builds gracefully
+replace that preview and its disposable applications. Failed builds preserve it.
+Closing the preview or Ctrl+C ends the watcher. Child-group cleanup never targets
+the host desktop. QML and TOML retain their existing live reload paths.
+
+The explicit `OHMANSY_SHINE_SHADER_DIR` override supplies checkout fragment
+shaders and rounded coverage source. The nested timer checks these files at
+250 ms intervals and redraws after changes. All new programs/caches replace
+the previous decoration renderer together on successful compilation; errors
+keep the working renderer. Compilation can leave EGL surfaceless, so both
+successful and failed attempts trigger the nested BACK draw-buffer restoration.
+Without the override, packaged sessions use their embedded shader sources.
+
+`graphics.rs` reports actual GL vendor/renderer/version and EGL render device
+in logs and IPC `graphics`. The development command sets
+`OHMANSY_REQUIRE_HARDWARE_RENDERER=1`; software EGL devices, known software
+renderer names and unknown acceleration are rejected. Normal sessions preserve
+software-renderer support. The pre-incident hardware trial identified the native
+NVIDIA device in both nested compositors; see the stall investigation below.
+
+`mise run shine-check` checks untracked Nix inputs, Rust formatting/tests/Clippy,
+preview lifecycle, the Git-backed package and selected private GPU trials.
+`-- --no-graphics` omits graphical trials. This does not activate the installed OS.
+
+Verified the non-graphical route end to end: 56 Rust tests, strict Clippy,
+formatting, a real-subprocess simulated preview test (failed-build preservation,
+shader-only edits, successful restart, cleanup and software-status rejection),
+and the Git-backed compositor Nix package. Updated maintenance skill validation
+passed. No graphical process or installed activation was run after the reported
+native freeze. The combined preview and actual live shader compilation/error
+recovery still need a GPU runtime trial; do not describe those as visually or
+physically verified yet. The existing read-only native hang monitor stays active.
+
+## Repeated native Shine stall investigation (2026-11-06)
+
+The owner reported another frozen desktop requiring a power cut, with the halo
+build active, and confirmed similar freezes predated the halo. Previous-boot
+journal evidence shows repeated shell IPC timeouts while the Nix daemon still
+accepted connections. No recorded NVIDIA Xid, kernel panic, OOM kill or
+compositor coredump establishes a GPU fault or a total kernel freeze. The
+compositor stopped responding; its blocking operation is not yet known.
+
+The private hardware-rendered halo trial passed about 17 seconds before the
+first logged shell timeout. This temporal proximity does not prove causation,
+but a nested/headless test shares the physical GPU and cannot rule out affecting
+the native session through the driver. Graphical trials were stopped during
+investigation. At the time of that incident, the GPU-only preview work was incomplete; its
+new development binary was not the installed login compositor. Later preview
+implementation/package verification is recorded above; live GPU validation remains pending.
+
+`tools/dev/shine-hang-watch.py` now supports observing an existing process and
+control socket without changing compositor state. After two failed status
+checks it captures two thread wait-state snapshots and recent journal entries,
+then exits without restarting anything. PID start-time checking prevents
+following a recycled PID. Healthy/stalled IPC fixture checks and a real read-only
+status check passed. A temporary user service watches the current session;
+private paths and process identities belong in `.local/SESSION.md`.
+
+Full process stacks/syscalls are unavailable under current ptrace permissions;
+reports retain readable thread wait channels and the access errors. No root
+cause was established, no speculative synchronization change was applied,
+and no installed-system activation or compositor restart was performed.
+
+## Shine content-colored window halos (2026-11-06)
+
+
+Packaging follow-up: the first installed-system rebuild failed because new
+`halo.rs`/`halo.frag` files were untracked and absent from Nix's Git snapshot.
+`git add -N` now includes the new source/test files without staging contents.
+The Git-backed `nix build .#compositor` subsequently passed, and the packaged
+executable's `--help` ran successfully. Development Cargo checks alone missed
+this packaging failure. AGENTS.md, Linux development docs and the shipped
+maintenance skill now require package verification and safe `os-test` before
+handoff to `os-boot`. Installed activation remains untested because local sudo
+authentication was unavailable. Never treat packaged build success as activation.
+
+Shine defaults to a 32 logical pixel halo at 0.35 opacity. Live settings are
+`decorations.halo.enabled`, `width` (1–128) and `opacity` (0–1). The effect
+uses a quarter-resolution surface-tree image, enlarged and Gaussian blurred
+on the GPU. `halo.rs` caches the result until content, size or style changes;
+four separately identified bands exclude the client interior, preserving
+translucent apps. Halos share window visual transforms and output clipping.
+Fullscreen omits them; popups and decorations are excluded from the source.
+Individual-window capture continues to omit decorations.
+
+A private pixel trial exposed the default EGL window draw buffer becoming
+NONE after surfaceless offscreen passes. The nested backend restores BACK on
+the actual window surface before rendering after a halo cache rebuild. Do not
+use `GlesRenderer::with_context` to restore window state: it makes the context
+surfaceless again. Use `GlesFrame::with_context` with the window target current.
+
+Verified a debug build, 54 Rust tests, formatting and strict Clippy. The private
+`compositor_halo.py` trial passed color/orientation/falloff pixels, client
+repaints, unchanged geometry/interiors, 100–200% scale, translucent clients,
+two monitors, output clipping, live settings/disable, fullscreen, hidden
+workspaces and idle. Existing shadow, corner/ring and inactive-effect trials
+also passed with halos explicitly disabled in their isolated fixtures. A halo
+screenshot was visually inspected. No installed-system activation or physical
+DRM compositor restart was performed; a new session/build is required to add
+this rendering code to an older running compositor.
+
 ## Shine favorite browser shortcut (2026-11-06)
 
 `[browser]` in Shine's config selects `program`, direct argv `args`, and

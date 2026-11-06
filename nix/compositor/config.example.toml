@@ -51,6 +51,11 @@ spread = 2 # Expand the shadow before softening (0–64)
 offset = [0, 6] # Horizontal and vertical logical pixels (−128–128)
 color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
 
+[decorations.halo]
+enabled = true
+width = 32 # Logical pixels (1–128)
+opacity = 0.35 # Strength of the blurred window colors (0–1)
+
 [decorations.inactive]
 # Numeric values outside the ranges below are clamped when loaded.
 enabled = true

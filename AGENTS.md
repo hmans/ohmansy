@@ -25,6 +25,10 @@ Use `apply_patch`, simple English, and Conventional Commits. Preserve unrelated 
    SSH endpoint, or local handoff file exists on another machine.
 4. Run checks appropriate to the change. Update relevant memory and local handoff
    notes, then report what was verified. Distinguish built, booted, and running.
+   For shipped Nix packages, verify the Git-backed package build; development
+   binaries alone are insufficient. Include new source files with `git add -N`.
+   For installed OS changes, use `os-test` before handing off to `os-boot` when
+   activation preserves the session. Report authentication or disruption limits.
 
 ## Essential boundaries
 

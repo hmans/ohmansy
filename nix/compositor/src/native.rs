@@ -494,6 +494,7 @@ pub fn init_native(event_loop: &mut EventLoop<CalloopData>, data: &mut CalloopDa
     let display = unsafe { EGLDisplay::new(gbm.clone()) }?;
     let context = EGLContext::new(&display)?;
     let mut renderer = unsafe { GlesRenderer::new(context) }?;
+    data.state.graphics = crate::graphics::inspect(&mut renderer)?;
     let decorations = crate::decoration::Renderer::new(&mut renderer)?;
     let render_device = EGLDevice::device_for_display(&display)
         .ok()

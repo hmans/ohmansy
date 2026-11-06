@@ -33,6 +33,7 @@ render_elements! {
     Surface=WaylandSurfaceRenderElement<GlesRenderer>,
     Rounded=crate::decoration::RoundedSurface,
     Decoration=smithay::backend::renderer::gles::element::PixelShaderElement,
+    Halo=crate::halo::ElementType,
 }
 render_elements! {
     pub SceneElement<=GlesRenderer>;
@@ -351,6 +352,27 @@ impl Smallvil {
             if !fullscreen && style.shadow.enabled && style.shadow.color[3] > 0.0 {
                 for shadow in decorations.shadow(id, bounds, style, scale) {
                     visual.push(WindowVisual::Decoration(shadow));
+                }
+            }
+            if !fullscreen && style.halo.enabled && style.halo.opacity > 0.0 {
+                let surfaces = render_elements_from_surface_tree(
+                    renderer,
+                    surface,
+                    Point::<i32, smithay::utils::Logical>::from((
+                        -window.geometry().loc.x,
+                        -window.geometry().loc.y,
+                    ))
+                    .to_physical_precise_round(0.25),
+                    0.25,
+                    1.0,
+                    Kind::Unspecified,
+                );
+                match decorations
+                    .halo
+                    .element(renderer, id, bounds, &style.halo, surfaces)
+                {
+                    Ok(halo) => visual.extend(halo.into_iter().map(WindowVisual::Halo)),
+                    Err(error) => eprintln!("Window halo unavailable: {error:#}"),
                 }
             }
             for element in visual {

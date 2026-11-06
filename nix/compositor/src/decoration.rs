@@ -24,6 +24,7 @@ struct Ring {
     elements: Vec<PixelShaderElement>,
 }
 pub struct Renderer {
+    pub halo: crate::halo::Renderer,
     rounded: GlesTexProgram,
     border: GlesPixelProgram,
     shadow: GlesPixelProgram,
@@ -33,11 +34,12 @@ pub struct Renderer {
     used: HashSet<Id>,
 }
 impl Renderer {
-    pub fn new(renderer: &mut GlesRenderer) -> Result<Self, GlesError> {
+    pub fn new(renderer: &mut GlesRenderer) -> anyhow::Result<Self> {
+        let sources = crate::shader_reload::Sources::configured()?;
         Ok(Self {
+            halo: crate::halo::Renderer::new(renderer, &sources.halo)?,
             rounded: renderer.compile_custom_texture_shader(
-                include_str!("rounded.frag")
-                    .replace("//_COVERAGE_", include_str!("rounded-coverage.glsl")),
+                sources.rounded.replace("//_COVERAGE_", &sources.coverage),
                 &[
                     UniformName::new("draw_origin", UniformType::_2f),
                     UniformName::new("mask_rect", UniformType::_4f),
@@ -48,8 +50,7 @@ impl Renderer {
                 ],
             )?,
             border: renderer.compile_custom_pixel_shader(
-                include_str!("focus-ring.frag")
-                    .replace("//_COVERAGE_", include_str!("rounded-coverage.glsl")),
+                sources.ring.replace("//_COVERAGE_", &sources.coverage),
                 &[
                     UniformName::new("radius", UniformType::_1f),
                     UniformName::new("thickness", UniformType::_1f),
@@ -60,7 +61,7 @@ impl Renderer {
                 ],
             )?,
             shadow: renderer.compile_custom_pixel_shader(
-                include_str!("shadow.frag"),
+                sources.shadow,
                 &[
                     UniformName::new("radius", UniformType::_1f),
                     UniformName::new("softness", UniformType::_1f),
@@ -82,6 +83,7 @@ impl Renderer {
         self.used.clear();
     }
     pub fn finish_output(&mut self, live: &HashSet<WindowId>, owned: &HashSet<WindowId>) {
+        self.halo.retain(live, owned);
         self.masks.retain(|id, m| {
             live.contains(&m.window) && (!owned.contains(&m.window) || self.used.contains(id))
         });

@@ -39,6 +39,27 @@ output if different. Build success does not activate anything. Select `switch`
 for immediate activation or `boot` for next boot according to the requested
 change. Plan session-disrupting changes with the user before activating them.
 
+When developing ohmansy in its checkout, include new source files in the
+Git-backed flake with `git add -N PATH` and build the affected Nix package before
+reporting it ready. Cargo or preview success does not verify shipped packaging.
+Keep private files and generated artifacts ignored. Use the checkout's
+`mise run os-build` and `mise run os-test` tasks: they preserve the installed
+machine configuration and release pin while overriding ohmansy with local sources.
+
+Use `os-test` and verify affected services before handing an installed change
+off for `os-boot`, when activation preserves the session. If local sudo
+authentication is unavailable, finish checks that do not require it and report
+installed activation as untested. Never request a password in chat. A successful
+test activation does not replace a running compositor; rendering code still
+needs a planned session restart before it can be verified in that desktop.
+
+For Shine rendering iterations, use `mise run shine-dev` from the checkout.
+It verifies hardware rendering, watches Rust sources and reloads shaders/QML
+in an isolated nested preview. Use `mise run shine-check -- --no-graphics`
+for package checks while investigating GPU freezes; a nested preview still
+shares the physical GPU with the main desktop. See the checkout's compositor
+development guide for logs, private configuration and verification limits.
+
 For diagnostics, inspect the affected unit with `systemctl status` and
 `journalctl -b -u UNIT`; desktop services use `systemctl --user` and
 `journalctl --user -b -u UNIT`. Prefer reloading the affected settings or

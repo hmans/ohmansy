@@ -121,6 +121,10 @@ make flake-check
 make vm-image
 ```
 
+Shine's `mise run shine-dev` task provides a GPU-only nested development desktop.
+Rust saves rebuild and replace only that preview; shaders, QML and appearance
+settings reload live. See [Shine development](docs/compositor-development.md).
+
 The root flake also provides `.#iso` for a disposable live desktop and
 `.#installer-iso` for the experimental installer. The primary app uses the
 persistent factory disk, with first-boot owner setup and no preset credentials.

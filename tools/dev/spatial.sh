@@ -7,8 +7,8 @@ cd "$repo"
 action=${1:-run}
 if (($#)); then shift; fi
 case "$action" in
-  run|check|integration) ;;
-  *) echo "Usage: bash tools/dev/spatial.sh [run|check|integration] [arguments...]" >&2; exit 2 ;;
+  run|check|integration|dev) ;;
+  *) echo "Usage: bash tools/dev/spatial.sh [run|check|integration|dev] [arguments...]" >&2; exit 2 ;;
 esac
 
 # Nix supplies native libraries and NixOS's patched rustup. Mise owns the Rust
@@ -38,6 +38,10 @@ fi
 if [[ $action == integration ]]; then
   mise exec -- cargo build --locked --manifest-path "$manifest"
   exec python3 tools/tests/compositor_integration.py "$@"
+fi
+if [[ $action == dev ]]; then
+  [[ $experiment == compositor ]] || { echo "Development preview requires Shine." >&2; exit 2; }
+  exec python3 tools/dev/shine-dev.py "$@"
 fi
 if [[ $action == check ]]; then
   mise exec -- cargo fmt --manifest-path "$manifest" --check

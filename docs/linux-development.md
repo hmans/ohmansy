@@ -61,8 +61,15 @@ and receiver configuration support depends on the keyboard model.
 
 ## Check and preview small changes
 
-Stage newly added Nix input files so the Git-backed flake includes them. Keep
-private configuration and generated artifacts ignored.
+Include newly added source files with `git add -N PATH` so the Git-backed flake
+includes their working-tree contents without staging those contents for commit.
+Check `git status --short` for remaining untracked inputs. Keep private
+configuration and generated artifacts ignored.
+
+For shipped package changes, build the affected flake output before reporting
+the change ready, for example `nix build .#compositor` for Shine. A successful
+Cargo build or private graphical trial does not verify Nix source inclusion,
+packaging, wrappers or the installed configuration.
 
 ```sh
 nix flake check --no-update-lock-file
@@ -174,7 +181,12 @@ checkout. They leave the installed release pin and lock file unchanged. `os-buil
 only builds; `os-test` activates without changing the boot default; `os-boot`
 selects the build for the next boot without activating it now; `os-switch`
 activates and changes the boot default. Reboot when ready after `os-boot`.
-Test and switch may restart services.
+Test and switch may restart services. For agent changes to the installed OS,
+use `os-test` and verify the affected services before handing the change off
+for `os-boot`, when activation can preserve the session. If sudo authentication
+is unavailable or activation would disrupt the desktop, complete the packaged
+build and available runtime checks, then state that installed activation remains
+untested. Never claim a build-only check tested activation.
 Use a planned boot activation and restart for login-manager, kernel, or
 graphics-driver changes, as described below.
 

@@ -63,6 +63,7 @@ pub struct Smallvil {
     pub nested_canvas_size: Option<(i32, i32)>,
     pub virtual_outputs: usize,
     pub native_mode: bool,
+    pub graphics: crate::graphics::Info,
     pub vt_request: Option<i32>,
     pub next_window: WindowId,
     pub configured: BTreeMap<WindowId, (i32, i32, bool, bool, bool)>,
@@ -195,6 +196,7 @@ impl Smallvil {
             nested_canvas_size: None,
             virtual_outputs: 1,
             native_mode: false,
+            graphics: Default::default(),
             vt_request: None,
             next_window: 1,
             configured: BTreeMap::new(),
@@ -819,7 +821,7 @@ impl Smallvil {
                 .map(|task| serde_json::json!({"id":task.id,"name":task.name}))
                 .collect()
         };
-        serde_json::json!({"workspaces":workspaces,"task_startup_errors":self.task_startup_errors,"task_config_path":self.task_config_file.as_ref().map(|f|f.path.to_string_lossy()),"task_config_error":self.task_config_error,"task_config_revision":self.task_config_revision,"preferences":{"browser":self.output_settings.browser,"clipboard":self.output_settings.clipboard,"decorations":self.output_settings.decorations,"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+        serde_json::json!({"graphics":self.graphics,"workspaces":workspaces,"task_startup_errors":self.task_startup_errors,"task_config_path":self.task_config_file.as_ref().map(|f|f.path.to_string_lossy()),"task_config_error":self.task_config_error,"task_config_revision":self.task_config_revision,"preferences":{"browser":self.output_settings.browser,"clipboard":self.output_settings.clipboard,"decorations":self.output_settings.decorations,"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift,"altgr":modifiers.iso_level3_shift,"level5":modifiers.iso_level5_shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }
 }
 

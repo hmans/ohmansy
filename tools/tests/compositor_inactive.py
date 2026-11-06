@@ -34,6 +34,8 @@ duration_ms=0
 [decorations]
 focus_ring_width=0
 inactive_ring_width=0
+[decorations.halo]
+enabled=false
 [decorations.shadow]
 enabled=false
 [decorations.inactive]

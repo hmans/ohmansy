@@ -230,11 +230,41 @@ quickshell ipc --pid SHELL_PID call wallpaper pause false
 
 ## Nested development demo
 
-Run the Shine desktop experiment inside the current Wayland desktop:
+For an interactive development loop inside the current Wayland desktop:
 
 ```sh
-mise run compositor-desktop
+mise run shine-dev
+# Optional: --outputs 2 --scale 1.5, or --no-watch for one build.
 ```
+
+The command prints the preview's shortcut prefix. It normally uses Super+Alt;
+when the parent config maps left Option/Alt to AltGr, it selects Ctrl+Alt
+(Control+Option on a Mac keyboard) so the outer desktop can forward the chord.
+Use `--mod-key ctrl-alt` to select this explicitly, or `--mod-key super-alt`
+to override detection. In Ctrl+Alt mode, add Shift to minus/equal for column
+resizing; plain minus/equal still changes scale. The host keyboard layout stays
+unchanged.
+
+This command requires hardware rendering and prints the actual GPU and render
+device. Software and unverified EGL devices are rejected. The `graphics` field
+in IPC status reports vendor, renderer, GL version, device and acceleration.
+Nested rendering shares the physical GPU with the main desktop; it does not
+isolate driver faults. Investigate recurring desktop freezes before stress tests.
+
+Rust saves build a replacement while the existing preview stays open. Successful
+builds gracefully close only the preview and reopen its disposable applications.
+Failed builds leave it running and retry after the next save. Closing the preview
+or pressing Ctrl+C stops the development loop. It uses a private D-Bus session and
+its own config/workspaces under `.local/shine-dev/`. Build/session logs and the
+current preview's control socket information are saved there too. `preview.png`
+captures the desktop after startup and is replaced after each Rust restart.
+
+Fragment shaders and `rounded-coverage.glsl` reload on save without restarting
+the preview. The explicit `OHMANSY_SHINE_SHADER_DIR` override loads checkout
+sources; without it, packaged builds use embedded shaders. A successful shader
+reload replaces decoration programs and caches together. Failed compilation or
+missing files keep the working shaders and log an error. QML and TOML edits also
+reload live. `mise run compositor-desktop` remains a single-run GPU-only demo.
 
 It opens a nested desktop with a new terminal, Firefox, GNOME Text Editor, and
 a Quickshell bar on each monitor. The bar has workspace buttons, a Terminal
@@ -274,7 +304,9 @@ four workspaces, fullscreen, client maximize requests, and column resizing.
 Click a window to focus it. **Mod** means **Super** in a login session and
 **Super+Alt** in a nested demo or packaged `--nested` preview. The host matches
 Super without Alt, so it forwards the child's Super+Alt shortcuts. Add Shift
-for the actions below. `--mod-key super|super-alt` overrides the default.
+for the actions below. `--mod-key super|super-alt|ctrl-alt` overrides the default.
+The development watcher can choose Ctrl+Alt automatically for an AltGr host,
+as described above; use its printed prefix in place of Mod.
 
 When nesting under the supplied Niri configuration, use the arrow keys for
 navigation: Niri reserves Super+Alt+L for screen locking.
@@ -289,7 +321,7 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+Shift+comma/period | Move window to previous/next monitor |
 | Mod+minus/plus (or equal) | Decrease/increase the focused monitor's scale by 5 percentage points (50–200%) |
 | Mod+0 | Restore the focused monitor's scale to 100% |
-| Mod+Ctrl+minus/equal | Narrow/widen the focused column |
+| Mod+Ctrl+minus/equal (Ctrl+Alt preview: Mod+Shift+minus/equal) | Narrow/widen the focused column |
 | Mod+R / Mod+Shift+R | Cycle column widths through 33⅓%, 50%, and 66⅔%, forward/backward |
 | Mod+1–4 | Switch workspace |
 | Mod+Up / Mod+Down | Cycle to the previous/next workspace, wrapping at either end |
@@ -594,6 +626,30 @@ pixels. `color` is RGBA from 0 to 1; its alpha controls opacity. Shadow edits
 reload live and are preserved when saving monitor settings. Shadows are visual
 only and do not change window sizes, spacing, or input regions.
 
+### Window color halo
+
+Windows have a soft halo made from an enlarged, blurred copy of their own
+contents. It follows app repaints, moves and visual scaling, and fades to zero
+at its outer edge. The client interior stays unchanged, including translucent
+windows. Menus and tooltips are excluded from the halo source. Fullscreen
+windows omit the effect; halos are clipped to their owning output.
+
+```toml
+[decorations.halo]
+enabled = true
+width = 32
+opacity = 0.35
+```
+
+`width` accepts 1–128 logical pixels; `opacity` accepts 0–1. Edits reload live
+on a compositor built with halo support. The effect changes neither layout nor
+input regions. Its reduced-resolution image is cached until the app contents,
+size or halo settings change. Stationary windows cause no extra repaints.
+Individual-window screen sharing excludes decorations, including the halo.
+Use `python3 tools/tests/compositor_halo.py` in the development shell for the
+private pixel trial. Rendering code changes need a new compositor session;
+configuration reload cannot add the effect to an older running compositor.
+
 ### Unfocused window appearance
 
 Unfocused windows recede slightly: 99% visual scale, 85% saturation and an
@@ -655,7 +711,9 @@ default_column_width = { proportion = 0.75 }
 Custom bindings replace the matching default; omitted bindings keep defaults.
 `none` removes a binding and lets the client receive the chord. `Mod` is Super
 in a login and Super+Alt in a nested preview. Explicit Super, Alt, Ctrl/Control
-and Shift modifiers are also supported, with exact modifier matching. Keys use
+and Shift modifiers are also supported, with exact modifier matching. AltGr
+(or Level3) and Level5 are distinct modifiers: they do not match plain Super
+shortcuts. Keys use
 XKB names such as Return, Left, comma, space or F6. Ctrl+Alt+F1–F12 remain reserved
 for VT switching. Key releases stay paired with intercepted presses across reloads.
 
@@ -835,6 +893,21 @@ source instead. There is no visual arrangement editor yet.
 
 ## Development
 
+For a freeze in an existing session, `tools/dev/shine-hang-watch.py` can observe
+the verified compositor PID and control socket without restarting it:
+
+```sh
+python3 tools/dev/shine-hang-watch.py --pid PID --socket PATH \
+  --directory .local/shine-hang-watch
+```
+
+It checks status every five seconds. After two consecutive failures, it saves
+two thread wait-state snapshots and recent session/kernel logs, then exits.
+It never sends input, changes settings or restarts processes. Diagnostics stay
+in the ignored directory. Kernel stacks and syscalls may be denied by ptrace
+permissions; the report records those limits. This gathers evidence, not a fix.
+The observer exits when its original process exits; start it again after login.
+
 Rust is pinned in `mise.toml`. The shared `.#spatial` Nix shell supplies NixOS's
 patched rustup, a C compiler, native graphics libraries, and the demo applications.
 On a fresh NixOS checkout, bootstrap once before mise auto-installs its generic
@@ -853,6 +926,12 @@ including through `mise run os-switch`. Dependency, compiler, or native library
 changes can rebuild the cache. This uses the Nix store, not `.build/spatial/`.
 Both Rust experiments share the incremental cache in `.build/spatial/`.
 Restart the nested process to try code changes; no OS rebuild is needed.
+
+`mise run shine-check` checks new Git inputs, Rust formatting/tests/Clippy,
+the preview lifecycle, the shipped Nix package, and selected private GPU trials.
+Use `mise run shine-check -- --no-graphics` for package and non-graphical checks
+while diagnosing GPU instability. Neither command activates the installed OS;
+use the installed-system workflow for that separate verification step.
 
 ```sh
 mise run compositor-check

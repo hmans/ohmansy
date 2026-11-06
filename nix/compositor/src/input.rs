@@ -17,6 +17,7 @@ pub enum ShortcutModifier {
     Super,
     #[default]
     SuperAlt,
+    CtrlAlt,
 }
 
 impl ShortcutModifier {
@@ -24,7 +25,8 @@ impl ShortcutModifier {
         match value {
             "super" => Ok(Self::Super),
             "super-alt" => Ok(Self::SuperAlt),
-            _ => Err("--mod-key must be super or super-alt".into()),
+            "ctrl-alt" => Ok(Self::CtrlAlt),
+            _ => Err("--mod-key must be super, super-alt, or ctrl-alt".into()),
         }
     }
 
@@ -32,6 +34,7 @@ impl ShortcutModifier {
         match self {
             Self::Super => "super",
             Self::SuperAlt => "super-alt",
+            Self::CtrlAlt => "ctrl-alt",
         }
     }
 
@@ -39,12 +42,19 @@ impl ShortcutModifier {
         match self {
             Self::Super => "Super",
             Self::SuperAlt => "Super+Alt",
+            Self::CtrlAlt => "Ctrl+Alt",
         }
     }
 
     #[cfg(test)]
     fn matches(self, modifiers: &smithay::input::keyboard::ModifiersState) -> bool {
-        modifiers.logo && !modifiers.ctrl && modifiers.alt == (self == Self::SuperAlt)
+        !modifiers.iso_level3_shift
+            && !modifiers.iso_level5_shift
+            && match self {
+                Self::Super => modifiers.logo && !modifiers.ctrl && !modifiers.alt,
+                Self::SuperAlt => modifiers.logo && !modifiers.ctrl && modifiers.alt,
+                Self::CtrlAlt => !modifiers.logo && modifiers.ctrl && modifiers.alt,
+            }
     }
 }
 
@@ -386,6 +396,10 @@ mod tests {
             ShortcutModifier::parse("super-alt"),
             Ok(ShortcutModifier::SuperAlt)
         );
-        assert!(ShortcutModifier::parse("ctrl-alt").is_err());
+        assert_eq!(
+            ShortcutModifier::parse("ctrl-alt"),
+            Ok(ShortcutModifier::CtrlAlt)
+        );
+        assert!(ShortcutModifier::parse("invalid").is_err());
     }
 }

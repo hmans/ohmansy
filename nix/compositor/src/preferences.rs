@@ -159,6 +159,7 @@ pub struct Decorations {
     pub inactive_ring_width: u32,
     pub inactive_ring_color: [f32; 4],
     pub shadow: Shadow,
+    pub halo: Halo,
     pub inactive: Inactive,
 }
 impl Default for Decorations {
@@ -170,6 +171,7 @@ impl Default for Decorations {
             inactive_ring_width: 1,
             inactive_ring_color: [0.55, 0.55, 0.60, 0.55],
             shadow: Shadow::default(),
+            halo: Halo::default(),
             inactive: Inactive::default(),
         }
     }
@@ -188,6 +190,12 @@ impl Decorations {
             return Err("Ring colors need four RGBA values from 0 to 1".into());
         }
         self.inactive.validate()?;
+        if !(1..=128).contains(&self.halo.width)
+            || !self.halo.opacity.is_finite()
+            || !(0.0..=1.0).contains(&self.halo.opacity)
+        {
+            return Err("Halo width must be 1–128 and opacity 0–1".into());
+        }
         self.shadow.validate()
     }
 }
@@ -282,6 +290,23 @@ impl Inactive {
 fn inactive_duration<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
     let duration = i64::deserialize(deserializer)?;
     Ok(duration.clamp(0, 5000) as u32)
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Halo {
+    pub enabled: bool,
+    pub width: u32,
+    pub opacity: f32,
+}
+impl Default for Halo {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            width: 32,
+            opacity: 0.35,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -534,17 +559,17 @@ impl Chord {
         let mut modifiers = 0;
         for modifier in parts {
             modifiers |= match modifier.to_ascii_lowercase().as_str() {
-                "mod" => {
-                    if profile == ShortcutModifier::SuperAlt {
-                        1 | 2
-                    } else {
-                        1
-                    }
-                }
+                "mod" => match profile {
+                    ShortcutModifier::Super => 1,
+                    ShortcutModifier::SuperAlt => 1 | 2,
+                    ShortcutModifier::CtrlAlt => 2 | 4,
+                },
                 "super" => 1,
                 "alt" => 2,
                 "ctrl" | "control" => 4,
                 "shift" => 8,
+                "altgr" | "level3" => 16,
+                "level5" => 32,
                 _ => return Err(format!("Unknown modifier {modifier} in {text}")),
             };
         }
@@ -565,7 +590,9 @@ impl Chord {
             == (u8::from(mods.logo)
                 | (u8::from(mods.alt) * 2)
                 | (u8::from(mods.ctrl) * 4)
-                | (u8::from(mods.shift) * 8))
+                | (u8::from(mods.shift) * 8)
+                | (u8::from(mods.iso_level3_shift) * 16)
+                | (u8::from(mods.iso_level5_shift) * 32))
             && symbols.iter().any(|s| lowercase(*s) == self.key)
     }
 
@@ -645,10 +672,6 @@ pub fn bindings(
         ("Mod+0".into(), Scale { value: Some(100) }),
         ("Mod+equal".into(), ScaleAdjust { value: 5 }),
         ("Mod+plus".into(), ScaleAdjust { value: 5 }),
-        ("Mod+Shift+plus".into(), ScaleAdjust { value: 5 }),
-        ("Mod+Shift+equal".into(), ScaleAdjust { value: 5 }),
-        ("Mod+Ctrl+minus".into(), Resize { value: -80 }),
-        ("Mod+Ctrl+equal".into(), Resize { value: 80 }),
         ("Mod+F".into(), Maximize),
         ("Mod+Shift+F".into(), Fullscreen),
         ("Mod+W".into(), Close),
@@ -657,6 +680,21 @@ pub fn bindings(
         ("Mod+Shift+comma".into(), MoveOutputPrev),
         ("Mod+Shift+period".into(), MoveOutputNext),
     ];
+    if profile == ShortcutModifier::CtrlAlt {
+        // Ctrl is already in Mod; use Shift for preview column resizing.
+        defaults.extend([
+            ("Mod+Shift+minus".into(), Resize { value: -80 }),
+            ("Mod+Shift+equal".into(), Resize { value: 80 }),
+            ("Mod+Shift+plus".into(), Resize { value: 80 }),
+        ]);
+    } else {
+        defaults.extend([
+            ("Mod+Shift+plus".into(), ScaleAdjust { value: 5 }),
+            ("Mod+Shift+equal".into(), ScaleAdjust { value: 5 }),
+            ("Mod+Ctrl+minus".into(), Resize { value: -80 }),
+            ("Mod+Ctrl+equal".into(), Resize { value: 80 }),
+        ]);
+    }
     for n in 1..=4 {
         defaults.push((format!("Mod+{n}"), Workspace { value: n }));
     }
@@ -768,6 +806,71 @@ impl Smallvil {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output_config::Settings;
+    #[test]
+    fn altgr_and_level5_are_distinct_modifiers_and_preview_control_alt_keeps_scale_and_resize() {
+        let host = Chord::parse("Mod+Return", ShortcutModifier::Super).unwrap();
+        let mut mods = ModifiersState {
+            logo: true,
+            ..Default::default()
+        };
+        assert!(host.matches(&mods, &[0xff0d]));
+        mods.iso_level3_shift = true;
+        assert!(!host.matches(&mods, &[0xff0d]));
+        assert!(Chord::parse("Super+AltGr+Return", ShortcutModifier::Super)
+            .unwrap()
+            .matches(&mods, &[0xff0d]));
+        mods.iso_level3_shift = false;
+        mods.iso_level5_shift = true;
+        assert!(!host.matches(&mods, &[0xff0d]));
+        let bindings = bindings(&BTreeMap::new(), ShortcutModifier::CtrlAlt).unwrap();
+        let action = |key| {
+            bindings
+                .iter()
+                .find(|(chord, _)| *chord == Chord::parse(key, ShortcutModifier::CtrlAlt).unwrap())
+                .map(|(_, action)| action)
+        };
+        assert!(matches!(action("Mod+Return"), Some(Action::Terminal)));
+        assert!(matches!(
+            action("Mod+equal"),
+            Some(Action::ScaleAdjust { value: 5 })
+        ));
+        assert!(matches!(
+            action("Mod+minus"),
+            Some(Action::ScaleAdjust { value: -5 })
+        ));
+        assert!(matches!(
+            action("Mod+Shift+equal"),
+            Some(Action::Resize { value: 80 })
+        ));
+        assert!(matches!(
+            action("Mod+Shift+plus"),
+            Some(Action::Resize { value: 80 })
+        ));
+        assert!(matches!(
+            action("Mod+Shift+minus"),
+            Some(Action::Resize { value: -80 })
+        ));
+    }
+    #[test]
+    fn halo_preferences_validate_size_strength_and_unknown_fields() {
+        assert!(
+            Settings::parse("[decorations.halo]\nwidth=128\nopacity=0.0\nenabled=false").is_ok()
+        );
+        for input in [
+            "width=0",
+            "width=129",
+            "opacity=-0.1",
+            "opacity=1.1",
+            "opacity=nan",
+        ] {
+            assert!(
+                Settings::parse(&format!("[decorations.halo]\n{input}")).is_err(),
+                "accepted {input}"
+            );
+        }
+        assert!(toml::from_str::<Settings>("[decorations.halo]\nunknown=true").is_err());
+    }
     #[test]
     fn launcher_and_width_shortcuts_follow_both_modifier_profiles() {
         for profile in [ShortcutModifier::Super, ShortcutModifier::SuperAlt] {

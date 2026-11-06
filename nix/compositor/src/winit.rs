@@ -6,8 +6,8 @@ use smithay::{
         renderer::{
             damage::OutputDamageTracker,
             element::utils::{Relocate, RelocateRenderElement},
-            gles::GlesRenderer,
-            ExportMem, ImportDma, TextureMapping,
+            gles::{ffi, GlesRenderer},
+            ExportMem, Frame, ImportDma, Renderer, TextureMapping,
         },
         winit::{self, WinitEvent},
     },
@@ -20,7 +20,7 @@ use smithay::{
     wayland::dmabuf::DmabufFeedbackBuilder,
 };
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     os::unix::fs::MetadataExt,
     rc::Rc,
     time::{Duration, Instant},
@@ -59,8 +59,12 @@ pub fn init_winit(
         .with_inner_size(::winit::dpi::LogicalSize::new(1360.0, 850.0));
     let (mut graphics, events) = winit::init_from_attributes::<GlesRenderer>(attributes)
         .map_err(|e| anyhow::anyhow!("{e}"))?;
+    data.state.graphics = crate::graphics::inspect(graphics.renderer())?;
     let formats = graphics.renderer().dmabuf_formats();
     let mut decorations = crate::decoration::Renderer::new(graphics.renderer())?;
+    let mut shader_watch = crate::shader_reload::Watch::configured()?;
+    let shader_reload = Rc::new(Cell::new(false));
+    let timer_shader_reload = shader_reload.clone();
     let device = EGLDevice::device_for_display(graphics.renderer().egl_context().display())
         .and_then(|d| d.render_device_path().or_else(|_| d.drm_device_path()))
         .ok()
@@ -111,6 +115,13 @@ pub fn init_winit(
         .insert_source(Timer::immediate(), move |_, _, data| {
             let now = Instant::now();
             let state = &mut data.state;
+            if shader_watch
+                .as_mut()
+                .is_some_and(|watch| watch.changed(now))
+            {
+                timer_shader_reload.set(true);
+                state.needs_redraw = true;
+            }
             if state.layout.tick((now - tick).as_secs_f64()) {
                 state.apply_positions();
             }
@@ -138,6 +149,20 @@ pub fn init_winit(
                 WinitEvent::Input(event) => state.process_input_event(event),
                 WinitEvent::Focus(false) if !state.test_input => state.release_keys(),
                 WinitEvent::Redraw => {
+                    if shader_reload.replace(false) {
+                        match crate::decoration::Renderer::new(backend.renderer()) {
+                            Ok(updated) => {
+                                decorations = updated;
+                                eprintln!("Shine shaders reloaded");
+                            }
+                            Err(error) => eprintln!(
+                                "Shine shader reload rejected: {error:#}; keeping working shaders"
+                            ),
+                        }
+                        // Compilation also makes EGL surfaceless, including on
+                        // failure. Restore the nested draw buffer below.
+                        decorations.halo.offscreen_rendered = true;
+                    }
                     state.import_buffers(backend.renderer());
                     state.space.refresh();
                     state.maintain_scene();
@@ -179,6 +204,17 @@ pub fn init_winit(
                                     }),
                             );
                             left += output.current_mode().unwrap().size.w;
+                        }
+                        if std::mem::take(&mut decorations.halo.offscreen_rendered) {
+                            // Surfaceless EGL passes leave the default draw buffer
+                            // at NONE. Restore BACK on the actual window surface
+                            // before clearing or drawing any output elements.
+                            let mut frame =
+                                renderer.render(&mut framebuffer, size, Transform::Flipped180)?;
+                            frame.with_context(|gl| unsafe {
+                                gl.DrawBuffers(1, &ffi::BACK);
+                            })?;
+                            let _ = frame.finish()?;
                         }
                         tracker.render_output(
                             renderer,
