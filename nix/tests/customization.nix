@@ -1,4 +1,4 @@
-{ nixpkgs, pkgs, system, ohmansyModules, herdrPackage, misePackage }:
+{ nixpkgs, pkgs, system, ohmansyModules, misePackage }:
 let
   lib = nixpkgs.lib;
   evaluate = modules: (lib.nixosSystem {
@@ -127,8 +127,6 @@ assert builtins.elem defaults.programs.appimage.package defaults.environment.sys
 assert defaults.boot.binfmt.registrations ? appimage_type_1;
 assert defaults.boot.binfmt.registrations ? appimage_type_2;
 assert !(noAppImages.boot.binfmt.registrations ? appimage_type_2);
-assert builtins.elem herdrPackage defaults.environment.systemPackages;
-assert builtins.elem herdrPackage softwareOnly.environment.systemPackages;
 assert builtins.elem misePackage defaults.environment.systemPackages;
 assert builtins.elem misePackage softwareOnly.environment.systemPackages;
 assert lib.hasInfix "$HOME/.local/share/mise/shims" defaults.environment.sessionVariables.PATH;
@@ -147,7 +145,6 @@ assert lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getExe misePacka
 assert !(lib.hasInfix "activate fish" custom.programs.fish.interactiveShellInit);
 assert !(lib.hasInfix "activate bash" custom.programs.bash.interactiveShellInit);
 assert !(lib.hasInfix "activate zsh" custom.programs.zsh.interactiveShellInit);
-assert !(builtins.any (package: lib.getName package == "herdr") desktopOnly.environment.systemPackages);
 assert noFish.users.defaultUserShell == pkgs.bashInteractive;
 assert softwareOnly.programs.starship.enable;
 assert !noFish.programs.starship.enable && !noFishStyle.programs.starship.enable;
@@ -159,7 +156,6 @@ assert custom.users.defaultUserShell == pkgs.zsh;
 assert custom.ohmansy.software.packages == [];
 assert builtins.elem pkgs.hello custom.environment.systemPackages;
 assert !(builtins.elem pkgs.git custom.environment.systemPackages);
-assert !(builtins.elem herdrPackage custom.environment.systemPackages);
 assert !(builtins.elem misePackage custom.environment.systemPackages);
 assert !(builtins.elem pkgs.fish custom.environment.systemPackages);
 assert !(custom.environment.etc ? "xdg/foot/foot.ini");

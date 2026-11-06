@@ -12,7 +12,6 @@ in
       lazygit
       tmux
       mise
-      herdr
       vim
       neovim
       vscodium

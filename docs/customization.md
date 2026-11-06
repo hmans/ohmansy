@@ -81,7 +81,7 @@ add it to the host's module imports. Then rebuild:
 sudo nixos-rebuild switch --flake /etc/nixos#ohmansy
 ```
 
-The optional software bundle defaults to Git, tig, lazygit, tmux, mise, herdr,
+The optional software bundle defaults to Git, tig, lazygit, tmux, mise,
 Vim, Neovim, VSCodium, Zed, curl, wget, fzf, ripgrep, eza, bat, Satty, jq,
 GCC, GNU Make, Python 3, pkg-config, fastfetch, btop, htop, and psmisc (including
 `killall`). These defaults live in `nix/modules/software.nix`, exported by the
@@ -106,11 +106,6 @@ so compatible application menus hide them when Chrome is unavailable.
 Run `nvim`, `codium`, or `zeditor` to open the bundled code editors. VSCodium
 and Zed also appear in the application menu. Editor settings and extensions
 belong to each user; ohmansy installs the editors without a custom configuration.
-
-Run `herdr` in a terminal to open its agent workspace. It comes from the upstream
-Nix flake, pinned to `v0.9.5`, for both PC and ARM systems. It updates with
-ohmansy through Nix. To select another upstream release when maintaining ohmansy,
-change `inputs.herdr.url` in `flake.nix` and run `nix flake update herdr`.
 
 The shared software defaults add `~/.local/bin` to `PATH`, including in Fish.
 Set `environment.localBinInPath = false;` to disable this. Log out and back in
