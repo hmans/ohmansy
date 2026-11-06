@@ -171,14 +171,19 @@ The shared launcher includes individual open windows and ranks matching windows
 before applications and desktop commands. Search covers window titles, app IDs,
 and matching desktop-entry names/keywords. Stable `window:<id>` results focus
 that exact window across workspaces and outputs instead of launching an app.
-Shine snapshots its control socket while the launcher is open and excludes
+Shine fetches its control-socket window list once on opening and excludes
 unmapped windows; Niri supplies its event-driven model and focus-window action.
+The launcher snapshots window IDs/titles/app IDs on opening for both backends.
+Results stay steady until reopening, including when background titles change;
+this replaces the initial 250 ms polling that rebuilt the list repeatedly.
 The launcher retains application entries so users can still select those.
 
 Verified the updated shared QML package and private headless launcher trial:
 window-before-app ranking, title-only WhatsApp fixtures without desktop entries,
 selection between two windows, cross-workspace focus, no duplicates, commands,
-failure reporting and dismissal. Niri wiring was implemented but not exercised
+failure reporting and dismissal. A further private regression changed a real
+window title during selection, verified unchanged results/selection for 800 ms,
+and verified the new title appeared on reopening. Niri wiring was implemented but not exercised
 in a running Niri session. A graceful live Quickshell refresh preserved the
 compositor and all seven window IDs; launcher IPC remained reachable through
 the original config path, preserving the installed Mod+Space helper. Keeping

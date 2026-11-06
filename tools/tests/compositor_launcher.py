@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+import sys
 
 import compositor_support as trial
 
@@ -82,9 +83,16 @@ def run():
             assert len([w for w in control()['windows'] if w['app_id']=='launcher-test-app'])==1
             # Browser windows can match by title without any corresponding app
             # entry. Each result must activate that particular window.
+            title_file = artifacts / 'chat-title'
+            title_file.write_text('WhatsApp 2')
             for index in (1, 2):
+                command = ['sleep', '90'] if index == 1 else [sys.executable, '-c',
+                    'import pathlib,sys,time\n'
+                    'while True:\n'
+                    ' print("\\033]2;"+pathlib.Path(sys.argv[1]).read_text()+"\\007",end="",flush=True)\n'
+                    ' time.sleep(.1)\n', str(title_file)]
                 control('launch', program='foot', args=[f'--app-id=web-chat-{index}',
-                    f'--title=WhatsApp {index}', 'sleep', '90'])
+                    f'--title=WhatsApp {index}', *command])
                 trial.wait_for(lambda: trial.window_for(control, f'web-chat-{index}'))
             chats = [w for w in control()['windows'] if w['app_id'].startswith('web-chat-')]
             control('focus', chats[1]['id'])
@@ -97,10 +105,22 @@ def run():
                 description='title matches for both open chat windows')
             type_codes([108])
             target = int(status()['selected'].split(':')[1])
+            stable = status()
+            title_file.write_text('WhatsApp 0 updated')
+            trial.wait_for(lambda: trial.window_for(control, 'web-chat-2')['title'] == 'WhatsApp 0 updated',
+                description='background window title changes')
+            time.sleep(.8)
+            assert status()['results'] == stable['results'], 'Background title change shuffled the launcher'
+            assert status()['selected'] == stable['selected'], 'Background title change moved selection'
             type_codes([28])
             trial.wait_for(lambda: control()['keyboard_focus'] == target,
                 description='activate the selected chat window')
             assert len([w for w in control()['windows'] if w['app_id'].startswith('web-chat-')]) == 2
+            ipc('toggle')
+            type_codes([17, 35, 30, 20, 31])
+            trial.wait_for(lambda: any(item['title'] == 'WhatsApp 0 updated' for item in status()['results']),
+                description='reopening refreshes window titles')
+            type_codes([1])
             control('workspace',1)
             # Dismissal must return keyboard focus and leave app identities alone.
             control('focus', focused)

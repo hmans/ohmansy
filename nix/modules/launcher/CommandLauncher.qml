@@ -14,6 +14,10 @@ PanelWindow {
     // Providers contribute data; the shell owns desktop command execution.
     property var providers: [Commands.desktop]
     property var windows: (shineWindows.state.windows || []).filter(window => window.mapped !== false)
+    property var windowSnapshot: []
+    function snapshotWindows() {
+        windowSnapshot = windows.map(window => ({ id: window.id, title: window.title, app_id: window.app_id }));
+    }
     signal dismissed()
     signal commandRequested(string command)
     signal windowRequested(int windowId)
@@ -22,7 +26,7 @@ PanelWindow {
         icon: app.icon, keywords: [app.genericName || "", app.comment || "", ...(app.keywords || [])],
         provider: "applications", desktopId: app.id
     }))
-    readonly property var windowItems: windows.map(window => {
+    readonly property var windowItems: windowSnapshot.map(window => {
         const appId = window.app_id || "";
         const app = applicationItems.find(item => item.desktopId.toLowerCase().replace(/\.desktop$/, "") === appId.toLowerCase().replace(/\.desktop$/, ""));
         return { id: "window:" + window.id, windowId: window.id,
@@ -90,20 +94,16 @@ PanelWindow {
             onRead: data => {
                 try {
                     const reply = JSON.parse(data);
-                    if (reply.ok) shineWindows.state = reply.state;
+                    if (reply.ok) {
+                        shineWindows.state = reply.state;
+                        if (launcher.opened) launcher.snapshotWindows();
+                    }
                     else launcher.error = "Could not switch to the window. Try again.";
                 } catch (error) { console.warn("Launcher windows:", error); }
                 shineWindows.connected = false;
                 if (shineWindows.request) Qt.callLater(() => shineWindows.connected = true);
             }
         }
-    }
-    Timer {
-        interval: 250
-        running: launcher.opened && !!shineWindows.path
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: if (!shineWindows.connected) shineWindows.connected = true
     }
     Process {
         id: launch
@@ -117,6 +117,13 @@ PanelWindow {
     onOpenedChanged: if (opened) {
         search.clear();
         selectedId = "";
+        // Hold names and order steady while choosing. Window titles can change
+        // continuously (terminal spinners, browser unread counts, downloads).
+        snapshotWindows();
+        if (shineWindows.path) {
+            shineWindows.request = { action: "status" };
+            if (!shineWindows.connected) shineWindows.connected = true;
+        }
         Qt.callLater(() => search.forceActiveFocus());
     }
     Ui.ColorPalette { id: launcherColors; dark: Qt.styleHints.colorScheme === Qt.ColorScheme.Dark }
