@@ -543,6 +543,8 @@ mod tests {
             "[animations]\nduration_ms=5001",
             "[decorations]\ncorner_radius=129",
             "[decorations]\nfocus_ring_width=17",
+            "[decorations]\ninactive_ring_width=17",
+            "[decorations]\ninactive_ring_color=[0.0,nan,0.0,1.0]",
             "[decorations]\nfocus_ring_color=[1.1,0.5,0.5,1.0]",
             "[decorations]\nfocus_ring_color=[0.5,0.5,0.5,nan]",
             "[decorations.shadow]\nsoftness=0",

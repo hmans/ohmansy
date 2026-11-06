@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import shutil
 
 import compositor_support as trial
 
@@ -40,6 +41,24 @@ def run():
     command += ['--test-input', '--config', str(artifacts / 'config.toml'), '--control-socket', control.path, '--close-after', '60', '--report', str(artifacts / 'state.json')]
     environment = os.environ.copy()
     environment['XDG_CACHE_HOME'] = str(artifacts / 'cache')
+    data = artifacts / 'data'
+    services = data / 'dbus-1/services'
+    services.mkdir(parents=True)
+    applications = data / 'applications'
+    applications.mkdir()
+    helper = artifacts / 'environment-probe'
+    helper.write_text(f'#!{sys.executable}\nimport json,os,pathlib,sys\n'
+                      'pathlib.Path(sys.argv[1]).write_text(json.dumps({k:os.environ.get(k) for k in '
+                      '["DISPLAY","WAYLAND_DISPLAY","DBUS_SESSION_BUS_ADDRESS"]}))\n'
+                      f'os.execl({shutil.which("dbus-test-tool")!r}, "dbus-test-tool", "echo", "--name=org.ohmansy.X11Probe") if len(sys.argv)>2 else None\n')
+    helper.chmod(0o700)
+    (services / 'org.ohmansy.X11Probe.service').write_text(
+        '[D-BUS Service]\nName=org.ohmansy.X11Probe\n'
+        f'Exec={helper} {artifacts / "bus-environment.json"} own\n')
+    (applications / 'shine-x11-probe.desktop').write_text(
+        '[Desktop Entry]\nType=Application\nName=Xyzprobe\n'
+        f'Exec={helper} {artifacts / "launcher-environment.json"}\n')
+    environment['XDG_DATA_HOME'] = str(data)
     shortcut = ('super', 'alt')
     with (artifacts / 'session.log').open('w') as log:
         process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
@@ -49,15 +68,23 @@ def run():
             probe = artifacts / 'child-environment.json'
             code = ('import json,os,pathlib; '
                     f'pathlib.Path({str(probe)!r}).write_text(json.dumps('
-                    '{k:os.environ.get(k) for k in ["DBUS_SESSION_BUS_ADDRESS","WAYLAND_DISPLAY","SSH_AUTH_SOCK"]}))')
+                    '{k:os.environ.get(k) for k in ["DBUS_SESSION_BUS_ADDRESS","WAYLAND_DISPLAY","DISPLAY","SSH_AUTH_SOCK"]}))')
             control('launch', program=sys.executable, args=['-c', code])
             trial.wait_for(probe.exists, description='nested child environment')
             child = json.loads(probe.read_text())
             assert child['DBUS_SESSION_BUS_ADDRESS'] != os.environ.get('DBUS_SESSION_BUS_ADDRESS'), child
             assert child['DBUS_SESSION_BUS_ADDRESS'] != f'unix:path={os.environ["XDG_RUNTIME_DIR"]}/bus', child
             assert child['WAYLAND_DISPLAY'] == state['wayland_display'], child
+            assert child['DISPLAY'] and child['DISPLAY'] != original_environment.get('DISPLAY'), child
             assert child['SSH_AUTH_SOCK'] == os.environ.get('SSH_AUTH_SOCK'), child
             ipc_environment = dict(environment, WAYLAND_DISPLAY=state['wayland_display'])
+            ipc_environment['DBUS_SESSION_BUS_ADDRESS'] = child['DBUS_SESSION_BUS_ADDRESS']
+            subprocess.run(['dbus-send', '--session', '--print-reply', '--dest=org.freedesktop.DBus',
+                '/org/freedesktop/DBus', 'org.freedesktop.DBus.StartServiceByName',
+                'string:org.ohmansy.X11Probe', 'uint32:0'], env=ipc_environment, check=True, capture_output=True, timeout=15)
+            bus_environment = json.loads((artifacts / 'bus-environment.json').read_text())
+            assert bus_environment['DISPLAY'] == child['DISPLAY'], bus_environment
+            assert bus_environment['WAYLAND_DISPLAY'] == child['WAYLAND_DISPLAY'], bus_environment
             def launcher_status():
                 instances = json.loads(subprocess.check_output(
                     ['quickshell', 'list', '--all', '--json'], env=ipc_environment, text=True))
@@ -73,6 +100,19 @@ def run():
             terminal = trial.wait_for(lambda: next((window for window in control()['windows'] if window['app_id'] == 'foot'), None), description='normal session terminal')
             # Pixel dimensions round fractional products to whole pixels.
             trial.wait_for(lambda: abs(next(window for window in control()['windows'] if window['id'] == terminal['id'])['render_density'] - control()['display_scale']) < .01, description='monitor-matched session terminal')
+            # Inspect Foot's initial environment without typing commands into it.
+            candidates = []
+            for path in Path('/proc').glob('[0-9]*/environ'):
+                try:
+                    entries = dict(item.split(b'=', 1) for item in path.read_bytes().split(b'\0') if b'=' in item)
+                    if (entries.get(b'WAYLAND_DISPLAY') == child['WAYLAND_DISPLAY'].encode()
+                            and entries.get(b'DBUS_SESSION_BUS_ADDRESS') == child['DBUS_SESSION_BUS_ADDRESS'].encode()
+                            and entries.get(b'XDG_RUNTIME_DIR') == environment['XDG_RUNTIME_DIR'].encode()
+                            and (path.parent / 'comm').read_text().strip() == 'foot'):
+                        candidates.append(entries)
+                except (OSError, ValueError):
+                    pass
+            assert candidates and all(item.get(b'DISPLAY') == child['DISPLAY'].encode() for item in candidates)
             if original_focus is not None:
                 trial.focus_parent_window(original_focus)
             trial.keys(control, pid, terminal['id'], [32], shortcut)
@@ -83,6 +123,14 @@ def run():
             control.send_keys([1])
             trial.wait_for(lambda: not launcher_status()['opened'], description='picker closing')
             trial.wait_for(lambda: control()['keyboard_focus'] == terminal['id'], description='picker restores app focus')
+            trial.keys(control, pid, terminal['id'], [57], shortcut)
+            trial.wait_for(lambda: launcher_status()['opened'], description='environment probe picker')
+            control.send_keys([45, 21, 44, 25, 19, 24, 48, 18])  # xyzprobe
+            trial.wait_for(lambda: launcher_status().get('selected') == 'app:shine-x11-probe', description='probe app search')
+            control.send_keys([28])
+            trial.wait_for(lambda: (artifacts / 'launcher-environment.json').exists(), description='GIO launcher environment')
+            launched = json.loads((artifacts / 'launcher-environment.json').read_text())
+            assert launched['DISPLAY'] == child['DISPLAY'], launched
             trial.keys(control, pid, terminal['id'], [18], shortcut + ('shift',))
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='sign-out confirmation')
             control.send_keys([28])
@@ -113,6 +161,7 @@ def run():
         'confirmed_logout': True, 'original_windows_preserved': True,
         'parent_activation_environment_preserved': True,
         'private_bus_and_inherited_agent': True,
+        'x11_terminal_launcher_and_dbus_environment': True,
     }, indent=2) + '\n')
     print('PASS: packaged session, monitor-matched terminal, application picker, cancel/confirm sign-out, parent desktop preservation')
 

@@ -30,6 +30,20 @@ impl PointerGrab<Smallvil> for MoveSurfaceGrab {
 
         let delta = event.location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
+        if let Some(id) = data.window_id(self.window.toplevel().unwrap().wl_surface()) {
+            if let Some(owner) = data.layout.owner(id) {
+                if data.layout.monitors[owner].layout.floating(id).is_some() {
+                    let origin = data.layout.monitors[owner].origin;
+                    data.layout.monitors[owner].layout.move_floating(
+                        id,
+                        new_location.x.round() as i32 - origin.0,
+                        new_location.y.round() as i32 - origin.1,
+                    );
+                    data.apply_positions();
+                    return;
+                }
+            }
+        }
         let location = data
             .space
             .element_location(&self.window)

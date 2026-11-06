@@ -24,7 +24,7 @@ def run():
     app.chmod(0o755)
     (data / 'ohmansy-launcher-test.desktop').write_text(
         '[Desktop Entry]\nType=Application\nName=Launcher Test Application\n'
-        f'Exec={app}\nIcon=utilities-terminal\nKeywords=probe;\n')
+        f'Exec={app}\nStartupWMClass=launcher-test-app\nIcon=utilities-terminal\nKeywords=probe;\n')
     (data / 'ohmansy-launcher-broken.desktop').write_text(
         '[Desktop Entry]\nType=Application\nName=zzbrokenlaunchertest\n'
         'Exec=/nonexistent/ohmansy-launcher-test\n')
@@ -65,6 +65,21 @@ def run():
             trial.wait_for(marker.exists, description='GIO desktop activation')
             trial.wait_for(lambda: trial.window_for(control, 'launcher-test-app'), description='launched app')
             assert not status()['opened']
+            # Selecting a running app reveals its existing window on another
+            # workspace instead of executing its desktop entry again.
+            launched = trial.window_for(control, 'launcher-test-app')['id']
+            control('focus', launched)
+            control('move-workspace', 2)
+            control('workspace', 1)
+            marker.unlink()
+            ipc('toggle')
+            trial.wait_for(lambda: status()['opened'])
+            type_codes([38,20,30])
+            type_codes([28])
+            trial.wait_for(lambda: control()['workspace']==2 and control()['keyboard_focus']==launched, description='launcher reveals running app')
+            assert not marker.exists(), 'Launcher started a duplicate app'
+            assert len([w for w in control()['windows'] if w['app_id']=='launcher-test-app'])==1
+            control('workspace',1)
             # Dismissal must return keyboard focus and leave app identities alone.
             control('focus', focused)
             before = {w['id'] for w in control()['windows']}

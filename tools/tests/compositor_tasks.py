@@ -68,7 +68,9 @@ def run():
             control('launch', program='foot', args=['--app-id=task-chat', '--title=chat', 'sleep', '90'])
             trial.wait_for(lambda: len(control()['windows']) == 3)
             trial.wait_for(lambda: all(w['workspace'] == 2 for w in control()['windows'] if w['app_id'] == 'task-chat'))
-            assert control()['keyboard_focus'] == dev, 'Background launches must preserve focus'
+            newest=max(w['id'] for w in control()['windows'] if w['app_id']=='task-chat')
+            trial.wait_for(lambda: control()['keyboard_focus']==newest, description='new task-routed window receives focus')
+            assert control()['workspace']==2
             control('task', id='chat')
             assert control()['workspace'] == 2
             control.send_keys([32], ('super',))  # Mod+D targets the stable dev ID.

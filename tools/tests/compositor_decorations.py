@@ -66,6 +66,7 @@ enabled=false
 [decorations]
 corner_radius={radius}
 focus_ring_width={width}
+inactive_ring_width=0 # This trial isolates the active ring; window_policy checks both.
 focus_ring_color={color}
 [decorations.shadow]
 enabled=false

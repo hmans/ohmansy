@@ -71,12 +71,28 @@ and a default limit of 30 FPS.
 Rebuild the installed machine configuration with the updated sources, preserving
 its hardware and account configuration. Then log out and back in: the running
 compositor cannot gain a new Wayland protocol through a portal restart. The
-session wrapper imports `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`,
+session wrapper imports `DISPLAY`, `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`,
 `XDG_SESSION_DESKTOP` and `XDG_SESSION_TYPE` into D-Bus and systemd after its
 Wayland socket is ready, then queues restarts of active portal services without
 waiting for them. Waiting here would deadlock startup because portals need
 Wayland replies from the compositor's event loop. No reboot
 is needed for the screen-sharing change alone.
+
+Shine sessions start their own `xwayland-satellite` for X11 applications such as
+Steam. Shine selects an unused X display; satellite signals readiness while Shine
+continues dispatching Wayland requests. Only then does Shine accept launch
+requests, publish `DISPLAY` to D-Bus and systemd, and start the shell and apps.
+Terminals and launcher apps inherit that display. Nested sessions own a separate
+X server and activation bus, preserving the host environment. Sign-out stops the
+bridge and its X server; compositor termination also ends the bridge. X11 TCP
+listening is disabled. The packaged session includes satellite explicitly.
+
+Use `python3 tools/tests/compositor_xwayland.py` inside `nix develop .#spatial`
+to test X11 pixels, keyboard and pointer input, stale-display isolation and
+shutdown on the private headless display. `compositor_session.py` also checks
+the packaged terminal, launcher/GIO and D-Bus activation environments. A running
+compositor needs a planned login restart after rebuilding to receive this code;
+existing terminals retain the environment with which they were started.
 
 For later portal-configuration-only changes, restarting
 `xdg-desktop-portal-wlr.service`, `xdg-desktop-portal-gtk.service` and then
@@ -277,10 +293,11 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+R / Mod+Shift+R | Cycle column widths through 33⅓%, 50%, and 66⅔%, forward/backward |
 | Mod+1–4 | Switch workspace |
 | Mod+Up / Mod+Down | Cycle to the previous/next workspace, wrapping at either end |
-| Mod+Shift+Up / Mod+Shift+Down | Move the focused window to the previous/next workspace, wrapping at either end |
+| Mod+Shift+Up / Mod+Shift+Down | Move to the previous/next workspace and follow the window, wrapping at either end |
 | Mod+Enter | Open a terminal |
 | Mod+E | Open Files |
 | Mod+Space | Open the application picker |
+| Mod+Shift+Space | Toggle the focused window between floating and tiled |
 | Mod+F | Toggle 100% working width, restoring the previous width |
 | Mod+Shift+F | Toggle fullscreen |
 | Mod+W | Close the focused window |
@@ -289,6 +306,22 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Shift+Print | Capture the focused monitor and open Satty for annotation |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
+
+Selecting an app in the launcher first looks for an existing mapped window using
+the desktop ID or `StartupWMClass`. Shine brings it into view on its monitor and
+workspace; otherwise GIO starts the app normally. New windows receive focus when
+their first buffer maps, after workspace placement. Closing a window focuses its
+left neighbor, with a right-neighbor fallback for the first column. Closing a
+floating dialog returns focus to its parent when available.
+
+Transient dialogs and fixed-size windows float at a bounded size inside the
+monitor's work area. Dialogs start centered over their parent, stay above tiled
+windows, and accompany their parent on workspace and monitor moves. Client
+move/resize requests operate on floating geometry; tiled movement keeps its
+column behavior. Menus and tooltips continue using xdg popups and popup grabs.
+`Mod+Shift+Space` also floats or tiles an ordinary window. Both window types use
+the active focus ring and a quieter inactive ring for contrast against wallpaper;
+`decorations.inactive_ring_width` and `inactive_ring_color` configure that ring.
 
 Copy and paste use Ctrl+C/V in ordinary apps and Ctrl+Shift+C/V in recognized
 terminals. Ctrl+C still interrupts terminal programs. Terminal copy uses the
@@ -603,7 +636,7 @@ and Shift modifiers are also supported, with exact modifier matching. Keys use
 XKB names such as Return, Left, comma, space or F6. Ctrl+Alt+F1–F12 remain reserved
 for VT switching. Key releases stay paired with intercepted presses across reloads.
 
-Actions include terminal, launcher, logout, close, maximize, fullscreen, focus-prev/next,
+Actions include terminal, launcher, logout, close, maximize, fullscreen, toggle-floating, focus-prev/next,
 move-prev/next, focus-output-prev/next, move-output-prev/next, resize, cycle-width, workspace,
 workspace-prev/next, move-workspace, move-workspace-prev/next, task, output, scale, scale-adjust, launch, reload-config and save-config. Resize
 uses `value` in logical pixels; workspace/move-workspace use 1-based indexes, output is
@@ -669,8 +702,8 @@ distinguishing terminals belonging to different tasks.
 Placement happens once, at the first window buffer commit, using the metadata
 available then. The first matching task wins. Later title changes and manual
 window moves do not trigger placement again. Apps that expose their final title
-only later need an app ID match instead. When tasks are configured, new windows
-preserve existing focus. Startup app failures do not block other apps; immediate
+only later need an app ID match instead. New windows receive focus after task
+placement, revealing their workspace. Startup app failures do not block other apps; immediate
 launch errors appear in the session log and IPC `task_startup_errors`.
 This is startup launching, not process supervision or session restoration.
 

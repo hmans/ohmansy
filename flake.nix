@@ -285,9 +285,10 @@
         let tools = import nixpkgs { system = target; overlays = [ self.overlays.default ]; };
         in { spatial = tools.mkShell {
           OHMANSY_COMPOSITOR_SHELL = "${import ./nix/modules/shine-shell.nix { pkgs = tools; }}/bin/ohmansy-shine-shell";
+          OHMANSY_XWAYLAND_SATELLITE = "${tools.xwayland-satellite}/bin/xwayland-satellite";
           packages = with tools; [ rustup pkg-config gcc tools.mise (python3.withPackages (p: [ p.pillow ])) niri weston dbus quickshell wl-clipboard xdg-user-dirs satty foot firefox gnome-text-editor mako ];
           buildInputs = with tools; [ wayland libxkbcommon libGL libgbm libdrm libinput seatd udev gtk4 ];
-          LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL ]);
+          LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL libx11 ]);
           OHMANSY_SPATIAL_FONT = "${tools.inter}/share/fonts/truetype/Inter.ttc";
           shellHook = ''. ${(import ./nix/modules/cursor-theme.nix { pkgs = tools; }).environment}'';
         }; default = tools.mkShell {

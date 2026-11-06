@@ -53,6 +53,7 @@ pub struct Smallvil {
     pub applied_keyboard: crate::preferences::Keyboard,
     pub window_preferences_applied: std::collections::BTreeSet<WindowId>,
     pub task_placement_applied: std::collections::BTreeSet<WindowId>,
+    pub mapped_windows: std::collections::BTreeSet<WindowId>,
     pub task_startup_errors: Vec<String>,
     pub task_settings: crate::tasks::Settings,
     pub task_config_file: Option<crate::output_config::ConfigFile>,
@@ -64,7 +65,7 @@ pub struct Smallvil {
     pub native_mode: bool,
     pub vt_request: Option<i32>,
     pub next_window: WindowId,
-    pub configured: BTreeMap<WindowId, (i32, i32, bool, bool)>,
+    pub configured: BTreeMap<WindowId, (i32, i32, bool, bool, bool)>,
     pub needs_redraw: bool,
     pub shortcut_keys: std::collections::BTreeSet<u32>,
     pub dmabuf_state: DmabufState,
@@ -103,6 +104,7 @@ pub struct Smallvil {
     // Smithay State
     pub compositor_state: CompositorState,
     pub xdg_shell_state: XdgShellState,
+    pub _dialog_state: smithay::wayland::shell::xdg::dialog::XdgDialogState,
     pub activation_state: smithay::wayland::xdg_activation::XdgActivationState,
     pub(crate) activation_input: crate::handlers::activation::RecentInput,
     pub layer_shell_state: smithay::wayland::shell::wlr_layer::WlrLayerShellState,
@@ -183,6 +185,7 @@ impl Smallvil {
             applied_keyboard: Default::default(),
             window_preferences_applied: Default::default(),
             task_placement_applied: Default::default(),
+            mapped_windows: Default::default(),
             task_startup_errors: Default::default(),
             task_settings: Default::default(),
             task_config_file: None,
@@ -233,6 +236,7 @@ impl Smallvil {
 
             compositor_state,
             xdg_shell_state,
+            _dialog_state: smithay::wayland::shell::xdg::dialog::XdgDialogState::new::<Self>(&dh),
             activation_state: smithay::wayland::xdg_activation::XdgActivationState::new::<Self>(
                 &dh,
             ),
@@ -409,6 +413,7 @@ impl Smallvil {
             self.configured.remove(&id);
             self.window_preferences_applied.remove(&id);
             self.task_placement_applied.remove(&id);
+            self.mapped_windows.remove(&id);
         }
         let specs = outputs
             .iter()
@@ -487,11 +492,8 @@ impl Smallvil {
         let id = self.next_window;
         self.next_window += 1;
         self.windows.insert(id, window);
-        if self.task_settings.workspaces.is_empty() {
-            self.layout.insert(id);
-        } else {
-            self.layout.insert_unfocused(id);
-        }
+        // Surface creation is not mapping: metadata and the buffer arrive later.
+        self.layout.insert_unfocused(id);
         self.relayout();
         self.sync_focus();
     }
@@ -516,7 +518,11 @@ impl Smallvil {
             };
             let fullscreen = self.layout.fullscreen_for(id);
             let maximized = self.layout.maximized_for(id);
-            let configuration = (width, height, fullscreen, maximized);
+            let floating = self
+                .layout
+                .owner(id)
+                .is_some_and(|i| self.layout.monitors[i].layout.floating(id).is_some());
+            let configuration = (width, height, fullscreen, maximized, floating);
             if self.configured.get(&id) != Some(&configuration) {
                 let toplevel = window.toplevel().unwrap();
                 toplevel.with_pending_state(|state| {
@@ -527,7 +533,11 @@ impl Smallvil {
                         State::TiledTop,
                         State::TiledBottom,
                     ] {
-                        state.states.set(edge);
+                        if floating {
+                            state.states.unset(edge);
+                        } else {
+                            state.states.set(edge);
+                        }
                     }
                     if maximized {
                         state.states.set(State::Maximized);
@@ -550,10 +560,25 @@ impl Smallvil {
         if let Some(window) = self.layout.focused().and_then(|id| self.windows.get(&id)) {
             self.space.raise_element(window, false);
         }
+        // Dialogs stay above their parent even when the parent regains focus.
+        let floating: Vec<_> = self
+            .windows
+            .iter()
+            .filter(|(id, _)| {
+                self.layout
+                    .owner(**id)
+                    .is_some_and(|i| self.layout.monitors[i].layout.floating(**id).is_some())
+            })
+            .map(|(_, w)| w.clone())
+            .collect();
+        for window in floating {
+            self.space.raise_element(&window, false);
+        }
         self.needs_redraw = true;
     }
 
     pub fn sync_focus(&mut self) {
+        self.focus_modal_descendant();
         self.ui_scale = self.layout.current().scale;
         let focused = self.layout.focused();
         for (id, window) in &self.windows {
@@ -649,6 +674,7 @@ impl Smallvil {
             }
             "fullscreen" => self.layout.toggle_fullscreen(),
             "maximize" => self.layout.toggle_maximize(),
+            "toggle-floating" => self.layout.toggle_floating(),
             "focus-output-next" => self.layout.monitor_delta(1, false),
             "focus-output-prev" => self.layout.monitor_delta(-1, false),
             "move-output-next" => self.layout.monitor_delta(1, true),
@@ -726,7 +752,7 @@ impl Smallvil {
             }
         };
         let pointer = self.seat.get_pointer().unwrap().current_location();
-        let windows: Vec<_> = self.windows.iter().map(|(id, window)| {
+        let mut windows: Vec<_> = self.windows.iter().map(|(id, window)| {
             // Popup lookup accesses surface state too; do it before taking
             // the surface-state lock used for client metadata.
             let popups = PopupManager::popups_for_surface(window.toplevel().unwrap().wl_surface()).count();
@@ -752,6 +778,16 @@ impl Smallvil {
                 serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"target_geometry":target_geometry,"moving":layout.is_some_and(|l| l.is_moving(*id)),"inactive_amount":self.inactive_amount(*id),"visual_scale":self.window_visual_scale(*id),"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
             })
         }).collect();
+        for window in &mut windows {
+            let id = window["id"].as_u64().unwrap();
+            let floating = self
+                .layout
+                .owner(id)
+                .and_then(|i| self.layout.monitors[i].layout.floating(id));
+            window["floating"] = serde_json::json!(floating.is_some());
+            window["parent"] = serde_json::json!(floating.and_then(|f| f.parent));
+            window["mapped"] = serde_json::json!(self.mapped_windows.contains(&id));
+        }
         let keyboard_focus = self
             .seat
             .get_keyboard()

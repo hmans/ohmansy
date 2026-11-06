@@ -9,6 +9,96 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine window focus, launcher reuse and floating dialogs (2026-11-06)
+
+The launcher helper first sends a display-scoped `activate-app` IPC request,
+matching exact app IDs or a desktop entry's StartupWMClass (case-insensitive).
+A mapped match is revealed on its monitor/workspace; otherwise the existing
+GIO launcher path runs. This applies to Shine while the shared helper retains
+normal launching in other desktops. The helper uses Python's standard library
+and resolves desktop IDs through XDG application directories.
+
+New windows receive focus on their first buffer map, after task placement.
+This intentionally replaces the earlier task-configured behavior that kept new
+windows unfocused. Closing a focused window chooses its left neighbor, falling
+back right when needed. Explicit numbered/adjacent workspace moves follow the
+window, including wraparound. Existing activation tokens still protect requests
+from applications trying to activate an already mapped surface on their own.
+
+Transient and fixed-size toplevels float. `Mod+Shift+Space` toggles ordinary
+windows between floating and tiled. Floating geometry is bounded to the work
+area; dialogs initially center over their parent and use the actual first mapped
+client size. Client titlebar move/resize requests update floating geometry rather
+than reordering columns. Parent/dialog families move together across workspaces
+and monitors, and dialog close restores parent focus. The xdg-dialog-v1 protocol
+supplies modal hints; selecting a modal parent redirects focus to its mapped
+dialog. Menus/tooltips retain the existing xdg-popup/grab path. Floating state
+and parent IDs appear in IPC window status. Source: `layout.rs`, `desktop.rs`,
+`window_policy.rs`, compositor commit handling and the existing pointer grabs.
+
+Unfocused windows have a quiet neutral ring by default, configured with
+`decorations.inactive_ring_width` and `inactive_ring_color`. Both ring styles
+share the existing rounded renderer. The decoration and inactive-effect trials
+explicitly disable inactive rings when isolating older pixel assertions; the
+new window-policy trial checks both styles together.
+
+Verified 53 Rust tests, formatting and strict Clippy; final session package built.
+Private headless trials passed actual GTK modal/dialog keyboard and pointer
+input, titlebar dragging, float/tile and maximize/restore, close-left focus,
+workspace following, desktop alias activation without duplication, hide/remap,
+parent/dialog moves across two outputs and active/inactive ring pixels. The real
+launcher trial reselects an app on a hidden workspace and proves its desktop
+entry was not executed twice. Monitor, browser/GTK popup/grab/clipboard/cursor,
+decoration, inactive-effect, packaged-session and X11 regression checks passed.
+Packaged terminal environment probes must match runtime directory and D-Bus bus,
+not just WAYLAND_DISPLAY, which can repeat across isolated concurrent trials.
+
+The running login compositor was not replaced and no OS activation was done.
+A build/private runtime trial is not an updated physical login. Rebuild the
+installed machine configuration and coordinate activation/login restart with
+the owner before changing the running compositor. The pending X11 work remains
+in the checkout as well; preserve it when reviewing or committing these changes.
+
+
+## Shine X11 session integration (2026-11-06)
+
+Shine session mode starts a session-owned xwayland-satellite, selects an
+unoccupied X display and waits for its systemd READY notification while
+continuing Wayland dispatch. Never block startup waiting for a Wayland client
+without dispatching the compositor. The IPC listener opens after readiness so
+an early launch cannot inherit a missing DISPLAY. Session wrappers explicitly
+include satellite and import DISPLAY along with Wayland/session variables into
+the login D-Bus/systemd environment, or the nested preview's private bus.
+Application and terminal spawns preserve the session DISPLAY. TCP is disabled.
+A process-group guard stops satellite and Xwayland on normal exit; parent-death
+signaling also cleans up after compositor termination. Other nested demos clear
+the parent DISPLAY and remain Wayland-only.
+
+Previously Shine started no X11 bridge, removed DISPLAY from child environments,
+and published DISPLAY= to the login activation environment. Steam failed with
+XOpenDisplay errors even though satellite was installed. Verify the compositor,
+shell, terminals and user manager separately; an agent's environment is not proof.
+
+Verified 50 Rust tests, formatting, strict Clippy and the native session package.
+The private Xlib trial (`tools/tests/compositor_xwayland.py`) checks actual green
+framebuffer pixels, key/button/expose events, stale DISPLAY isolation, normal
+shutdown and compositor termination. The packaged session trial checks terminal,
+launcher/GIO and actual D-Bus activation DISPLAY, login/logout controls and
+preserved parent activation variables. A fresh live user service inherited the
+repaired display. A temporary bridge and graceful shell-only refresh let Steam
+start in the existing physical desktop; its signed-in library/download UI was
+visually checked. The live compositor was preserved; no existing application was stopped by this work.
+Some window identities changed during concurrent user activity, so the final
+live snapshot does not prove every initial window survived.
+
+No installed-system rebuild, activation or login restart was performed: reading
+this machine's protected configuration required local sudo authentication.
+Packaged/nested tests do not prove a new physical login. Existing running
+compositors/terminals retain their old launch behavior until the installed
+configuration is rebuilt and the user coordinates a login restart. Runtime
+bridge details belong in ignored local handoff notes.
+
+
 ## Shine reload diagnostics (2026-11-06)
 
 Automatic compositor configuration reloads now log rejected edits and successful

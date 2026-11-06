@@ -218,27 +218,22 @@ impl Desktop {
             self.active_monitor = index;
             return;
         };
-        let column = self
+        let family = self.family(id);
+        let columns: Vec<_> = self
             .workspace()
             .columns
             .iter()
-            .find(|c| c.id == id)
-            .unwrap()
-            .clone();
-        self.monitors[self.active_monitor].layout.remove(id);
+            .filter(|c| family.contains(&c.id))
+            .cloned()
+            .collect();
+        for column in &columns {
+            self.monitors[self.active_monitor].layout.remove(column.id);
+        }
         self.active_monitor = index;
         let target = &mut self.monitors[index].layout;
-        target.insert(id);
-        target.set_width(id, column.width);
-        if let Some(restore) = column.restore_width {
-            target.maximize(id, true);
-            target.workspaces[target.active]
-                .columns
-                .iter_mut()
-                .find(|c| c.id == id)
-                .unwrap()
-                .restore_width = Some(restore);
-        }
+        target.workspaces[target.active].columns.extend(columns);
+        target.focus(id);
+        target.set_size(target.size);
     }
     pub fn remove(&mut self, id: WindowId) {
         for m in &mut self.monitors {
@@ -424,6 +419,19 @@ mod tests {
         assert_eq!(d.focused(), Some(2));
         assert_eq!(d.owner(1), Some(0));
         assert_eq!(d.owner(2), Some(0));
+    }
+    #[test]
+    fn monitor_moves_preserve_floating_dialog_family() {
+        let mut d = two();
+        d.insert(1);
+        d.insert(2);
+        d.set_floating(2, Some(1), (400, 200));
+        d.focus(1);
+        d.move_to_monitor(1);
+        assert_eq!(d.owner(1), Some(1));
+        assert_eq!(d.owner(2), Some(1));
+        assert_eq!(d.floating(2).unwrap().parent, Some(1));
+        assert_eq!(d.focused(), Some(1));
     }
     #[test]
     fn mixed_scale_pointer_mapping_and_short_monitor_edges() {

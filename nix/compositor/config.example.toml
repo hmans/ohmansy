@@ -34,6 +34,8 @@ default_column_width = { proportion = 0.62 }
 corner_radius = 14
 focus_ring_width = 2
 focus_ring_color = [0.55, 0.50, 0.62, 0.75] # RGBA, each from 0 to 1
+inactive_ring_width = 1
+inactive_ring_color = [0.55, 0.55, 0.60, 0.55]
 
 [decorations.shadow]
 enabled = true
@@ -65,6 +67,7 @@ easing = "ease-out" # linear, ease-in, ease-out, or ease-in-out
 "Mod+Left" = { action = "focus-prev" }
 "Mod+Right" = { action = "focus-next" }
 "Mod+Tab" = { action = "focus-next-wrap" }
+"Mod+Shift+Space" = { action = "toggle-floating" }
 "Mod+Shift+Right" = { action = "move-next" }
 "Mod+1" = { action = "workspace", value = 1 }
 "Mod+Up" = { action = "workspace-prev" }

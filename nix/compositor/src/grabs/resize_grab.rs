@@ -133,8 +133,28 @@ impl PointerGrab<Smallvil> for ResizeSurfaceGrab {
             new_window_height.max(min_height).min(max_height),
         ));
         if let Some(id) = data.window_id(self.window.toplevel().unwrap().wl_surface()) {
-            data.layout.set_width(id, self.last_window_size.w);
-            self.last_window_size.h = (data.layout.size.1 - data.layout.gap * 2).max(1);
+            let owner = data.layout.owner(id).unwrap();
+            if data.layout.monitors[owner].layout.floating(id).is_some() {
+                let origin = data.layout.monitors[owner].origin;
+                let x = self.initial_rect.loc.x - origin.0
+                    + if self.edges.intersects(ResizeEdge::LEFT) {
+                        self.initial_rect.size.w - self.last_window_size.w
+                    } else {
+                        0
+                    };
+                let y = self.initial_rect.loc.y - origin.1
+                    + if self.edges.intersects(ResizeEdge::TOP) {
+                        self.initial_rect.size.h - self.last_window_size.h
+                    } else {
+                        0
+                    };
+                let layout = &mut data.layout.monitors[owner].layout;
+                layout.resize_floating(id, self.last_window_size.w, self.last_window_size.h);
+                layout.move_floating(id, x, y);
+            } else {
+                data.layout.set_width(id, self.last_window_size.w);
+                self.last_window_size.h = (data.layout.size.1 - data.layout.gap * 2).max(1);
+            }
             data.relayout();
         }
 

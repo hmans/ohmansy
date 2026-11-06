@@ -41,7 +41,49 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
         .insert_source(receiver, |event, _, data| {
             if let channel::Event::Msg((request, response)) = event {
                 let action = request["action"].as_str().unwrap_or("status");
-                let result = if action == "pointer" {
+                let mut app_activated = false;
+                let result = if action == "activate-app" {
+                    let names: Vec<_> = request["app_ids"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|v| v.as_str())
+                        .map(|s| s.trim_end_matches(".desktop").to_lowercase())
+                        .collect();
+                    let id = data.state.windows.iter().rev().find_map(|(id, w)| {
+                        if request["wayland_display"].as_str() != data.state.socket_name.to_str() {
+                            return None;
+                        }
+                        if !data.state.mapped_windows.contains(id) {
+                            return None;
+                        }
+                        smithay::wayland::compositor::with_states(
+                            w.toplevel().unwrap().wl_surface(),
+                            |states| {
+                                let metadata = states
+                                    .data_map
+                                    .get::<smithay::wayland::shell::xdg::XdgToplevelSurfaceData>()?
+                                    .lock()
+                                    .unwrap();
+                                metadata
+                                    .app_id
+                                    .as_ref()
+                                    .filter(|app| {
+                                        names.contains(
+                                            &app.trim_end_matches(".desktop").to_lowercase(),
+                                        )
+                                    })
+                                    .map(|_| *id)
+                            },
+                        )
+                    });
+                    if let Some(id) = id {
+                        data.state.layout.focus(id);
+                        data.state.sync_focus();
+                        app_activated = true;
+                    }
+                    Ok(())
+                } else if action == "pointer" {
                     if !data.state.test_input {
                         Err("Test input is disabled".into())
                     } else if let (Some(x), Some(y)) =
@@ -171,6 +213,7 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                     Ok(()) => {
                         let mut state = data.state.status();
                         state["screenshot"] = json!(data.state.capture.last);
+                        state["app_activated"] = json!(app_activated);
                         json!({"ok":true,"state":state})
                     }
                     Err(error) => json!({"ok":false,"error":error}),

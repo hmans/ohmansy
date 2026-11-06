@@ -122,6 +122,8 @@ pub struct Decorations {
     pub corner_radius: u32,
     pub focus_ring_width: u32,
     pub focus_ring_color: [f32; 4],
+    pub inactive_ring_width: u32,
+    pub inactive_ring_color: [f32; 4],
     pub shadow: Shadow,
     pub inactive: Inactive,
 }
@@ -131,6 +133,8 @@ impl Default for Decorations {
             corner_radius: 14,
             focus_ring_width: 2,
             focus_ring_color: [0.55, 0.50, 0.62, 0.75],
+            inactive_ring_width: 1,
+            inactive_ring_color: [0.55, 0.55, 0.60, 0.55],
             shadow: Shadow::default(),
             inactive: Inactive::default(),
         }
@@ -138,17 +142,16 @@ impl Default for Decorations {
 }
 impl Decorations {
     pub fn validate(&self) -> Result<(), String> {
-        if self.corner_radius > 128 || self.focus_ring_width > 16 {
-            return Err(
-                "Corner radius must be 0–128 and focus ring width 0–16 logical pixels".into(),
-            );
+        if self.corner_radius > 128 || self.focus_ring_width > 16 || self.inactive_ring_width > 16 {
+            return Err("Corner radius must be 0–128 and ring widths 0–16 logical pixels".into());
         }
         if self
             .focus_ring_color
             .iter()
+            .chain(self.inactive_ring_color.iter())
             .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
         {
-            return Err("Focus ring color needs four RGBA values from 0 to 1".into());
+            return Err("Ring colors need four RGBA values from 0 to 1".into());
         }
         self.inactive.validate()?;
         self.shadow.validate()
@@ -330,6 +333,7 @@ pub enum Action {
     MoveNext,
     Fullscreen,
     Maximize,
+    ToggleFloating,
     Terminal,
     Launcher,
     Logout,
@@ -439,6 +443,7 @@ impl Action {
                     MoveNext => "move-next",
                     Fullscreen => "fullscreen",
                     Maximize => "maximize",
+                    ToggleFloating => "toggle-floating",
                     Terminal => "terminal",
                     Launcher => "launcher",
                     Logout => "logout",
@@ -564,6 +569,7 @@ pub fn bindings(
         ("Shift+Print".into(), Screenshot { annotate: true }),
         ("Mod+Return".to_owned(), Terminal),
         ("Mod+Space".into(), Launcher),
+        ("Mod+Shift+Space".into(), ToggleFloating),
         (
             "Mod+E".into(),
             Launch {

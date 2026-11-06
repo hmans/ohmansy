@@ -28,7 +28,7 @@ let
     if [ "$OHMANSY_COMPOSITOR_SESSION_KIND" = login ]; then
       printf '%s\n' "$WAYLAND_DISPLAY" > "$OHMANSY_COMPOSITOR_SESSION_STATE"
       ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd \
-        DISPLAY= WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
+        DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
         XDG_SESSION_TYPE SSH_AUTH_SOCK
       ${pkgs.lib.optionalString enableKeyring ''
         # PAM unlocks a login-mode daemon. Finish its initialization before
@@ -46,7 +46,7 @@ let
     fi
     # A preview must never replace the parent desktop's activation environment.
     exec ${pkgs.dbus}/bin/dbus-update-activation-environment \
-      WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE
+      DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE
   '';
   cleanup = pkgs.writeShellScript "ohmansy-compositor-session-cleanup" ''
     set -eu
@@ -105,6 +105,7 @@ let
     export OHMANSY_COMPOSITOR_LAUNCHER=${launcher}
     export OHMANSY_COMPOSITOR_LOGOUT=${logout}
     export OHMANSY_COMPOSITOR_SESSION_SETUP=${setup}
+    export OHMANSY_XWAYLAND_SATELLITE=${pkgs.xwayland-satellite}/bin/xwayland-satellite
     export OHMANSY_COMPOSITOR_SHELL=${shell}/bin/ohmansy-shine-shell
     if [ "$OHMANSY_COMPOSITOR_SESSION_KIND" = nested ]; then
       exec ${pkgs.dbus}/bin/dbus-run-session -- \

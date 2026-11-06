@@ -20,7 +20,9 @@ mod screencopy;
 mod screenshot;
 mod state;
 mod tasks;
+mod window_policy;
 mod winit;
+mod xwayland;
 
 use anyhow::{Context, Result};
 use smithay::reexports::{
@@ -65,7 +67,6 @@ pub fn spawn_application_with_env(
         .envs(environment)
         .env("WAYLAND_DISPLAY", socket)
         .env_remove("WAYLAND_SOCKET")
-        .env_remove("DISPLAY")
         .env_remove("NIRI_SOCKET")
         .env("MOZ_ENABLE_WAYLAND", "1")
         .env("GDK_BACKEND", "wayland")
@@ -138,7 +139,6 @@ pub fn spawn_terminal(socket: &std::ffi::OsStr, demo: bool) -> Result<()> {
     command
         .env("WAYLAND_DISPLAY", socket)
         .env_remove("WAYLAND_SOCKET")
-        .env_remove("DISPLAY")
         .env_remove("NIRI_SOCKET")
         .env("XDG_CURRENT_DESKTOP", "ohmansy-lab")
         .args(["--app-id=ohmansy-nested-client", "--title=Shine terminal"]);
@@ -350,7 +350,6 @@ fn main() -> Result<()> {
         PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").unwrap())
             .join(format!("ohmansy-compositor-{}.sock", std::process::id()))
     });
-    let _control = ipc::start(&event_loop, control_path.clone())?;
     std::env::set_var("OHMANSY_COMPOSITOR_CONTROL", &control_path);
     eprintln!("Control socket: {}", control_path.display());
 
@@ -365,12 +364,34 @@ fn main() -> Result<()> {
     if let Some(path) = &socket_file {
         std::fs::write(path, data.state.socket_name.to_string_lossy().as_bytes())?;
     }
+    // Never pass a parent compositor's X display into a nested session.
+    std::env::remove_var("DISPLAY");
+    let mut satellite = if session_mode {
+        Some(xwayland::Satellite::start(&data.state.socket_name)?)
+    } else {
+        None
+    };
+    if let Some(satellite) = satellite.as_mut() {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !satellite.ready()? {
+            anyhow::ensure!(
+                Instant::now() < deadline,
+                "Xwayland satellite readiness timed out"
+            );
+            event_loop.dispatch(Some(Duration::from_millis(10)), &mut data)?;
+            native::dispatch(&mut data);
+            data.display_handle.flush_clients()?;
+        }
+        std::env::set_var("DISPLAY", &satellite.display);
+        eprintln!("Xwayland satellite ready on {}", satellite.display);
+    }
+    // Launch requests must not race satellite readiness and inherit no DISPLAY.
+    let _control = ipc::start(&event_loop, control_path.clone())?;
     if !client.is_empty() {
         let child = std::process::Command::new(&client[0])
             .args(&client[1..])
             .env("WAYLAND_DISPLAY", &data.state.socket_name)
             .env_remove("WAYLAND_SOCKET")
-            .env_remove("DISPLAY")
             .env_remove("NIRI_SOCKET")
             .spawn()?;
         std::thread::spawn(move || {

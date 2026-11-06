@@ -300,13 +300,18 @@ impl Smallvil {
                 }
             }
             let style = &self.output_settings.decorations;
-            if !fullscreen
-                && self.layout.focused() == Some(id)
-                && style.focus_ring_width > 0
-                && self.seat.get_keyboard().unwrap().current_focus().is_some()
-            {
-                for ring in decorations.ring(id, bounds, style, scale) {
-                    visual.push(WindowVisual::Decoration(ring));
+            if !fullscreen {
+                let mut ring_style = style.clone();
+                if self.layout.focused() != Some(id)
+                    || self.seat.get_keyboard().unwrap().current_focus().is_none()
+                {
+                    ring_style.focus_ring_width = style.inactive_ring_width;
+                    ring_style.focus_ring_color = style.inactive_ring_color;
+                }
+                if ring_style.focus_ring_width > 0 {
+                    for ring in decorations.ring(id, bounds, &ring_style, scale) {
+                        visual.push(WindowVisual::Decoration(ring));
+                    }
                 }
             }
             for element in render_elements_from_surface_tree::<

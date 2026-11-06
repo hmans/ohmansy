@@ -19,6 +19,14 @@ pub struct Column {
     pub id: WindowId,
     pub width: i32,
     pub restore_width: Option<i32>,
+    pub floating: Option<Floating>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Floating {
+    pub parent: Option<WindowId>,
+    pub geometry: (i32, i32, i32, i32),
+    pub restore_geometry: Option<(i32, i32, i32, i32)>,
 }
 
 #[derive(Default, Debug)]
@@ -91,6 +99,7 @@ impl Layout {
                 id,
                 width: width.max(200),
                 restore_width: None,
+                floating: None,
             },
         );
         workspace.focused = Some(id);
@@ -108,16 +117,33 @@ impl Layout {
                 .focused
                 .and_then(|focused| workspace.columns.iter().position(|c| c.id == focused));
             let removed = workspace.columns.remove(index);
-            if focused_index.is_some_and(|focused| index < focused) {
+            if removed.floating.is_none() && focused_index.is_some_and(|focused| index < focused) {
                 let shift = (removed.width + self.gap) as f64;
                 workspace.scroll = (workspace.scroll - shift).max(0.0);
                 workspace.target = (workspace.target - shift).max(0.0);
             }
             if workspace.focused == Some(id) {
-                workspace.focused = workspace
-                    .columns
-                    .get(index.min(workspace.columns.len().saturating_sub(1)))
-                    .map(|c| c.id);
+                workspace.focused = removed
+                    .floating
+                    .and_then(|f| f.parent)
+                    .filter(|parent| workspace.columns.iter().any(|c| c.id == *parent))
+                    .or_else(|| {
+                        workspace
+                            .columns
+                            .get(
+                                index
+                                    .saturating_sub(1)
+                                    .min(workspace.columns.len().saturating_sub(1)),
+                            )
+                            .map(|c| c.id)
+                    });
+            }
+            for column in &mut workspace.columns {
+                if let Some(floating) = &mut column.floating {
+                    if floating.parent == Some(id) {
+                        floating.parent = None;
+                    }
+                }
             }
             if workspace.fullscreen == Some(id) {
                 workspace.fullscreen = None;
@@ -171,6 +197,13 @@ impl Layout {
     }
 
     pub fn resize(&mut self, delta: i32) {
+        if let Some((id, geometry)) = self
+            .focused()
+            .and_then(|id| self.floating(id).map(|f| (id, f.geometry)))
+        {
+            self.resize_floating(id, (geometry.2 + delta).max(1), geometry.3);
+            return;
+        }
         self.finish_movements();
         let focused = self.focused();
         let max_width = (self.size.0 * 2).max(200);
@@ -186,13 +219,24 @@ impl Layout {
     }
 
     pub fn reorder(&mut self, delta: i32) {
+        if self.focused().is_some_and(|id| self.floating(id).is_some()) {
+            return;
+        }
         let workspace = self.workspace();
         if let Some(index) = workspace
             .columns
             .iter()
             .position(|c| Some(c.id) == workspace.focused)
         {
-            let next = (index as i32 + delta).clamp(0, workspace.columns.len() as i32 - 1) as usize;
+            let tiled: Vec<_> = workspace
+                .columns
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c.floating.is_none())
+                .map(|(i, _)| i)
+                .collect();
+            let position = tiled.iter().position(|i| *i == index).unwrap();
+            let next = tiled[(position as i32 + delta).clamp(0, tiled.len() as i32 - 1) as usize];
             if index == next {
                 return;
             }
@@ -214,7 +258,9 @@ impl Layout {
                         0.0
                     };
                     let position = x + offset;
-                    x += (column.width + self.gap) as f64;
+                    if column.floating.is_none() {
+                        x += (column.width + self.gap) as f64;
+                    }
                     (column.id, position)
                 })
                 .collect();
@@ -233,7 +279,9 @@ impl Layout {
                                 .insert(column.id, Movement { from, elapsed: 0.0 });
                         }
                     }
-                    x += (column.width + self.gap) as f64;
+                    if column.floating.is_none() {
+                        x += (column.width + self.gap) as f64;
+                    }
                 }
             } else {
                 workspace.movements.clear();
@@ -316,6 +364,22 @@ impl Layout {
         self.finish_movements();
         for workspace in &mut self.workspaces {
             if let Some(column) = workspace.columns.iter_mut().find(|column| column.id == id) {
+                if let Some(f) = &mut column.floating {
+                    if enabled {
+                        f.restore_geometry.get_or_insert(f.geometry);
+                        column.restore_width.get_or_insert(column.width);
+                        f.geometry = (
+                            self.work_area.0 + self.gap,
+                            self.work_area.1 + self.gap,
+                            (self.work_area.2 - 2 * self.gap).max(1),
+                            (self.work_area.3 - 2 * self.gap).max(1),
+                        );
+                    } else if let Some(geometry) = f.restore_geometry.take() {
+                        f.geometry = geometry;
+                        column.restore_width = None;
+                    }
+                    continue;
+                }
                 if enabled {
                     column.restore_width.get_or_insert(column.width);
                     column.width = (self.work_area.2 - 2 * self.gap).max(200);
@@ -364,19 +428,141 @@ impl Layout {
         let Some(id) = self.focused() else {
             return;
         };
-        let Some(column) = self
+        let family = self.family(id);
+        let columns: Vec<_> = self
             .workspace()
             .columns
             .iter()
-            .find(|c| c.id == id)
+            .filter(|c| family.contains(&c.id))
             .cloned()
-        else {
-            return;
-        };
-        self.remove(id);
+            .collect();
+        for column in &columns {
+            self.remove(column.id);
+        }
         let destination = &mut self.workspaces[index];
-        destination.columns.push(column);
+        destination.columns.extend(columns);
         destination.focused = Some(id);
+        self.active = index;
+        self.reveal();
+    }
+
+    pub fn floating(&self, id: WindowId) -> Option<&Floating> {
+        self.workspaces
+            .iter()
+            .flat_map(|w| &w.columns)
+            .find(|c| c.id == id)?
+            .floating
+            .as_ref()
+    }
+
+    pub fn family(&self, id: WindowId) -> Vec<WindowId> {
+        let mut id = id;
+        for _ in 0..self
+            .workspaces
+            .iter()
+            .map(|w| w.columns.len())
+            .sum::<usize>()
+        {
+            let Some(parent) = self.floating(id).and_then(|f| f.parent) else {
+                break;
+            };
+            id = parent;
+        }
+        let mut ids = vec![id];
+        loop {
+            let count = ids.len();
+            for column in self.workspaces.iter().flat_map(|w| &w.columns) {
+                if !ids.contains(&column.id)
+                    && column
+                        .floating
+                        .as_ref()
+                        .and_then(|f| f.parent)
+                        .is_some_and(|p| ids.contains(&p))
+                {
+                    ids.push(column.id);
+                }
+            }
+            if ids.len() == count {
+                return ids;
+            }
+        }
+    }
+
+    pub fn resize_floating(&mut self, id: WindowId, width: i32, height: i32) {
+        let area = self.work_area;
+        if let Some(f) = self
+            .workspaces
+            .iter_mut()
+            .flat_map(|w| &mut w.columns)
+            .find(|c| c.id == id)
+            .and_then(|c| c.floating.as_mut())
+        {
+            f.geometry.2 = width.clamp(1, area.2.max(1));
+            f.geometry.3 = height.clamp(1, area.3.max(1));
+        }
+    }
+
+    pub fn set_floating(&mut self, id: WindowId, parent: Option<WindowId>, size: (i32, i32)) {
+        let area = self.work_area;
+        let anchor = parent
+            .and_then(|p| self.target_geometries().into_iter().find(|g| g.0 == p))
+            .map(|(_, x, y, w, h)| (x, y, w, h))
+            .unwrap_or(area);
+        let width = size.0.clamp(1, area.2.max(1));
+        let height = size.1.clamp(1, area.3.max(1));
+        let x = (anchor.0 + (anchor.2 - width) / 2).clamp(area.0, area.0 + (area.2 - width).max(0));
+        let y =
+            (anchor.1 + (anchor.3 - height) / 2).clamp(area.1, area.1 + (area.3 - height).max(0));
+        if let Some(column) = self
+            .workspaces
+            .iter_mut()
+            .flat_map(|w| &mut w.columns)
+            .find(|c| c.id == id)
+        {
+            column.floating = Some(Floating {
+                parent,
+                geometry: (x, y, width, height),
+                restore_geometry: None,
+            });
+        }
+        self.finish_movements();
+        self.reveal();
+    }
+
+    pub fn move_floating(&mut self, id: WindowId, x: i32, y: i32) {
+        let area = self.work_area;
+        if let Some(f) = self
+            .workspaces
+            .iter_mut()
+            .flat_map(|w| &mut w.columns)
+            .find(|c| c.id == id)
+            .and_then(|c| c.floating.as_mut())
+        {
+            f.geometry.0 = x.clamp(area.0, area.0 + (area.2 - f.geometry.2).max(0));
+            f.geometry.1 = y.clamp(area.1, area.1 + (area.3 - f.geometry.3).max(0));
+        }
+    }
+
+    pub fn toggle_floating(&mut self) {
+        let Some(id) = self.focused() else { return };
+        if self.floating(id).is_some() {
+            self.workspaces[self.active]
+                .columns
+                .iter_mut()
+                .find(|c| c.id == id)
+                .unwrap()
+                .floating = None;
+            self.reveal();
+        } else {
+            self.set_floating(
+                id,
+                None,
+                (
+                    (self.work_area.2 * 2 / 3).max(200),
+                    (self.work_area.3 * 2 / 3).max(120),
+                ),
+            );
+        }
     }
 
     pub fn toggle_fullscreen(&mut self) {
@@ -466,6 +652,24 @@ impl Layout {
             .columns
             .iter()
             .map(|column| {
+                if let Some(f) = &column.floating {
+                    let (x, y, w, h) = f.geometry;
+                    let w = w.min(self.work_area.2).max(1);
+                    let h = h.min(self.work_area.3).max(1);
+                    return (
+                        column.id,
+                        x.clamp(
+                            self.work_area.0,
+                            self.work_area.0 + (self.work_area.2 - w).max(0),
+                        ),
+                        y.clamp(
+                            self.work_area.1,
+                            self.work_area.1 + (self.work_area.3 - h).max(0),
+                        ),
+                        w,
+                        h,
+                    );
+                }
                 let offset = if animated {
                     workspace
                         .movements
@@ -523,6 +727,9 @@ impl Layout {
         let mut left = self.gap as f64;
         let mut focused_bounds = None;
         for column in &workspace.columns {
+            if column.floating.is_some() {
+                continue;
+            }
             if Some(column.id) == workspace.focused {
                 focused_bounds = Some((left, left + column.width as f64));
             }
@@ -915,7 +1122,8 @@ mod tests {
         layout.insert(2);
         let width = layout.workspace().columns[1].width;
         layout.move_to_workspace(1);
-        assert_eq!(layout.focused(), Some(1));
+        assert_eq!(layout.focused(), Some(2));
+        assert_eq!(layout.active, 1);
         layout.switch_workspace(1);
         assert_eq!(layout.focused(), Some(2));
         assert_eq!(layout.workspace().columns[0].width, width);
@@ -926,21 +1134,22 @@ mod tests {
     }
 
     #[test]
-    fn adjacent_workspace_moves_wrap_and_keep_the_current_workspace() {
+    fn adjacent_workspace_moves_wrap_and_follow_the_window() {
         let mut layout = Layout::default();
         layout.insert(1);
         layout.insert(2);
         let width = layout.workspace().columns[1].width;
         layout.move_to_adjacent_workspace(true);
-        assert_eq!(layout.active, 0);
-        assert_eq!(layout.focused(), Some(1));
-        layout.switch_workspace(3);
+        assert_eq!(layout.active, 3);
         assert_eq!(layout.focused(), Some(2));
         assert_eq!(layout.workspace().columns[0].width, width);
         layout.move_to_adjacent_workspace(false);
-        assert_eq!(layout.active, 3);
+        assert_eq!(layout.active, 0);
+        assert_eq!(layout.focused(), Some(2));
+        layout.switch_workspace(3);
         assert!(layout.workspace().columns.is_empty());
         layout.move_to_adjacent_workspace(false); // Empty workspace is a no-op.
+        assert_eq!(layout.active, 3);
         layout.switch_workspace(0);
         assert_eq!(layout.focused(), Some(2));
         layout.move_to_adjacent_workspace(false);
@@ -950,5 +1159,77 @@ mod tests {
         layout.switch_workspace(0);
         assert_eq!(layout.focused(), Some(2));
         assert_eq!(layout.workspace().columns[1].width, width);
+    }
+
+    #[test]
+    fn closing_focus_prefers_left_and_dialogs_return_to_their_parent() {
+        let mut layout = Layout::default();
+        for id in 1..=3 {
+            layout.insert(id);
+        }
+        layout.focus(2);
+        layout.remove(2);
+        assert_eq!(layout.focused(), Some(1));
+        layout.remove(1);
+        assert_eq!(layout.focused(), Some(3));
+        layout.insert(4);
+        layout.set_floating(4, Some(3), (400, 200));
+        layout.remove(4);
+        assert_eq!(layout.focused(), Some(3));
+    }
+
+    #[test]
+    fn floating_dialogs_do_not_consume_columns_and_follow_parent_moves() {
+        let mut layout = Layout::default();
+        layout.insert(1);
+        layout.insert(2);
+        layout.set_floating(2, Some(1), (400, 200));
+        layout.insert(3);
+        let parent = layout
+            .target_geometries()
+            .into_iter()
+            .find(|g| g.0 == 1)
+            .unwrap();
+        assert_eq!(
+            layout
+                .target_geometries()
+                .into_iter()
+                .find(|g| g.0 == 3)
+                .unwrap()
+                .1,
+            parent.1 + parent.3 + layout.gap
+        );
+        layout.focus(1);
+        layout.move_to_workspace(2);
+        assert_eq!(layout.active, 2);
+        assert_eq!(layout.family(1), vec![1, 2]);
+        assert_eq!(
+            layout.workspaces[0]
+                .columns
+                .iter()
+                .map(|c| c.id)
+                .collect::<Vec<_>>(),
+            vec![3]
+        );
+        layout.move_floating(2, -100, 10000);
+        let g = layout
+            .target_geometries()
+            .into_iter()
+            .find(|g| g.0 == 2)
+            .unwrap();
+        assert_eq!((g.1, g.2), (0, 500));
+        layout.set_size((300, 180));
+        let g = layout
+            .target_geometries()
+            .into_iter()
+            .find(|g| g.0 == 2)
+            .unwrap();
+        assert_eq!((g.1, g.2, g.3, g.4), (0, 0, 300, 180));
+        layout.focus(2);
+        let original = layout.floating(2).unwrap().geometry;
+        layout.toggle_maximize();
+        assert_eq!(layout.floating(2).unwrap().geometry, (12, 12, 276, 156));
+        layout.toggle_maximize();
+        assert_eq!(layout.floating(2).unwrap().geometry, original);
     }
 }
