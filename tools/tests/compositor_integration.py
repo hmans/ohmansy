@@ -156,7 +156,9 @@ def run():
             cursor_css = 'url("data:image/svg+xml,' + quote(cursor_svg) + '") 0 0, crosshair'
             set_browser_cursor(browser, cursor_css)
             viewport = control()['viewport_size']
-            control('pointer', x=viewport[0]-120, y=viewport[1]*.6)
+            # Keep the fixed physical point inside the client at every tested
+            # scale, even if the client leaves fullscreen during reconfiguration.
+            control('pointer', x=viewport[0]*.25, y=viewport[1]*.3)
             wait_for(lambda: control()['cursor']['kind'] == 'surface' and control()['cursor_rendered_elements'] > 0, description='custom browser cursor')
             old = control()
             cursor_pixels = [value * old['display_scale'] for value in old['pointer_position']]
