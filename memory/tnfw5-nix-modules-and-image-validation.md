@@ -1219,3 +1219,22 @@ A long-lived agent can retain a dead Niri IPC path after login even while its
 Wayland socket belongs to Shine. The test helper now falls back, after Niri IPC
 fails, to a unique live Shine control socket matching the inherited Wayland
 display. It never assumes the desktop label alone identifies the active server.
+
+
+## Shared agent skills (2026-11-06)
+
+`nix/modules/agent-skills.nix` ships provider-neutral Agent Skills content from
+`skills/`, enabled by the default module and exported as `nixosModules.agentSkills`.
+The canonical `/etc/ohmansy/skills` entries and Codex/Claude Code discovery
+entries point to the same store directories. Claude Code's Linux path is
+`/etc/claude-code/.claude/skills`; Codex uses `/etc/codex/skills`. There is no
+universal system-wide discovery path in the Agent Skills specification.
+No user service, skeleton copy, or home-directory mutation is needed for these
+clients; existing and future users read the shared content. Hosts can opt out
+with `ohmansy.agentSkills.enable = false`. Agent binaries remain user-installed.
+
+The initial `ohmansy-maintenance` skill covers installed configuration, software,
+service diagnostics, updates and recovery. Skill validation, native customization
+checks (shared sources and opt-out), and native flake evaluation passed. A
+standalone module's `/etc` output built successfully. These checks do not prove
+live client discovery; no OS activation or desktop restart was performed.
