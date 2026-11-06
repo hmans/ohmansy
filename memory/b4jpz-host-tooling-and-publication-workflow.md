@@ -389,6 +389,23 @@ CI actions are pinned. The AppArmor exception in .github/ permits user namespace
 only for the Nix unshare executable on disposable runners; do not replace it
 with a global security disable. CI artifacts are not public GitHub releases.
 
+CI scheduling (2026-11-06): `.github/workflows/checks.yml` evaluates the flake
+with `--no-build` on native ARM and x86-64 runners for relevant PRs and pushes
+to `main`, and runs the existing installer, guest-source, factory and ISO
+packaging Python suites on x86-64. Image assembly in `images.yml` runs only
+through workflow dispatch or pushed `v*` tags. Both workflows cancel superseded
+runs for the same PR/ref. Full `nix flake check` remains in image builds because
+it also builds graphical and NixOS VM tests. Do not add it to routine CI while
+claiming those runs avoid VM builds.
+
+Local verification: actionlint 1.7.12 passed with its external ShellCheck
+integration disabled (the local ShellCheck shim has no configured version);
+all 34 selected Python tests passed. The broader 104-test suite hit the
+Mac-specific `/bin/cp -c` GPU-probe test on Linux, so it is not the Linux CI
+selection. No GitHub run, image build or boot was performed for this scheduling
+change. See the pipeline section in `docs/ohmansy-development.md`.
+
+
 Bibata default (2026-11-04): after the user tried and selected Bibata Modern
 Classic, the shared helper, Niri desktop, greeter, session environment and
 unlocked GTK defaults use Bibata-Modern-Classic at size 24. The native cursor

@@ -1,10 +1,12 @@
-name: Ohmansy images
+name: ohmansy images
 on:
   workflow_dispatch:
   push:
-    paths: ['flake.nix', 'flake.lock', 'nix/**', 'app/runtime/**', 'tools/**', '.github/**']
-  pull_request:
-    paths: ['flake.nix', 'flake.lock', 'nix/**', 'app/runtime/**', 'tools/**', '.github/**']
+    tags: ['v*']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
