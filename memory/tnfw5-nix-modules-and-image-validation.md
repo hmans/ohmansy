@@ -9,6 +9,31 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine notification activation (2026-11-06)
+
+Shine implements xdg-activation-v1 in `handlers/activation.rs`. A client can
+obtain a token only using a recent pointer-button or forwarded key-press serial
+that Shine delivered to that same client on its seat. The input grant is
+consumed on token creation; tokens are single-use and expire after ten seconds.
+Activation focuses the exact surface selected by the app through the existing
+monitor/workspace navigation, without moving the window. A notification click
+belongs to Mako, so token issuance must not require keyboard focus on Mako.
+
+Apps must offer a notification action and consume Mako's ActivationToken signal.
+The pinned GLib 2.88.3 GNotification backend ignores that signal; its action can
+run without focus. Do not weaken serial validation to work around it. The GTK
+trial handles the standard D-Bus token directly before presenting its window.
+Apps with no action or no token handling cannot reliably identify a destination.
+
+38 Rust tests, formatting, strict Clippy, the development build, and the
+packaged `nix build .#compositor` passed.
+`tools/tests/compositor_notifications.py` passed real Mako clicks on a private
+headless display with a two-window GTK client: exact-window keyboard focus
+across monitors/workspaces, unchanged destination, rejected background present,
+replay, and unused-token expiry. The spatial dev shell supplies GTK development
+headers and Mako for this trial. No installed-system activation or login
+compositor restart was performed. See the compositor guide for user behavior.
+
 ## Ribbon shader cost and runtime fidelity (2026-11-06)
 
 The background skips its 27 particle candidates when proximity is below
