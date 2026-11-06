@@ -558,6 +558,7 @@ mod tests {
             "[decorations.inactive]\nfog=-0.1",
             "[decorations.inactive]\nfog_color=[0.0,nan,0.0]",
             "[decorations.inactive]\nduration_ms=5001",
+            "[decorations.inactive]\neasing='unknown'",
         ] {
             assert!(Settings::parse(invalid).is_err(), "{invalid}");
         }

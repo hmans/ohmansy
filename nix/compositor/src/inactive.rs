@@ -1,4 +1,5 @@
 //! One reversible focus transition shared by rendering and pointer input.
+use crate::preferences::FocusEasing;
 use crate::{layout::WindowId, Smallvil};
 use smithay::{
     desktop::Window,
@@ -13,6 +14,7 @@ pub struct Transition {
     target: f64,
     started: f64,
     duration: f64,
+    easing: FocusEasing,
 }
 impl Transition {
     fn value(&self, now: f64) -> f64 {
@@ -21,7 +23,7 @@ impl Transition {
         } else {
             ((now - self.started) / self.duration).clamp(0.0, 1.0)
         };
-        self.from + (self.target - self.from) * (t * t * (3.0 - 2.0 * t))
+        self.from + (self.target - self.from) * self.easing.sample(t)
     }
 }
 impl Smallvil {
@@ -47,6 +49,7 @@ impl Smallvil {
     }
     pub fn update_inactive(&mut self) -> bool {
         let now = self.start_time.elapsed().as_secs_f64();
+        let easing = self.output_settings.decorations.inactive.easing;
         let duration = if self.output_settings.animations.enabled {
             self.output_settings.decorations.inactive.duration_ms as f64 / 1000.0
         } else {
@@ -60,13 +63,15 @@ impl Smallvil {
                 target,
                 started: now,
                 duration,
+                easing,
             });
-            if t.target != target || t.duration != duration {
+            if t.target != target || t.duration != duration || t.easing != easing {
                 *t = Transition {
                     from: t.value(now),
                     target,
                     started: now,
                     duration,
+                    easing,
                 };
                 changed = true;
             }
@@ -108,18 +113,51 @@ impl Smallvil {
 mod tests {
     use super::*;
     #[test]
+    fn configurable_curves_have_distinct_timing_and_fixed_endpoints() {
+        for (easing, quarter) in [
+            (FocusEasing::Linear, 0.25),
+            (FocusEasing::EaseIn, 0.015625),
+            (FocusEasing::EaseOut, 0.578125),
+            (FocusEasing::EaseInOut, 0.0625),
+        ] {
+            assert_eq!(easing.sample(0.0), 0.0);
+            assert_eq!(easing.sample(0.25), quarter);
+            assert_eq!(easing.sample(1.0), 1.0);
+        }
+    }
+
+    #[test]
+    fn focus_transitions_ease_out_in_both_directions() {
+        for (from, target) in [(0.0, 1.0), (1.0, 0.0)] {
+            let t = Transition {
+                from,
+                target,
+                started: 0.0,
+                duration: 1.0,
+                easing: FocusEasing::EaseOut,
+            };
+            assert_eq!(t.value(0.0), from);
+            assert_eq!(t.value(0.5), from + (target - from) * 0.875);
+            assert_eq!(t.value(1.0), target);
+            assert!((t.value(0.25) - from).abs() > (target - t.value(0.75)).abs());
+        }
+    }
+
+    #[test]
     fn interrupted_transition_keeps_its_visible_value() {
         let t = Transition {
             from: 0.0,
             target: 1.0,
             started: 0.0,
             duration: 1.0,
+            easing: FocusEasing::EaseOut,
         };
         let reverse = Transition {
             from: t.value(0.4),
             target: 0.0,
             started: 0.4,
             duration: 1.0,
+            easing: FocusEasing::EaseOut,
         };
         assert_eq!(reverse.value(0.4), t.value(0.4));
         assert_eq!(reverse.value(1.4), 0.0);

@@ -164,16 +164,43 @@ pub struct Inactive {
     pub fog: f32,
     pub fog_color: [f32; 3],
     pub duration_ms: u32,
+    pub easing: FocusEasing,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FocusEasing {
+    Linear,
+    EaseIn,
+    #[default]
+    EaseOut,
+    EaseInOut,
+}
+impl FocusEasing {
+    pub fn sample(self, t: f64) -> f64 {
+        match self {
+            Self::Linear => t,
+            Self::EaseIn => t.powi(3),
+            Self::EaseOut => 1.0 - (1.0 - t).powi(3),
+            Self::EaseInOut => {
+                if t < 0.5 {
+                    4.0 * t.powi(3)
+                } else {
+                    1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+                }
+            }
+        }
+    }
 }
 impl Default for Inactive {
     fn default() -> Self {
         Self {
             enabled: true,
-            scale: 0.985,
+            scale: 0.99,
             saturation: 0.85,
-            fog: 0.05,
+            fog: 0.08,
             fog_color: [0.5, 0.5, 0.55],
             duration_ms: 160,
+            easing: FocusEasing::default(),
         }
     }
 }

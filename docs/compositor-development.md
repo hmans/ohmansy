@@ -538,27 +538,32 @@ only and do not change window sizes, spacing, or input regions.
 
 ### Unfocused window appearance
 
-Unfocused windows recede slightly: 98.5% visual scale, 85% saturation and a
-5% neutral fog, with a reversible 160 ms focus transition. This preserves app
-opacity, client sizes and column spacing. The selected app stays emphasized
+Unfocused windows recede slightly: 99% visual scale, 85% saturation and an
+8% neutral fog, with a reversible 160 ms cubic ease-out focus transition. This
+preserves app opacity, client sizes and column spacing. The selected app stays emphasized
 while the launcher or another desktop overlay has keyboard focus. Windows on
 other monitors also recede; fullscreen windows keep their normal appearance.
 
 ```toml
 [decorations.inactive]
 enabled = true
-scale = 0.985
+scale = 0.99
 saturation = 0.85
-fog = 0.05
+fog = 0.08
 fog_color = [0.5, 0.5, 0.55]
 duration_ms = 160
+easing = "ease-out"
 ```
 
-These settings reload live. Set `enabled = false` to disable the effect, or
+Edit this section in `~/.config/shine/config.toml`; these settings reload live.
+Set `enabled = false` to disable the effect, or
 `scale = 1.0` for color muting alone. Scale accepts 0.8–1, saturation and fog
 accept 0–1, and duration accepts 0–5000 ms. Fog color is RGB from 0 to 1;
 choose a lighter or darker neutral to suit your wallpaper and appearance.
 Disabling animations also makes focus transitions immediate.
+`easing` accepts `linear`, `ease-in`, `ease-out` (default), or `ease-in-out`.
+The eased curves are cubic and apply when both focusing and unfocusing a window.
+Changing the curve during a transition continues from its current visible value.
 
 Windows, menus, corners, rings and shadows share the visual transform. Pointer
 coordinates follow the displayed surfaces, including during a click drag.

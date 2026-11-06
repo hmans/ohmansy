@@ -11,11 +11,23 @@ title: Nix modules and image validation
 
 ## Shine unfocused window effects (2026-11-06)
 
-Shine defaults to 0.985 visual scale, 0.85 saturation and 0.05 neutral fog for
-unfocused windows, with a reversible 160 ms transition. Live TOML controls are
+Shine defaults to 0.99 visual scale, 0.85 saturation and 0.08 neutral fog for
+unfocused windows, with a reversible 160 ms cubic ease-out transition. Live TOML controls are
 under `decorations.inactive`; see `docs/compositor-development.md`. The effect
 uses the layout-selected app, so desktop overlays do not mute the selected app.
 Fullscreen windows are exempt. Client sizes and layout slots do not change.
+
+The revised effect passed 49 Rust tests, formatting, strict Clippy, a debug
+build and the private headless pixel/input/drag/reversal/reload/idle trial.
+All effect parameters are user configurable in `~/.config/shine/config.toml`.
+The `easing` setting accepts `linear`, `ease-in`, `ease-out` (default), or
+`ease-in-out`; eased curves are cubic. Curve edits reload live and preserve
+the visible value of an interrupted transition. The private trial exercised
+live reload and focus reversal for all four curves; invalid names are rejected.
+The owner confirmed the configurable effect works well. Scale and fog were
+also applied to the running desktop through live TOML reload.
+Easing requires the rebuilt compositor at a future session start; the running
+login compositor was preserved.
 
 `inactive.rs` shares the transition and inverse transform with pointer input.
 `scene.rs` transforms window surfaces, popups and decorations before output

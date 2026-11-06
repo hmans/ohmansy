@@ -22,7 +22,8 @@ def run():
     control = trial.Control(artifacts / 'control.sock')
     original = {w['id']: w['pid'] for w in trial.parent_windows()}
 
-    def configure(enabled=True, scale=.985, saturation=.85, fog=.05, duration=160, animations=False):
+    def configure(enabled=True, scale=.99, saturation=.85, fog=.08, duration=160, animations=False,
+                  easing='ease-out'):
         temporary = config.with_suffix('.new')
         temporary.write_text(f'''[layout]
 gap=40
@@ -40,6 +41,7 @@ scale={scale}
 saturation={saturation}
 fog={fog}
 duration_ms={duration}
+easing="{easing}"
 ''')
         temporary.replace(config)
 
@@ -105,7 +107,7 @@ while True:
             image = capture('default')
             near(pixel(image, ids[0], 150, 100), (208, 32, 64))
             luma = 208*.2126 + 32*.7152 + 64*.0722
-            muted = [(.85*c + .15*luma)*.95 + .05*f*255
+            muted = [(.85*c + .15*luma)*.92 + .08*f*255
                      for c, f in zip((208, 32, 64), (.5, .5, .55))]
             for ident in ids[1:]:
                 near(pixel(image, ident, 150, 100), muted)
@@ -148,7 +150,7 @@ while True:
                 image = capture(f'scale-{scale}')
                 near(pixel(image, ids[1], 150, window(ids[1])['geometry'][3]/2), (208, 32, 64))
             # A static app must animate, and rapid reversal must not jump.
-            configure(scale=.985, animations=True, duration=1000)
+            configure(animations=True, duration=1000)
             trial.wait_for(lambda: control()['preferences']['decorations']['inactive']['duration_ms'] == 1000)
             control('focus', ids[0])
             trial.wait_for(settled)
@@ -161,6 +163,14 @@ while True:
             after = window(ids[0])['inactive_amount']
             assert abs(after-middle) < .3, (middle, after)
             trial.wait_for(settled)
+            for easing in ('linear', 'ease-in', 'ease-in-out', 'ease-out'):
+                configure(animations=True, duration=1000, easing=easing)
+                trial.wait_for(lambda: control()['preferences']['decorations']['inactive']['easing'] == easing)
+                control('focus', ids[1])
+                time.sleep(.1)
+                assert 0 < window(ids[0])['inactive_amount'] < 1
+                control('focus', ids[0])
+                trial.wait_for(settled)
             frames = control()['rendered_frames']
             time.sleep(.3)
             assert control()['rendered_frames'] <= frames+2, 'Effect kept repainting after settling'
