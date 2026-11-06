@@ -9,6 +9,22 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## NetBird defaults (2026-11-06)
+
+`nix/modules/netbird.nix` is imported by the shared default module and enables
+NetBird's service, CLI, and desktop app with overridable NixOS defaults.
+Desktop-only and software-only imports do not enable it. Hosts can disable
+`services.netbird.enable` or omit just the UI with `services.netbird.ui.enable`.
+Enrollment remains interactive; images contain no keys or account configuration.
+See `docs/customization.md` for user instructions.
+
+PC and ARM live configurations evaluated with the service and UI enabled.
+Native evaluation also verified that disabling the service removes its default
+client and systemd unit, while disabling only the UI preserves the service.
+The native wrapper and both upstream packages were realized from the binary
+cache; its CLI reported v0.71.4. No image boot, desktop sign-in, network enrollment,
+or installed-system activation was performed.
+
 ## Shine individual-window capture (2026-11-06)
 
 Shine now exposes ext-foreign-toplevel-list-v1, ext-image-capture-source-v1
