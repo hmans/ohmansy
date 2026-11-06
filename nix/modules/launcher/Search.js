@@ -34,6 +34,7 @@ function rank(items, input) {
         }
         return { item: item, score: total };
     }).filter(result => result.score >= 0).sort((a, b) =>
+        Number(b.item.provider === "windows") - Number(a.item.provider === "windows") ||
         b.score - a.score || a.item.title.localeCompare(b.item.title) || a.item.id.localeCompare(b.item.id)
     ).map(result => result.item);
 }

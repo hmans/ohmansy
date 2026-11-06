@@ -13,14 +13,25 @@ PanelWindow {
     required property bool opened
     // Providers contribute data; the shell owns desktop command execution.
     property var providers: [Commands.desktop]
+    property var windows: (shineWindows.state.windows || []).filter(window => window.mapped !== false)
     signal dismissed()
     signal commandRequested(string command)
+    signal windowRequested(int windowId)
     readonly property var applicationItems: DesktopEntries.applications.values.map(app => ({
         id: "app:" + app.id, title: app.name, subtitle: app.genericName || app.comment || "Application",
         icon: app.icon, keywords: [app.genericName || "", app.comment || "", ...(app.keywords || [])],
         provider: "applications", desktopId: app.id
     }))
-    readonly property var items: applicationItems.concat(...providers.map(provider => provider.items))
+    readonly property var windowItems: windows.map(window => {
+        const appId = window.app_id || "";
+        const app = applicationItems.find(item => item.desktopId.toLowerCase().replace(/\.desktop$/, "") === appId.toLowerCase().replace(/\.desktop$/, ""));
+        return { id: "window:" + window.id, windowId: window.id,
+            title: window.title || (app ? app.title : appId) || "Untitled window",
+            subtitle: app ? app.title : appId || "Open window",
+            icon: app ? app.icon : "application-x-executable",
+            keywords: [appId, ...(app ? [app.title, ...app.keywords] : [])], provider: "windows" };
+    })
+    readonly property var items: windowItems.concat(applicationItems, ...providers.map(provider => provider.items))
     readonly property var matches: Search.rank(items, search.text)
     property string error: ""
     property string selectedId: ""
@@ -44,6 +55,14 @@ PanelWindow {
     function activate(item) {
         if (!item || !opened || launch.running) return;
         error = "";
+        if (item.provider === "windows") {
+            dismissed();
+            if (shineWindows.path) {
+                shineWindows.request = { action: "focus", value: item.windowId };
+                if (!shineWindows.connected) shineWindows.connected = true;
+            } else windowRequested(item.windowId);
+            return;
+        }
         if (item.provider !== "applications") {
             dismissed();
             commandRequested(item.command);
@@ -53,6 +72,38 @@ PanelWindow {
         dismissed();
         launch.command = [Quickshell.env("OHMANSY_APP_LAUNCHER"), "--", item.desktopId + ".desktop"];
         launch.running = true;
+    }
+    // Shine supplies a snapshot over its control socket. Niri passes its
+    // event-driven window model and handles windowRequested in the shell.
+    Socket {
+        id: shineWindows
+        path: Quickshell.env("OHMANSY_COMPOSITOR_CONTROL") || ""
+        property var state: ({ windows: [] })
+        property var request: null
+        onConnectedChanged: if (connected) {
+            const action = request || { action: "status" };
+            request = null;
+            write(JSON.stringify(action) + "\n");
+            flush();
+        }
+        parser: SplitParser {
+            onRead: data => {
+                try {
+                    const reply = JSON.parse(data);
+                    if (reply.ok) shineWindows.state = reply.state;
+                    else launcher.error = "Could not switch to the window. Try again.";
+                } catch (error) { console.warn("Launcher windows:", error); }
+                shineWindows.connected = false;
+                if (shineWindows.request) Qt.callLater(() => shineWindows.connected = true);
+            }
+        }
+    }
+    Timer {
+        interval: 250
+        running: launcher.opened && !!shineWindows.path
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: if (!shineWindows.connected) shineWindows.connected = true
     }
     Process {
         id: launch
@@ -101,8 +152,8 @@ PanelWindow {
                     Layout.fillWidth: true
                     implicitHeight: 52
                     colors: launcherColors
-                    placeholderText: "Search apps and commands…"
-                    Accessible.name: "Search apps and commands"
+                    placeholderText: "Search windows, apps and commands…"
+                    Accessible.name: "Search windows, apps and commands"
                     onTextEdited: launcher.selectedId = ""
                     onAccepted: launcher.activate(launcher.selectedItem)
                     Keys.onDownPressed: launcher.moveSelection(1)
@@ -168,7 +219,7 @@ PanelWindow {
                                 }
                             }
                             Text {
-                                text: row.modelData.provider === "applications" ? "App" : "Command"
+                                text: row.modelData.provider === "windows" ? "Window" : row.modelData.provider === "applications" ? "App" : "Command"
                                 color: launcherColors.secondary
                                 font { family: Ui.Theme.fontFamily; pixelSize: 11 }
                             }

@@ -24,6 +24,8 @@ PanelWindow {
     Commands.CommandLauncher {
         screen: bar.screen
         opened: bar.launcherActive && bar.launcherMode === "apps"
+        windows: bar.niriState.state.windows || []
+        onWindowRequested: windowId => Quickshell.execDetached([Quickshell.env("OHMANSY_DESKTOP"), "focus-window", String(windowId)])
         onDismissed: bar.launcherDismissed()
         onCommandRequested: command => {
             if (command === "displays") bar.displayRequested();

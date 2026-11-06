@@ -4,7 +4,9 @@
 macOS host, with an accelerated guest display and a persistent private VM disk.
 
 Quickshell supplies a shared launcher for Shine and Niri. Press Mod+Space or
-click **ohmansy** in the bar to search applications and desktop commands together.
+click **ohmansy** in the bar to search open windows, applications and desktop commands together.
+Matching open windows appear first; selecting one switches to that window,
+including on another workspace or monitor.
 Search accepts abbreviations, with exact names and prefixes ranked first. Use
 arrows and Enter to open a result; Escape, Mod+Space, or an outside click closes
 the launcher. The first commands open Displays or a terminal and select light or

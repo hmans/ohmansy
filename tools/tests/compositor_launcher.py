@@ -75,10 +75,32 @@ def run():
             ipc('toggle')
             trial.wait_for(lambda: status()['opened'])
             type_codes([38,20,30])
+            trial.wait_for(lambda: status()['selected'] == f'window:{launched}', description='running window ranks before app')
             type_codes([28])
             trial.wait_for(lambda: control()['workspace']==2 and control()['keyboard_focus']==launched, description='launcher reveals running app')
             assert not marker.exists(), 'Launcher started a duplicate app'
             assert len([w for w in control()['windows'] if w['app_id']=='launcher-test-app'])==1
+            # Browser windows can match by title without any corresponding app
+            # entry. Each result must activate that particular window.
+            for index in (1, 2):
+                control('launch', program='foot', args=[f'--app-id=web-chat-{index}',
+                    f'--title=WhatsApp {index}', 'sleep', '90'])
+                trial.wait_for(lambda: trial.window_for(control, f'web-chat-{index}'))
+            chats = [w for w in control()['windows'] if w['app_id'].startswith('web-chat-')]
+            control('focus', chats[1]['id'])
+            control('move-workspace', 3)
+            control('workspace', 1)
+            ipc('toggle')
+            type_codes([17, 35, 30, 20, 31])  # whats
+            trial.wait_for(lambda: len(status()['results']) >= 2 and
+                all(item['id'].startswith('window:') for item in status()['results'][:2]),
+                description='title matches for both open chat windows')
+            type_codes([108])
+            target = int(status()['selected'].split(':')[1])
+            type_codes([28])
+            trial.wait_for(lambda: control()['keyboard_focus'] == target,
+                description='activate the selected chat window')
+            assert len([w for w in control()['windows'] if w['app_id'].startswith('web-chat-')]) == 2
             control('workspace',1)
             # Dismissal must return keyboard focus and leave app identities alone.
             control('focus', focused)

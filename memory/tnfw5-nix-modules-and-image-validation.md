@@ -7,6 +7,27 @@ data:
 id: tnfw5
 title: Nix modules and image validation
 ---
+## Launcher open-window search (2026-11-06)
+
+The shared launcher includes individual open windows and ranks matching windows
+before applications and desktop commands. Search covers window titles, app IDs,
+and matching desktop-entry names/keywords. Stable `window:<id>` results focus
+that exact window across workspaces and outputs instead of launching an app.
+Shine snapshots its control socket while the launcher is open and excludes
+unmapped windows; Niri supplies its event-driven model and focus-window action.
+The launcher retains application entries so users can still select those.
+
+Verified the updated shared QML package and private headless launcher trial:
+window-before-app ranking, title-only WhatsApp fixtures without desktop entries,
+selection between two windows, cross-workspace focus, no duplicates, commands,
+failure reporting and dismissal. Niri wiring was implemented but not exercised
+in a running Niri session. A graceful live Quickshell refresh preserved the
+compositor and all seven window IDs; launcher IPC remained reachable through
+the original config path, preserving the installed Mod+Space helper. Keeping
+that path while overriding QML_IMPORT_PATH lets shared component updates apply
+without a compositor restart or personal shortcut override. No OS activation;
+an installed rebuild is needed to persist the new package across logins.
+
 # Official Ohmansy configuration
 
 ## Crane source evaluation in CI (2026-11-06)
