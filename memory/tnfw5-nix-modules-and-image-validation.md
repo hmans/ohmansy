@@ -9,6 +9,39 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine GPU synchronization (2026-11-06)
+
+Shine waits for implicit DMA-BUF write fences before applying surface commits.
+`handlers/compositor.rs` installs a pre-commit hook for every surface, including
+subsurfaces and cursors. Smithay's readiness source runs in the existing calloop
+loop and clears the client's transaction blocker when ready. Already-ready and
+shared-memory buffers continue immediately. This follows Smithay 0.7 Anvil's
+`anvil/src/shell/mod.rs`. Keep this before commit application so synchronized
+subsurface transactions remain atomic; waiting only in the commit handler is too
+late. This does not add the explicit-sync Wayland protocol.
+
+`native.rs` checks `RenderFrameResult::needs_sync()` and waits on the swapchain
+render fence before queueing a nonempty frame when KMS cannot synchronize it.
+Smithay documents this as the caller's responsibility on `queue_frame`; skipping
+it can submit incomplete rendering. Drivers with usable fences keep asynchronous
+submission. Niri's native backend uses the same conditional completion check.
+
+The investigation followed reported single-frame black rectangles in Electron
+apps on a native NVIDIA Wayland session. These two missing waits are verified
+source defects, but their connection to the reported flicker remains a hypothesis
+until tested in an updated physical login session. Preserve the running compositor
+and application windows; applying Rust compositor changes needs a new session.
+
+Validation: all 40 Rust tests, formatting, strict Clippy and the packaged native
+two-monitor DRM VM check passed. Physical desktop activation was not performed.
+The browser integration initially failed its custom-cursor scale assertion on
+both patched and unchanged source: its fixed physical pointer could leave the
+browser after reconfiguration. The fixture now uses a point inside the client
+through the 100–200% scale cycle.
+The corrected full private-display Firefox/GTK integration passed, including
+GPU imports, subsurface menus, cursors, input, clipboard and idle rendering.
+
+
 ## NetBird defaults (2026-11-06)
 
 `nix/modules/netbird.nix` is imported by the shared default module and enables
