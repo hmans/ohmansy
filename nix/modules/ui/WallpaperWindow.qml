@@ -41,7 +41,10 @@ PanelWindow {
         onLoaded: {
             item.motionSpeed = 0.15;
             // Reduce shader pixels while preserving window size and cadence.
-            item.renderScale = 0.75;
+            item.renderScale = Qt.binding(() => WallpaperQuality.renderScale);
+            item.particleLayers = Qt.binding(() => WallpaperQuality.particleLayers);
+            item.particleMotionDetail = Qt.binding(() => WallpaperQuality.particleMotionDetail);
+            item.moving = Qt.binding(() => WallpaperQuality.moving);
             // About 15 fps at rest; keep the short appearance fade smooth.
             item.frameInterval = Qt.binding(() => Appearance.transitioning ? 16 : 66);
             item.targetLightMix = Qt.binding(() => Appearance.lightMix);

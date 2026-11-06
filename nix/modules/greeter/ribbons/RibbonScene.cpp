@@ -9,17 +9,23 @@
 #include <QQuickOpenGLUtils>
 #include <QVector2D>
 #include <algorithm>
+#include <vector>
 
 // OpenGL port of app/native/WelcomeCanvas.m. Keep the same draw order and
 // per-ribbon depth prepass; ordinary alpha sorting loses the fabric folds.
 class RibbonRenderer : public QQuickFramebufferObject::Renderer,
                        protected QOpenGLExtraFunctions {
 public:
-    ~RibbonRenderer() override { if (vao) glDeleteVertexArrays(1, &vao); }
+    ~RibbonRenderer() override {
+        if (indices) glDeleteBuffers(1, &indices);
+        if (vao) glDeleteVertexArrays(1, &vao);
+    }
     void synchronize(QQuickFramebufferObject *item) override {
         owner = static_cast<RibbonScene *>(item);
         elapsed = owner->elapsed();
         lightMix = owner->lightMix();
+        particleLayers = owner->particleLayers();
+        particleMotionDetail = owner->particleMotionDetail();
         if (renderScale != owner->renderScale()) {
             renderScale = owner->renderScale();
             invalidateFramebufferObject();
@@ -65,6 +71,8 @@ public:
         glDisable(GL_BLEND);
         background.bind();
         uniforms(background, size);
+        background.setUniformValue("particleLayers", particleLayers);
+        background.setUniformValue("particleMotionDetail", particleMotionDetail);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         ribbons.bind();
@@ -80,11 +88,11 @@ public:
             glDepthMask(GL_TRUE);
             glEnable(GL_POLYGON_OFFSET_FILL);
             glPolygonOffset(1.0f, 1.0f);
-            glDrawArrays(GL_TRIANGLES, 0, 256 * 12 * 6);
+            glDrawElements(GL_TRIANGLES, 256 * 12 * 6, GL_UNSIGNED_SHORT, nullptr);
             glDisable(GL_POLYGON_OFFSET_FILL);
             glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
             glDepthMask(GL_FALSE);
-            glDrawArrays(GL_TRIANGLES, 0, 256 * 12 * 6);
+            glDrawElements(GL_TRIANGLES, 256 * 12 * 6, GL_UNSIGNED_SHORT, nullptr);
         }
         // The scene is an opaque composited backdrop. Preserve alpha=1 for Qt.
         glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
@@ -156,6 +164,22 @@ private:
             return;
         }
         glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+        // The same 257x13 vertices are shared by adjacent triangles. Keep the
+        // existing triangle order and winding for the transparent depth pass.
+        std::vector<GLushort> mesh;
+        mesh.reserve(256 * 12 * 6);
+        for (int s = 0; s < 256; ++s) {
+            for (int v = 0; v < 12; ++v) {
+                const int i = s * 13 + v;
+                for (int index : {i, i + 13, i + 1, i + 13, i + 14, i + 1})
+                    mesh.push_back(static_cast<GLushort>(index));
+            }
+        }
+        glGenBuffers(1, &indices);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.size() * sizeof(GLushort), mesh.data(), GL_STATIC_DRAW);
+        glBindVertexArray(0);
         statistics.start();
         qInfo() << "Ohmansy welcome ribbons:" << reinterpret_cast<const char *>(glGetString(GL_RENDERER));
     }
@@ -163,9 +187,12 @@ private:
     QOpenGLShaderProgram background, ribbons;
     QElapsedTimer statistics;
     GLuint vao = 0;
+    GLuint indices = 0;
     float elapsed = 12;
     float lightMix = 0;
     float renderScale = 1;
+    int particleLayers = 3;
+    float particleMotionDetail = 1;
     int frames = 0;
     bool attempted = false, ready = false, openGLES = false;
 };

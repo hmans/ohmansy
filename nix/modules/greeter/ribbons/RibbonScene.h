@@ -10,6 +10,8 @@ class RibbonScene : public QQuickFramebufferObject {
     Q_PROPERTY(float lightMix READ lightMix WRITE setLightMix NOTIFY lightMixChanged)
     Q_PROPERTY(float renderScale READ renderScale WRITE setRenderScale NOTIFY renderScaleChanged)
     Q_PROPERTY(QSize renderSize READ renderSize NOTIFY renderSizeChanged)
+    Q_PROPERTY(int particleLayers READ particleLayers WRITE setParticleLayers NOTIFY particleLayersChanged)
+    Q_PROPERTY(float particleMotionDetail READ particleMotionDetail WRITE setParticleMotionDetail NOTIFY particleMotionDetailChanged)
     Q_PROPERTY(bool failed READ failed NOTIFY failedChanged)
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY statisticsChanged)
     Q_PROPERTY(double frameTime READ frameTime NOTIFY statisticsChanged)
@@ -46,6 +48,23 @@ public:
         update();
     }
     QSize renderSize() const { return m_renderSize; }
+    int particleLayers() const { return m_particleLayers; }
+    void setParticleLayers(int value) {
+        value = qBound(0, value, 3);
+        if (value == m_particleLayers) return;
+        m_particleLayers = value;
+        emit particleLayersChanged();
+        update();
+    }
+    float particleMotionDetail() const { return m_particleMotionDetail; }
+    void setParticleMotionDetail(float value) {
+        if (!std::isfinite(value)) return;
+        value = qBound(0.0f, value, 1.0f);
+        if (value == m_particleMotionDetail) return;
+        m_particleMotionDetail = value;
+        emit particleMotionDetailChanged();
+        update();
+    }
     void reportRenderSize(QSize value) {
         if (value == m_renderSize) return;
         m_renderSize = value;
@@ -61,6 +80,8 @@ signals:
     void lightMixChanged();
     void renderScaleChanged();
     void renderSizeChanged();
+    void particleLayersChanged();
+    void particleMotionDetailChanged();
     void failedChanged();
     void statisticsChanged();
 private:
@@ -68,6 +89,8 @@ private:
     float m_lightMix = 0;
     float m_renderScale = 1;
     QSize m_renderSize;
+    int m_particleLayers = 3;
+    float m_particleMotionDetail = 1;
     bool m_failed = false;
     int m_fps = 0;
     double m_frameTime = 0;

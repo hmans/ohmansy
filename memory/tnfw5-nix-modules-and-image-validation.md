@@ -9,6 +9,48 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Ribbon shader cost and runtime fidelity (2026-11-06)
+
+The background skips its 27 particle candidates when proximity is below
+0.0001. Even all candidates at maximum intensity contribute less than one
+8-bit channel step there. The haze and gradient still render. Ribbon normals
+use the exact derivative of the quadratic cross-section for the v direction,
+including id-0 z flattening, reducing full shape evaluations from five to three
+per vertex. A static 16-bit index buffer shares the 257x13 vertices while
+retaining the original 256x12 grid, triangle order/winding and two-pass drawing.
+
+RibbonScene exposes particleLayers (0–3) and particleMotionDetail (finite 0–1)
+as live properties, synchronized into background-shader uniforms. Layers are
+dropped faintest/smallest first; zero motion detail bypasses the four curl-noise
+samples while retaining two-noise drift. Positive motion detail scales curl
+strength and still performs those samples. Native defaults retain 3 layers and
+full motion, including in the greeter.
+
+The shared WallpaperQuality QML singleton supplies desktop defaults of .75
+render scale, 2 layers, full motion and the existing 66 ms cadence. Its
+`wallpaper` IPC target provides quality(high|balanced|low), configure(scale,
+layers,motion), status and pause(bool). High selects 1/3/1, balanced .75/2/1,
+low .5/1/0. Validation rejects the entire request before changing settings.
+Controls cover all outputs in one shell and reset at shell restart. They are
+available in Shine and the Niri wallpaper process. See the compositor guide.
+
+Desktop GL and ES checks passed live uniform/size changes, rendered differences
+at reduced particle detail, exact full-fidelity restoration and GL error checks.
+Twelve baseline scenes (three poses, dark/light, two aspect ratios) found culling
+differences at most 1/255 and analytic-normal differences at most 2/255. Indexed
+and unindexed renders were pixel-identical in all twelve. Balanced-vs-full
+particle comparisons retained almost all pixels; changes are confined to the
+faint layer. Physical NVIDIA paired samples found a useful particle-culling
+power reduction; indexing lowered core clocks but had little additional board
+power saving. Do not infer a 5.5x whole-scene speedup from shared vertex counts.
+Machine-specific measurements remain in ignored artifacts.
+
+The final session built, and the private headless shell trial passed runtime
+presets/validation/pause/resume, animation, transparent blending, image override,
+software fallback, two-output controls and clean shutdown. Only Quickshell was
+replaced live; compositor and app window IDs were preserved. No OS activation
+or login compositor restart.
+
 ## Desktop ribbon render resolution (2026-11-06)
 
 `WallpaperWindow.qml` now sets RibbonScene.renderScale to 0.75, independently

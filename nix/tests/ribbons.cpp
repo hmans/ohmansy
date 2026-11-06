@@ -69,16 +69,36 @@ int main(int argc, char **argv) {
         } else if (step == 5) {
             if (scene->renderSize() != QSize(240, 150)) qFatal("Second render scale did not apply");
             scene->setRenderScale(1);
-        } else {
+        } else if (step == 6) {
             if (scene->renderSize() != QSize(480, 300)) qFatal("Render scale did not restore the target");
             if (frame != light) qFatal("Render scale round trip changed the scene");
+            scene->setLightMix(0);
+        } else if (step == 7) {
+            dark = frame;
+            scene->setParticleLayers(0);
+        } else if (step == 8) {
+            if (frame == dark) qFatal("Particle layer uniform did not change the scene");
+            light = frame;
+            scene->setParticleLayers(2);
+            scene->setParticleMotionDetail(0);
+        } else if (step == 9) {
+            if (frame == light) qFatal("Reduced particle detail did not render");
+            light = frame;
+            scene->setParticleMotionDetail(0.5);
+        } else if (step == 10) {
+            if (frame == light) qFatal("Particle motion uniform did not update");
+            scene->setParticleLayers(3);
+            scene->setParticleMotionDetail(1);
+        } else {
+            if (scene->renderSize() != QSize(480, 300)) qFatal("Uniforms changed the framebuffer size");
+            if (frame != dark) qFatal("Particle fidelity round trip changed the scene");
             qInfo() << (es ? "ES" : "Desktop GL")
-                    << "ribbons: dark, light, motion, resize, live render scale, and GL error checks passed";
+                    << "ribbons: palettes, motion, resize, live resolution/particle uniforms, and GL checks passed";
             app.quit();
         }
         ++step;
     });
-    QTimer::singleShot(20000, &app, [] { qFatal("Render check timed out"); });
+    QTimer::singleShot(30000, &app, [] { qFatal("Render check timed out"); });
     window.show();
     capture.start();
     return app.exec();

@@ -64,6 +64,25 @@ def run():
             time.sleep(0.8)
             next_frame = capture('ribbons-next').crop((80, 80, 600, 500))
             assert ImageChops.difference(first_frame, next_frame).getbbox(), 'Ribbons are not animating'
+            def wallpaper(function, *args):
+                return json.loads(subprocess.check_output(['quickshell', 'ipc', '--pid', str(shell.pid),
+                    'call', 'wallpaper', function, *map(str, args)], env=environment, text=True))
+            balanced = wallpaper('status')
+            assert balanced == dict(renderScale=.75, particleLayers=2, particleMotionDetail=1, moving=True), balanced
+            assert 'error' in wallpaper('configure', .1, 9, 2)
+            assert wallpaper('status') == balanced, 'Invalid request partially changed fidelity'
+            assert wallpaper('quality', 'high')['particleLayers'] == 3
+            low = wallpaper('quality', 'low')
+            assert low['renderScale'] == .5 and low['particleMotionDetail'] == 0, low
+            assert wallpaper('quality', 'balanced') == balanced
+            wallpaper('pause', 'true')
+            time.sleep(.3)
+            paused = capture('paused-first').crop((80, 80, 600, 500))
+            time.sleep(.4)
+            assert not ImageChops.difference(paused, capture('paused-next').crop((80, 80, 600, 500))).getbbox(), 'Pause kept moving'
+            wallpaper('pause', 'false')
+            time.sleep(.5)
+            assert ImageChops.difference(paused, capture('resumed').crop((80, 80, 600, 500))).getbbox(), 'Resume stayed frozen'
             control('launch', program='foot', args=['--app-id=shine-shell-test', 'sleep', '100'])
             window = trial.wait_for(lambda: trial.window_for(control, 'shine-shell-test'))
             trial.wait_for(lambda: trial.window_for(control, 'shine-shell-test')['geometry'][1] == 56,
@@ -181,7 +200,7 @@ def run():
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
     print('PASS: animated wallpapers, image override, software fallback, foot transparency, two panels, reserved space, '
-          'workspace/terminal clicks, keyboard focus, fullscreen, scale, clean shell exit '
+          'runtime fidelity, validation, pause/resume, workspace/terminal clicks, keyboard focus, fullscreen, scale, clean shell exit '
           'and parent windows preserved')
 
 

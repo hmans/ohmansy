@@ -27,6 +27,7 @@ moves its windows to a remaining monitor. Shine's Quickshell shell draws the
 shared animated ribbon wallpaper on each monitor, behind application windows.
 The ribbon render target uses 75% of its capped resolution (up to 1800 pixels
 wide), while the desktop animation remains about 15 frames per second.
+The balanced default keeps two particle layers with full particle motion.
 The background stays stationary while columns and workspaces change; Niri's
 parallax is not yet connected to Shine. Saved wallpaper images are honored,
 with a static fallback when ribbon rendering is unavailable. Foot's shared
@@ -77,6 +78,40 @@ Nested previews support scale changes; their resolution follows the host window.
 
 The module honors `ohmansy.terminal`; the standalone flake preview uses Foot.
 Close the preview's outer window or use its sign-out confirmation to end it.
+
+## Wallpaper fidelity
+
+The wallpaper's render scale, particle layers and particle motion detail can
+change live. Use `quickshell list` to find the desktop shell's PID, then:
+
+```sh
+quickshell ipc --pid SHELL_PID call wallpaper quality balanced
+quickshell ipc --pid SHELL_PID call wallpaper status
+```
+
+| Preset | Render scale | Particle layers | Particle motion detail |
+| --- | --- | --- | --- |
+| `high` | 100% | 3 | Full |
+| `balanced` (default) | 75% | 2 | Full |
+| `low` | 50% | 1 | Simple |
+
+The scale applies after the renderer's 2400-pixel width cap. All presets keep
+the same ribbon shape, motion speed and roughly 15 FPS. Lower detail removes
+the faintest particle layers first; simple particle motion skips the curl
+calculation. Changes apply to every monitor in that shell and last until it
+restarts. Niri exposes the same controls through its wallpaper process.
+
+For custom settings, supply scale (0.25–1), layers (0–3), and particle motion
+detail (0–1). Particle settings update shader uniforms; the shader stays loaded.
+Motion detail scales curl strength; zero skips its four noise samples per
+particle and retains the simpler drift.
+Pause freezes the animation in place and resume continues it:
+
+```sh
+quickshell ipc --pid SHELL_PID call wallpaper configure 0.75 2 0.5
+quickshell ipc --pid SHELL_PID call wallpaper pause true
+quickshell ipc --pid SHELL_PID call wallpaper pause false
+```
 
 ## Nested development demo
 

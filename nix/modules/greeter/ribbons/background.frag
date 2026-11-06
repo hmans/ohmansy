@@ -22,25 +22,32 @@ void main() {
         float distance = (uv.y - screenY) / 0.085;
         proximity = max(proximity, exp(-distance * distance));
     }
-    for (int layer = 0; layer < 3; ++layer) {
-        float depth = float(layer) / 2.0;
-        float density = mix(9.0, 3.8, depth);
-        vec2 field = p * density;
-        vec2 cell = floor(field);
-        for (int iy = -1; iy <= 1; ++iy) {
-            for (int ix = -1; ix <= 1; ++ix) {
-                vec2 id = cell + vec2(ix, iy);
-                float seed = hash(id + float(layer) * 73.19);
-                vec2 offset = vec2(hash(id + 2.7 + float(layer) * 31.0), hash(id + 5.3 + float(layer) * 61.0));
-                offset += turbulence(id + float(layer) * 19.37, t * (0.8 + depth * 0.5) + seed * 3.0);
-                vec2 delta = (field - id - offset) / density;
-                float radius = mix(0.00065, 0.0038, depth) * (0.65 + seed);
-                float distance = length(delta);
-                float core = 1.0 - smoothstep(radius * 0.15, radius + 1.0 / size.y, distance);
-                float halo = exp(-distance / (radius * 2.5)) * (0.08 + depth * 0.12);
-                float shimmer = 0.55 + 0.45 * pow(0.5 + 0.5 * sin(t * (0.5 + seed) + seed * 59.0), 2.0);
-                vec3 tint = mix(vec3(0.35, 0.65, 0.84), vec3(0.72, 0.57, 0.91), seed);
-                color += tint * (core + halo) * (0.16 + depth * 0.28) * shimmer * quiet * proximity * mix(1.0, 0.35, lightMix);
+    // Even summing all 27 particles at their maximum intensity, this cutoff
+    // omits less than one 8-bit color step. Keep shading the haze/background.
+    if (proximity >= 0.0001) {
+        for (int layer = 0; layer < 3; ++layer) {
+            // Drop the smallest, faintest particles first. Retained layers keep
+            // their original sizes, positions, colors and animation phases.
+            if (layer < 3 - particleLayers) continue;
+            float depth = float(layer) / 2.0;
+            float density = mix(9.0, 3.8, depth);
+            vec2 field = p * density;
+            vec2 cell = floor(field);
+            for (int iy = -1; iy <= 1; ++iy) {
+                for (int ix = -1; ix <= 1; ++ix) {
+                    vec2 id = cell + vec2(ix, iy);
+                    float seed = hash(id + float(layer) * 73.19);
+                    vec2 offset = vec2(hash(id + 2.7 + float(layer) * 31.0), hash(id + 5.3 + float(layer) * 61.0));
+                    offset += turbulence(id + float(layer) * 19.37, t * (0.8 + depth * 0.5) + seed * 3.0);
+                    vec2 delta = (field - id - offset) / density;
+                    float radius = mix(0.00065, 0.0038, depth) * (0.65 + seed);
+                    float distance = length(delta);
+                    float core = 1.0 - smoothstep(radius * 0.15, radius + 1.0 / size.y, distance);
+                    float halo = exp(-distance / (radius * 2.5)) * (0.08 + depth * 0.12);
+                    float shimmer = 0.55 + 0.45 * pow(0.5 + 0.5 * sin(t * (0.5 + seed) + seed * 59.0), 2.0);
+                    vec3 tint = mix(vec3(0.35, 0.65, 0.84), vec3(0.72, 0.57, 0.91), seed);
+                    color += tint * (core + halo) * (0.16 + depth * 0.28) * shimmer * quiet * proximity * mix(1.0, 0.35, lightMix);
+                }
             }
         }
     }

@@ -3,6 +3,8 @@ uniform vec2 size;
 uniform float time;
 uniform float lightMix;
 uniform int ribbonId;
+uniform int particleLayers;
+uniform float particleMotionDetail;
 
 float hash(vec2 p) {
     vec3 q = fract(vec3(p.x, p.y, p.x) * 0.1031);
@@ -16,14 +18,19 @@ float noise(vec2 p) {
                mix(hash(cell + vec2(0, 1)), hash(cell + 1.0), f.x), f.y);
 }
 vec2 turbulence(vec2 p, float t) {
-    vec2 q = p * 0.63 + vec2(t * 0.11, -t * 0.07);
-    const float e = 0.12;
-    float dx = noise(q + vec2(e, 0)) - noise(q - vec2(e, 0));
-    float dy = noise(q + vec2(0, e)) - noise(q - vec2(0, e));
-    vec2 curl = vec2(dy, -dx) / (2.0 * e);
+    vec2 curlMotion = vec2(0);
+    // Uniform branching skips four noise samples at the lowest motion detail.
+    if (particleMotionDetail > 0.0) {
+        vec2 q = p * 0.63 + vec2(t * 0.11, -t * 0.07);
+        const float e = 0.12;
+        float dx = noise(q + vec2(e, 0)) - noise(q - vec2(e, 0));
+        float dy = noise(q + vec2(0, e)) - noise(q - vec2(0, e));
+        vec2 curl = vec2(dy, -dx) / (2.0 * e);
+        curlMotion = tanh(curl) * 0.46 * particleMotionDetail;
+    }
     vec2 fine = vec2(noise(p * 1.7 + vec2(t * 0.19, 7.3)),
                      noise(p.yx * 1.9 + vec2(-t * 0.16, 29.1))) * 2.0 - 1.0;
-    return tanh(curl) * 0.46 + fine * 0.24;
+    return curlMotion + fine * 0.24;
 }
 float ribbonDepth(int id) {
     const float depths[3] = float[3](-6.0, 0.0, 1.8);
@@ -42,7 +49,7 @@ vec3 ribbonCenter(float s, float t, float id) {
     float depthScale = (4.5 - baseZ) / 4.5;
     return vec3(x * depthScale, y * depthScale, z);
 }
-vec3 ribbonPoint(float s, float v, float t, int id) {
+vec3 ribbonPoint(float s, float v, float t, int id, out vec3 across) {
     float f = float(id);
     vec3 center = ribbonCenter(s, t, f);
     vec3 tangent = normalize(ribbonCenter(s + 0.001, t, f) - center);
@@ -55,6 +62,16 @@ vec3 ribbonPoint(float s, float v, float t, int id) {
     float width = widths[id] * (0.28 + 1.25 * noise(vec2(s * 5.0 + f * 23.0, t * 0.055)));
     width *= (4.5 - ribbonDepth(id)) / 4.5;
     vec3 offset = side * v * width + cross(tangent, side) * (1.0 - v * v) * width * 0.22;
-    if (id == 0) offset.z *= 0.30;
+    // The cross-section is quadratic in v. Its derivative replaces two full
+    // shape samples when calculating the normal, including the flattened fold.
+    across = side * width - cross(tangent, side) * (2.0 * v) * width * 0.22;
+    if (id == 0) {
+        offset.z *= 0.30;
+        across.z *= 0.30;
+    }
     return center + offset;
+}
+vec3 ribbonPoint(float s, float v, float t, int id) {
+    vec3 across;
+    return ribbonPoint(s, v, t, id, across);
 }
