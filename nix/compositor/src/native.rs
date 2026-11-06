@@ -12,7 +12,7 @@ use smithay::{
             Fourcc,
         },
         drm::{
-            compositor::{DrmCompositor, FrameFlags},
+            compositor::{DrmCompositor, FrameFlags, PrimaryPlaneElement},
             exporter::gbm::GbmFramebufferExporter,
             DrmDevice, DrmDeviceFd, DrmEvent,
         },
@@ -425,6 +425,13 @@ impl Native {
             };
             head.dirty = false;
             if !result.is_empty {
+                // KMS cannot always wait on the renderer's fence (for example,
+                // when the driver cannot export it). Finish before submitting.
+                if result.needs_sync() {
+                    if let PrimaryPlaneElement::Swapchain(element) = &result.primary_element {
+                        element.sync.wait().context("Wait for display rendering")?;
+                    }
+                }
                 if let Err(error) = head.scanout.queue_frame(()) {
                     if head.mode != original_mode {
                         head.rollback(original_mode, state, error.to_string())?;
