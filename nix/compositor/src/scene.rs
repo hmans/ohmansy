@@ -29,10 +29,15 @@ use smithay::{
 use std::collections::HashMap;
 
 render_elements! {
+    pub WindowVisual<=GlesRenderer>;
+    Surface=WaylandSurfaceRenderElement<GlesRenderer>,
+    Rounded=crate::decoration::RoundedSurface,
+    Decoration=smithay::backend::renderer::gles::element::PixelShaderElement,
+}
+render_elements! {
     pub SceneElement<=GlesRenderer>;
     Window=CropRenderElement<WaylandSurfaceRenderElement<GlesRenderer>>,
-    Rounded=CropRenderElement<crate::decoration::RoundedSurface>,
-    Ring=CropRenderElement<smithay::backend::renderer::gles::element::PixelShaderElement>,
+    Visual=CropRenderElement<RescaleRenderElement<WindowVisual>>,
     Surface=WaylandSurfaceRenderElement<GlesRenderer>,
     Cursor=MemoryRenderBufferRenderElement<GlesRenderer>,
 }
@@ -259,6 +264,13 @@ impl Smallvil {
             let location =
                 self.space.element_location(window).unwrap() - window.geometry().loc - origin;
             let surface = window.toplevel().unwrap().wl_surface();
+            let bounds = Rectangle::new(location + window.geometry().loc, window.geometry().size);
+            let center = (bounds.loc + Point::from((bounds.size.w / 2, bounds.size.h / 2)))
+                .to_physical_precise_round(1.0);
+            let visual_scale = self.window_visual_scale(id);
+            let mut visual = Vec::new();
+            let amount = self.inactive_amount(id) as f32;
+            let inactive = &self.output_settings.decorations.inactive;
             // Popups have their own geometry and may extend beyond the window.
             for (popup, offset) in smithay::desktop::PopupManager::popups_for_surface(surface) {
                 let popup_location =
@@ -274,12 +286,19 @@ impl Smallvil {
                     1.0,
                     Kind::Unspecified,
                 ) {
-                    if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
-                        elements.push(SceneElement::Window(element));
-                    }
+                    let geometry = smithay::backend::renderer::element::Element::geometry(
+                        &element,
+                        1.0.into(),
+                    );
+                    let bounds =
+                        Rectangle::new(geometry.loc.to_logical(1), geometry.size.to_logical(1));
+                    visual.push(WindowVisual::Rounded(
+                        decorations
+                            .rounded(id, element, bounds, 0, scale, canvas, amount, inactive)
+                            .rescale(center, visual_scale, scale, canvas),
+                    ));
                 }
             }
-            let bounds = Rectangle::new(location + window.geometry().loc, window.geometry().size);
             let style = &self.output_settings.decorations;
             if !fullscreen
                 && self.layout.focused() == Some(id)
@@ -287,9 +306,7 @@ impl Smallvil {
                 && self.seat.get_keyboard().unwrap().current_focus().is_some()
             {
                 for ring in decorations.ring(id, bounds, style, scale) {
-                    if let Some(ring) = CropRenderElement::from_element(ring, 1.0, crop) {
-                        elements.push(SceneElement::Ring(ring));
-                    }
+                    visual.push(WindowVisual::Decoration(ring));
                 }
             }
             for element in render_elements_from_surface_tree::<
@@ -303,7 +320,7 @@ impl Smallvil {
                 1.0,
                 Kind::Unspecified,
             ) {
-                if !fullscreen && style.corner_radius > 0 {
+                if !fullscreen {
                     let element = decorations.rounded(
                         id,
                         element,
@@ -311,21 +328,30 @@ impl Smallvil {
                         style.corner_radius,
                         scale,
                         canvas,
+                        amount,
+                        inactive,
                     );
-                    if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
-                        elements.push(SceneElement::Rounded(element));
-                    }
-                } else if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
-                    elements.push(SceneElement::Window(element));
+                    visual.push(WindowVisual::Rounded(element.rescale(
+                        center,
+                        visual_scale,
+                        scale,
+                        canvas,
+                    )));
+                } else {
+                    visual.push(WindowVisual::Surface(element));
                 }
             }
             // Elements are ordered front to back: each shadow sits below its
             // own window and above windows behind it, with output-local clipping.
             if !fullscreen && style.shadow.enabled && style.shadow.color[3] > 0.0 {
                 for shadow in decorations.shadow(id, bounds, style, scale) {
-                    if let Some(shadow) = CropRenderElement::from_element(shadow, 1.0, crop) {
-                        elements.push(SceneElement::Ring(shadow));
-                    }
+                    visual.push(WindowVisual::Decoration(shadow));
+                }
+            }
+            for element in visual {
+                let element = RescaleRenderElement::from_element(element, center, visual_scale);
+                if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
+                    elements.push(SceneElement::Visual(element));
                 }
             }
         }

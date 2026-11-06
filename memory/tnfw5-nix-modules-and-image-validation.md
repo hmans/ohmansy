@@ -9,29 +9,41 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
-## Shine menu bar controls (2026-11-06)
+## Shine unfocused window effects (2026-11-06)
 
-Shine's bar uses plain clickable ohmansy text to open the launcher. Terminal
-and Displays remain launcher commands rather than left-side shortcuts. Sun and
-moon icons select appearance; a speaker icon and slider control the default
-PipeWire sink. The shell imports the existing AudioState and AppearanceState
-components through Ohmansy.Desktop, packaged by quickshell-ui.nix. The bar uses
-an appearance-aware ColorPalette for text, workspace surfaces, icons and the
-volume slider; the fixed Ui.Theme foreground stays light for other glass UIs.
-The private shell trial checks actual brand text pixels in both light and dark
-mode after changing the appearance preference.
+Shine defaults to 0.985 visual scale, 0.85 saturation and 0.05 neutral fog for
+unfocused windows, with a reversible 160 ms transition. Live TOML controls are
+under `decorations.inactive`; see `docs/compositor-development.md`. The effect
+uses the layout-selected app, so desktop overlays do not mute the selected app.
+Fullscreen windows are exempt. Client sizes and layout slots do not change.
 
-The compositor-session package built and the private headless compositor_shell.py
-trial passed with terminal/display access through the launcher, wallpaper,
-focus, scaling and clean shutdown checks. The running physical session loaded
-the checkout bar on both monitors without replacing the compositor or apps.
-This was a live runtime preview, not an OS activation or new boot.
+`inactive.rs` shares the transition and inverse transform with pointer input.
+`scene.rs` transforms window surfaces, popups and decorations before output
+clipping. The rounded texture shader applies premultiplied-alpha color muting;
+its mask follows the visual transform. Uniform changes invalidate cached mask
+identities so static clients repaint. Settled transitions repaint their exact
+endpoint once and then stop scheduling frames. `grabs/scaled_click.rs` updates
+the implicit click grab's coordinates during focus animation and beyond window
+bounds; existing popup and drag grabs retain their ownership.
 
-For runtime shell replacement from a sandboxed agent, a transient systemd user
-service can preserve native graphics and session assets. Direct launch from the
-agent environment selected llvmpipe and missed the installed wallpaper; the
-same wrapper launched with systemd-run --user used NVIDIA and the wallpaper.
-Verify the actual environment and rendering after replacement.
+Individual-window capture remains unscaled and unmuted; embedded cursor
+coordinates use the inverse transform. Whole-output capture includes the effect.
+
+Verification: 41 Rust tests, formatting, strict Clippy and the packaged session
+build passed. Private headless inactive-window pixel/input/drag/reversal/reload/
+idle trials passed at 100–200% display scaling, as did existing corner, shadow
+and movement trials. The real private PipeWire portal trial passed isolated
+window colors, popups, resize, hidden-workspace animation and display capture.
+The packaged session headless login/launcher/logout trial passed using an
+ignored wrapper that selects the packaged D-Bus session config explicitly:
+this machine's system session.conf is an empty stub. No OS activation or login
+compositor replacement was performed. A separate interactive preview was
+closed after the user clarified that remaining verification must stay headless.
+
+Long checkout paths exceed Linux's Unix-socket path limit. The shared test
+Control helper uses a private temporary directory alias for long socket paths,
+keeping the actual socket with its test artifacts. The movement fixture pins
+its expected ring color instead of assuming a historical desktop default.
 
 ## Shine GPU synchronization (2026-11-06)
 
@@ -1475,3 +1487,27 @@ service diagnostics, updates and recovery. Skill validation, native customizatio
 checks (shared sources and opt-out), and native flake evaluation passed. A
 standalone module's `/etc` output built successfully. These checks do not prove
 live client discovery; no OS activation or desktop restart was performed.
+
+## Shine menu bar controls (2026-11-06)
+
+Shine's bar uses plain clickable ohmansy text to open the launcher. Terminal
+and Displays remain launcher commands rather than left-side shortcuts. Sun and
+moon icons select appearance; a speaker icon and slider control the default
+PipeWire sink. The shell imports the existing AudioState and AppearanceState
+components through Ohmansy.Desktop, packaged by quickshell-ui.nix. The bar uses
+an appearance-aware ColorPalette for text, workspace surfaces, icons and the
+volume slider; the fixed Ui.Theme foreground stays light for other glass UIs.
+The private shell trial checks actual brand text pixels in both light and dark
+mode after changing the appearance preference.
+
+The compositor-session package built and the private headless compositor_shell.py
+trial passed with terminal/display access through the launcher, wallpaper,
+focus, scaling and clean shutdown checks. The running physical session loaded
+the checkout bar on both monitors without replacing the compositor or apps.
+This was a live runtime preview, not an OS activation or new boot.
+
+For runtime shell replacement from a sandboxed agent, a transient systemd user
+service can preserve native graphics and session assets. Direct launch from the
+agent environment selected llvmpipe and missed the installed wallpaper; the
+same wrapper launched with systemd-run --user used NVIDIA and the wallpaper.
+Verify the actual environment and rendering after replacement.

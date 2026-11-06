@@ -13,7 +13,7 @@ use smithay::{
 };
 use std::collections::{HashMap, HashSet};
 
-type MaskKey = (i32, i32, i32, i32, u32, u64);
+type MaskKey = (i32, i32, i32, i32, u32, u64, u32, u32, [u32; 3]);
 struct MaskId {
     window: WindowId,
     key: MaskKey,
@@ -42,6 +42,9 @@ impl Renderer {
                     UniformName::new("draw_origin", UniformType::_2f),
                     UniformName::new("mask_rect", UniformType::_4f),
                     UniformName::new("radius", UniformType::_1f),
+                    UniformName::new("saturation", UniformType::_1f),
+                    UniformName::new("fog", UniformType::_1f),
+                    UniformName::new("fog_color", UniformType::_3f),
                 ],
             )?,
             border: renderer.compile_custom_pixel_shader(
@@ -85,6 +88,7 @@ impl Renderer {
         self.rings.retain(|id, _| live.contains(id));
         self.shadows.retain(|id, _| live.contains(id));
     }
+    #[allow(clippy::too_many_arguments)]
     pub fn rounded(
         &mut self,
         window: WindowId,
@@ -93,8 +97,12 @@ impl Renderer {
         radius: u32,
         scale: f64,
         canvas: Point<i32, Physical>,
+        amount: f32,
+        inactive: &crate::preferences::Inactive,
     ) -> RoundedSurface {
         let geometry = inner.geometry(1.0.into());
+        let saturation = 1.0 + (inactive.saturation - 1.0) * amount;
+        let fog = inactive.fog * amount;
         let key = (
             bounds.loc.x - geometry.loc.x,
             bounds.loc.y - geometry.loc.y,
@@ -102,6 +110,9 @@ impl Renderer {
             bounds.size.h,
             radius,
             scale.to_bits(),
+            saturation.to_bits(),
+            fog.to_bits(),
+            inactive.fog_color.map(f32::to_bits),
         );
         self.used.insert(inner.id().clone());
         let cache = self
@@ -126,6 +137,9 @@ impl Renderer {
             physical,
             radius: radius as f32 * scale as f32,
             logical_radius: radius,
+            saturation,
+            fog,
+            fog_color: inactive.fog_color,
         }
     }
     pub fn shadow(
@@ -276,6 +290,34 @@ pub struct RoundedSurface {
     physical: Rectangle<i32, Physical>,
     radius: f32,
     logical_radius: u32,
+    saturation: f32,
+    fog: f32,
+    fog_color: [f32; 3],
+}
+impl RoundedSurface {
+    pub fn rescale(
+        mut self,
+        center: Point<i32, Physical>,
+        factor: f64,
+        scale: f64,
+        canvas: Point<i32, Physical>,
+    ) -> Self {
+        // Match the render-element transform before output scaling and cropping.
+        let bounds = self.bounds.to_physical_precise_round(1.0);
+        let bounds = Rectangle::new(
+            (bounds.loc - center)
+                .to_f64()
+                .upscale(factor)
+                .to_i32_round()
+                + center,
+            (bounds.size.to_f64() * factor).to_i32_round(),
+        );
+        self.physical = Rectangle::new(bounds.loc.to_logical(1), bounds.size.to_logical(1))
+            .to_physical_precise_round(scale);
+        self.physical.loc += canvas;
+        self.radius *= factor as f32;
+        self
+    }
 }
 impl Element for RoundedSurface {
     fn id(&self) -> &Id {
@@ -357,6 +399,9 @@ impl RenderElement<GlesRenderer> for RoundedSurface {
                     ),
                 ),
                 Uniform::new("radius", self.radius),
+                Uniform::new("saturation", self.saturation),
+                Uniform::new("fog", self.fog),
+                Uniform::new("fog_color", self.fog_color),
             ],
         );
         let result = self.inner.draw(frame, src, dst, damage, opaque);

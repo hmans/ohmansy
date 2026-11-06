@@ -7,6 +7,7 @@ mod desktop;
 mod grabs;
 mod handlers;
 mod image_capture;
+mod inactive;
 mod input;
 mod ipc;
 mod layout;
