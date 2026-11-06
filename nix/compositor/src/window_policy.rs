@@ -140,7 +140,10 @@ impl Smallvil {
                 };
                 self.layout.monitors[owner]
                     .layout
-                    .set_floating(id, parent, (width, height));
+                    .set_floating(id, parent, {
+                        let (side, top) = self.output_settings.decorations.frame.insets(false);
+                        (width + 2 * side, height + top + side)
+                    });
             }
         }
         if mapped {
@@ -148,11 +151,13 @@ impl Smallvil {
                 if self.layout.monitors[owner].layout.floating(id).is_some() {
                     let size = window.geometry().size;
                     if size.w > 0 && size.h > 0 {
-                        self.layout.monitors[owner].layout.set_floating(
-                            id,
-                            parent,
-                            (size.w, size.h),
-                        );
+                        self.layout.monitors[owner]
+                            .layout
+                            .set_floating(id, parent, {
+                                let (side, top) =
+                                    self.output_settings.decorations.frame.insets(false);
+                                (size.w + 2 * side, size.h + top + side)
+                            });
                     }
                 }
             }

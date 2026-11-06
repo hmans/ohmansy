@@ -154,12 +154,20 @@ impl Default for LayoutPreferences {
 #[serde(default, deny_unknown_fields)]
 pub struct Decorations {
     pub corner_radius: u32,
+    // Legacy settings remain readable; frames replace both focus rings.
+    #[serde(skip_serializing)]
     pub focus_ring_width: u32,
+    #[serde(skip_serializing)]
     pub focus_ring_color: [f32; 4],
+    #[serde(skip_serializing)]
     pub inactive_ring_width: u32,
+    #[serde(skip_serializing)]
     pub inactive_ring_color: [f32; 4],
     pub shadow: Shadow,
-    pub halo: Halo,
+    pub frame: Frame,
+    // Accept old settings so upgrading does not discard the rest of the file.
+    #[serde(skip_serializing, deserialize_with = "discard_halo")]
+    pub halo: (),
     pub inactive: Inactive,
 }
 impl Default for Decorations {
@@ -171,12 +179,27 @@ impl Default for Decorations {
             inactive_ring_width: 1,
             inactive_ring_color: [0.55, 0.55, 0.60, 0.55],
             shadow: Shadow::default(),
-            halo: Halo::default(),
+            frame: Frame::default(),
+            halo: (),
             inactive: Inactive::default(),
         }
     }
 }
 impl Decorations {
+    pub fn outer_radius(&self) -> u32 {
+        if self.frame.enabled {
+            self.frame.outer_corner_radius
+        } else {
+            self.corner_radius
+        }
+    }
+    pub fn inner_radius(&self) -> u32 {
+        if self.frame.enabled {
+            self.frame.inner_corner_radius
+        } else {
+            self.corner_radius
+        }
+    }
     pub fn validate(&self) -> Result<(), String> {
         if self.corner_radius > 128 || self.focus_ring_width > 16 || self.inactive_ring_width > 16 {
             return Err("Corner radius must be 0–128 and ring widths 0–16 logical pixels".into());
@@ -190,12 +213,7 @@ impl Decorations {
             return Err("Ring colors need four RGBA values from 0 to 1".into());
         }
         self.inactive.validate()?;
-        if !(1..=128).contains(&self.halo.width)
-            || !self.halo.opacity.is_finite()
-            || !(0.0..=1.0).contains(&self.halo.opacity)
-        {
-            return Err("Halo width must be 1–128 and opacity 0–1".into());
-        }
+        self.frame.validate()?;
         self.shadow.validate()
     }
 }
@@ -294,19 +312,125 @@ fn inactive_duration<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Resul
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Halo {
+pub struct Frame {
     pub enabled: bool,
     pub width: u32,
-    pub opacity: f32,
+    pub titlebar_height: u32,
+    pub title_font_size: f64,
+    pub icon_width: u32,
+    pub icon_height: u32,
+    pub title_padding: u32,
+    pub icon_title_gap: u32,
+    pub outer_corner_radius: u32,
+    pub inner_corner_radius: u32,
+    pub glass: Glass,
+    pub active_color: [f32; 4],
+    pub inactive_color: [f32; 4],
 }
-impl Default for Halo {
+impl Default for Frame {
     fn default() -> Self {
         Self {
             enabled: true,
-            width: 32,
-            opacity: 0.35,
+            width: 7,
+            titlebar_height: 30,
+            title_font_size: 13.0,
+            icon_width: 18,
+            icon_height: 18,
+            title_padding: 11,
+            icon_title_gap: 7,
+            outer_corner_radius: 10,
+            inner_corner_radius: 8,
+            glass: Glass::default(),
+            active_color: [81.0 / 255.0, 64.0 / 255.0, 95.0 / 255.0, 0.55],
+            inactive_color: [37.0 / 255.0, 40.0 / 255.0, 53.0 / 255.0, 0.40],
         }
     }
+}
+impl Frame {
+    pub fn validate(&self) -> Result<(), String> {
+        self.glass.validate()?;
+        if !(1..=16).contains(&self.width) || !(20..=64).contains(&self.titlebar_height) {
+            return Err("Frame width must be 1–16 and titlebar height 20–64 logical pixels".into());
+        }
+        if !self.title_font_size.is_finite() || !(4.0..=64.0).contains(&self.title_font_size) {
+            return Err("Title font size must be 4–64 logical pixels".into());
+        }
+        if !(1..=128).contains(&self.icon_width)
+            || !(1..=128).contains(&self.icon_height)
+            || self.title_padding > 128
+            || self.icon_title_gap > 128
+            || self.outer_corner_radius > 128
+            || self.inner_corner_radius > 128
+        {
+            return Err(
+                "Icon dimensions must be 1–128; padding, gap and corner radii 0–128 logical pixels"
+                    .into(),
+            );
+        }
+        if self
+            .active_color
+            .iter()
+            .chain(&self.inactive_color)
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err("Frame colors need four RGBA values from 0 to 1".into());
+        }
+        Ok(())
+    }
+    pub fn insets(&self, fullscreen: bool) -> (i32, i32) {
+        if self.enabled && !fullscreen {
+            (self.width as i32, self.titlebar_height as i32)
+        } else {
+            (0, 0)
+        }
+    }
+    pub fn bounds(
+        &self,
+        client: smithay::utils::Rectangle<i32, smithay::utils::Logical>,
+        fullscreen: bool,
+    ) -> smithay::utils::Rectangle<i32, smithay::utils::Logical> {
+        let (side, top) = self.insets(fullscreen);
+        smithay::utils::Rectangle::new(
+            client.loc - smithay::utils::Point::from((side, top)),
+            (client.size.w + side * 2, client.size.h + top + side).into(),
+        )
+    }
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Glass {
+    pub enabled: bool,
+    pub blur_radius: u32,
+    pub opacity: f32,
+    pub noise: f32,
+}
+impl Default for Glass {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            blur_radius: 12,
+            opacity: 0.9,
+            noise: 0.025,
+        }
+    }
+}
+impl Glass {
+    fn validate(&self) -> Result<(), String> {
+        if self.blur_radius > 64
+            || [self.opacity, self.noise]
+                .iter()
+                .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err(
+                "Glass blur radius must be 0–64 logical pixels; opacity and noise 0–1".into(),
+            );
+        }
+        Ok(())
+    }
+}
+fn discard_halo<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<(), D::Error> {
+    let _ = serde::de::IgnoredAny::deserialize(deserializer)?;
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -853,23 +977,85 @@ mod tests {
         ));
     }
     #[test]
-    fn halo_preferences_validate_size_strength_and_unknown_fields() {
+    fn frame_preferences_validate_size_and_colors() {
+        let defaults = Frame::default();
+        assert_eq!((defaults.width, defaults.titlebar_height), (7, 30));
+        assert_eq!(
+            (
+                defaults.icon_width,
+                defaults.icon_height,
+                defaults.title_padding,
+                defaults.icon_title_gap
+            ),
+            (18, 18, 11, 7)
+        );
+        assert_eq!(
+            (defaults.outer_corner_radius, defaults.inner_corner_radius),
+            (10, 8)
+        );
+        assert_eq!(defaults.title_font_size, 13.0);
         assert!(
-            Settings::parse("[decorations.halo]\nwidth=128\nopacity=0.0\nenabled=false").is_ok()
+            Settings::parse("[decorations.frame]\nwidth=3\ntitlebar_height=26\nenabled=false")
+                .is_ok()
         );
         for input in [
             "width=0",
-            "width=129",
-            "opacity=-0.1",
-            "opacity=1.1",
-            "opacity=nan",
+            "width=17",
+            "titlebar_height=19",
+            "titlebar_height=65",
+            "active_color=[1.1,0.0,0.0,1.0]",
+            "title_font_size=nan",
+            "title_font_size=inf",
+            "title_font_size=3.9",
+            "title_font_size=64.1",
+            "icon_width=0",
+            "icon_height=129",
+            "title_padding=129",
+            "icon_title_gap=129",
+            "outer_corner_radius=129",
+            "inner_corner_radius=129",
         ] {
             assert!(
-                Settings::parse(&format!("[decorations.halo]\n{input}")).is_err(),
+                Settings::parse(&format!("[decorations.frame]\n{input}")).is_err(),
                 "accepted {input}"
             );
         }
-        assert!(toml::from_str::<Settings>("[decorations.halo]\nunknown=true").is_err());
+        assert!(toml::from_str::<Settings>("[decorations.frame]\nunknown=true").is_err());
+        assert!(Settings::parse("[decorations.halo]\nenabled=true\nwidth=32\nopacity=0.5").is_ok());
+        for input in [
+            "blur_radius=65",
+            "opacity=-0.1",
+            "opacity=nan",
+            "noise=1.1",
+            "noise=inf",
+        ] {
+            assert!(
+                Settings::parse(&format!("[decorations.frame.glass]\n{input}")).is_err(),
+                "accepted {input}"
+            );
+        }
+        assert!(Settings::parse(
+            "[decorations.frame.glass]\nblur_radius=0\nopacity=0.0\nnoise=0.0\nenabled=false"
+        )
+        .is_ok());
+        let settings = Settings::parse("[decorations.frame]\nwidth=6\ntitlebar_height=44\ntitle_font_size=20.5\nicon_width=24\nicon_height=12\ntitle_padding=10\nicon_title_gap=9\nouter_corner_radius=0\ninner_corner_radius=32").unwrap();
+        let frame = &settings.decorations.frame;
+        assert_eq!(frame.title_font_size, 20.5);
+        assert_eq!((frame.icon_width, frame.icon_height), (24, 12));
+        assert_eq!(
+            (
+                settings.decorations.outer_radius(),
+                settings.decorations.inner_radius()
+            ),
+            (0, 32)
+        );
+        assert_eq!(
+            Settings::parse(&toml::to_string(&settings).unwrap())
+                .unwrap()
+                .decorations
+                .frame,
+            settings.decorations.frame
+        );
     }
     #[test]
     fn launcher_and_width_shortcuts_follow_both_modifier_profiles() {

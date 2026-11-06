@@ -66,7 +66,7 @@ pub struct Smallvil {
     pub graphics: crate::graphics::Info,
     pub vt_request: Option<i32>,
     pub next_window: WindowId,
-    pub configured: BTreeMap<WindowId, (i32, i32, bool, bool, bool)>,
+    pub configured: BTreeMap<WindowId, (i32, i32, bool, bool, bool, bool)>,
     pub needs_redraw: bool,
     pub shortcut_keys: std::collections::BTreeSet<u32>,
     pub dmabuf_state: DmabufState,
@@ -309,15 +309,16 @@ impl Smallvil {
         pos: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<f64, Logical>)> {
         use smithay::wayland::shell::wlr_layer::Layer;
-        self.layer_under(pos, &[Layer::Overlay, Layer::Top])
-            .or_else(|| {
-                self.window_under(pos).and_then(|(window, location)| {
-                    let local = self.window_input_point(window, pos - location.to_f64());
-                    self.window_surface_at(window, local)
-                        .map(|(s, p)| (s, pos - (local - p.to_f64())))
-                })
-            })
-            .or_else(|| self.layer_under(pos, &[Layer::Bottom, Layer::Background]))
+        if let Some(layer) = self.layer_under(pos, &[Layer::Overlay, Layer::Top]) {
+            return Some(layer);
+        }
+        if let Some((window, location)) = self.window_under(pos) {
+            let local = self.window_input_point(window, pos - location.to_f64());
+            return self
+                .window_surface_at(window, local)
+                .map(|(s, p)| (s, pos - (local - p.to_f64())));
+        }
+        self.layer_under(pos, &[Layer::Bottom, Layer::Background])
     }
 
     pub fn window_under(&self, pos: Point<f64, Logical>) -> Option<(&Window, Point<i32, Logical>)> {
@@ -328,11 +329,17 @@ impl Smallvil {
                 return None;
             }
             let location = self.space.element_location(window)? - window.geometry().loc;
-            self.window_surface_at(
-                window,
-                self.window_input_point(window, pos - location.to_f64()),
-            )
-            .map(|_| (window, location))
+            let point = self.window_input_point(window, pos - location.to_f64());
+            let frame = &self.output_settings.decorations.frame;
+            let bounds = frame.bounds(window.geometry(), self.layout.fullscreen_for(id));
+            (self.window_surface_at(window, point).is_some()
+                || (frame.enabled
+                    && crate::decoration::contains(
+                        bounds,
+                        self.output_settings.decorations.outer_radius(),
+                        point,
+                    )))
+            .then_some((window, location))
         })
     }
 
@@ -348,7 +355,18 @@ impl Smallvil {
             return Some(popup);
         }
         let id = self.window_id(window.toplevel()?.wl_surface())?;
-        let radius = self.output_settings.decorations.corner_radius;
+        let style = &self.output_settings.decorations;
+        let radius = style.inner_radius();
+        if style.frame.enabled
+            && !self.layout.fullscreen_for(id)
+            && !crate::decoration::contains(
+                style.frame.bounds(window.geometry(), false),
+                style.outer_radius(),
+                point,
+            )
+        {
+            return None;
+        }
         if radius > 0
             && !self.layout.fullscreen_for(id)
             && !crate::decoration::contains(window.geometry(), radius, point)
@@ -515,7 +533,16 @@ impl Smallvil {
         use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel::State;
         for (id, window) in &self.windows {
             let (min, max) = window_width_limits(window);
-            self.layout.constrain_width(*id, min, max);
+            let (side, _) = self
+                .output_settings
+                .decorations
+                .frame
+                .insets(self.layout.fullscreen_for(*id));
+            self.layout.constrain_width(
+                *id,
+                min + 2 * side,
+                if max > 0 { max + 2 * side } else { 0 },
+            );
         }
         let geometries = self.layout.geometries();
         for (id, window) in &self.windows {
@@ -528,16 +555,30 @@ impl Smallvil {
                 continue;
             };
             let fullscreen = self.layout.fullscreen_for(id);
+            let (side, top) = self.output_settings.decorations.frame.insets(fullscreen);
+            let width = (width - 2 * side).max(1);
+            let height = (height - top - side).max(1);
             let maximized = self.layout.maximized_for(id);
             let floating = self
                 .layout
                 .owner(id)
                 .is_some_and(|i| self.layout.monitors[i].layout.floating(id).is_some());
-            let configuration = (width, height, fullscreen, maximized, floating);
+            let configuration = (
+                width,
+                height,
+                fullscreen,
+                maximized,
+                floating,
+                self.output_settings.decorations.frame.enabled,
+            );
             if self.configured.get(&id) != Some(&configuration) {
                 let toplevel = window.toplevel().unwrap();
                 toplevel.with_pending_state(|state| {
                     state.size = Some((width, height).into());
+                    if state.decoration_mode.is_some() {
+                        use smithay::reexports::wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode;
+                        state.decoration_mode = Some(if self.output_settings.decorations.frame.enabled { Mode::ServerSide } else { Mode::ClientSide });
+                    }
                     for edge in [
                         State::TiledLeft,
                         State::TiledRight,
@@ -566,7 +607,7 @@ impl Smallvil {
                 }
                 self.configured.insert(id, configuration);
             }
-            self.space.map_element(window, (x, y), false);
+            self.space.map_element(window, (x + side, y + top), false);
         }
         if let Some(window) = self.layout.focused().and_then(|id| self.windows.get(&id)) {
             self.space.raise_element(window, false);
@@ -660,8 +701,17 @@ impl Smallvil {
                 let (min, max) = self
                     .layout
                     .focused()
-                    .and_then(|id| self.windows.get(&id))
-                    .map(window_width_limits)
+                    .and_then(|id| {
+                        self.windows.get(&id).map(|window| {
+                            let (min, max) = window_width_limits(window);
+                            let (side, _) = self
+                                .output_settings
+                                .decorations
+                                .frame
+                                .insets(self.layout.fullscreen_for(id));
+                            (min + side * 2, if max > 0 { max + side * 2 } else { 0 })
+                        })
+                    })
                     .unwrap_or((0, 0));
                 self.layout.cycle_width(direction < 0, min, max);
             }
@@ -791,6 +841,24 @@ impl Smallvil {
         }).collect();
         for window in &mut windows {
             let id = window["id"].as_u64().unwrap();
+            let (side, top) = self
+                .output_settings
+                .decorations
+                .frame
+                .insets(self.layout.fullscreen_for(id));
+            for field in ["geometry", "target_geometry"] {
+                let content_field = format!("content_{field}");
+                window[&content_field] = window[field].clone();
+                if let Some(rect) = window[&content_field].as_array_mut() {
+                    let values: Vec<i64> = rect.iter().map(|v| v.as_i64().unwrap()).collect();
+                    *rect = vec![
+                        (values[0] + side as i64).into(),
+                        (values[1] + top as i64).into(),
+                        (values[2] - 2 * side as i64).max(1).into(),
+                        (values[3] - top as i64 - side as i64).max(1).into(),
+                    ];
+                }
+            }
             let floating = self
                 .layout
                 .owner(id)

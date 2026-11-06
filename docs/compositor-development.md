@@ -352,8 +352,8 @@ windows, and accompany their parent on workspace and monitor moves. Client
 move/resize requests operate on floating geometry; tiled movement keeps its
 column behavior. Menus and tooltips continue using xdg popups and popup grabs.
 `Mod+Shift+Space` also floats or tiles an ordinary window. Both window types use
-the active focus ring and a quieter inactive ring for contrast against wallpaper;
-`decorations.inactive_ring_width` and `inactive_ring_color` configure that ring.
+a frame whose color changes with focus; `decorations.frame.active_color` and
+`inactive_color` configure its colors.
 
 Copy and paste use Ctrl+C/V in ordinary apps and Ctrl+Shift+C/V in recognized
 terminals. Ctrl+C still interrupts terminal programs. Terminal copy uses the
@@ -584,25 +584,46 @@ column widths. Animations control scrolling and same-workspace column reordering
 `duration_ms` is 0–5000, with 180 ms as the default. Shift+Mod+Left/Right (or H/L)
 slides both swapped columns using cubic easing. Repeated moves start from their
 current visible positions, and any accompanying viewport scroll uses the same
-timing. Keyboard focus stays with the moved window; its ring, menus, and pointer
+timing. Keyboard focus stays with the moved window; its frame, menus, and pointer
 input follow the visible position. Disabling animations or choosing zero snaps
 to the destination. Width changes, workspace transfers, and monitor transfers
 remain immediate. Resize, fullscreen, layout changes, and window removal finish
 pending reorder animations.
 
-### Rounded corners, focus ring and shadows
+### Window frames and shadows
 
-Windows have 14 px rounded corners, soft drop shadows, and a muted 2 px lavender ring
-around the focused window. Fullscreen windows have square corners, no shadow,
-and no ring. Menus and tooltips
-remain free to extend beyond the window. Transparent corners do not receive
-pointer input.
+Every window has a 7 px frosted glass frame, with a 30 px top edge for an 18 px
+app icon and an ellipsized window title. Focused frames use a muted purple tint;
+unfocused frames use a dark slate tint. Click the frame to focus a window.
+Drag its top edge to move a
+floating window or reorder a tiled column. The frame reserves space in the
+layout and never covers application content. Fullscreen windows omit the frame
+and shadow. Clients supporting server decorations omit their own titlebar;
+apps with integrated headerbars can keep them inside the frame.
 
 ```toml
 [decorations]
 corner_radius = 14
-focus_ring_width = 2
-focus_ring_color = [0.55, 0.50, 0.62, 0.75]
+
+[decorations.frame]
+enabled = true
+width = 7
+titlebar_height = 30
+title_font_size = 13.0
+icon_width = 18
+icon_height = 18
+title_padding = 11
+icon_title_gap = 7
+outer_corner_radius = 10
+inner_corner_radius = 8
+active_color = [0.317647, 0.250980, 0.372549, 0.55]
+inactive_color = [0.145098, 0.156863, 0.207843, 0.40]
+
+[decorations.frame.glass]
+enabled = true
+blur_radius = 12
+opacity = 0.9
+noise = 0.025
 
 [decorations.shadow]
 enabled = true
@@ -612,43 +633,43 @@ offset = [0, 6]
 color = [0.0, 0.0, 0.0, 0.35]
 ```
 
-Dimensions are logical pixels: radius 0–128 and ring width 0–16. Zero disables
-that decoration. The color is RGBA with four values from 0 to 1. Edits apply
-live to existing windows; output saves preserve this section. This uses the
-same renderer in the login session and the nested desktop preview.
+All dimensions, including font size, use logical pixels. Frame width accepts
+1–16, top height 20–64, title font size 4–64, icon width/height 1–128, and
+padding, gap and both radii 0–128. Font size can be fractional. Icon dimensions
+are independent; the icon and title are centered vertically in the top edge.
+Oversized captions are clipped to the frame and long titles are ellipsized.
+The outer radius controls the frame silhouette and shadow; the inner radius
+controls the client cutout independently. Both rendering and pointer hit areas
+follow these shapes. `decorations.corner_radius` applies when frames are disabled.
+Colors are RGBA values from 0 to 1; alpha controls tint strength in glass mode. Settings reload live on a
+compositor built with frame support. Rendering code changes need a new preview
+process; they cannot update the compositor in an existing login session.
+Desktop-entry icons support PNG and SVG, with a window glyph as fallback.
+Title text uses Inter with font fallback for other scripts. Titles and icons
+are cached until the title, app, caption measurements or render density changes.
 
-Drop shadows follow each window's rounded shape and movement, and disappear in
-fullscreen. Their interiors are cut out so translucent windows keep their
-original background opacity. `enabled = false` disables shadows. `softness`
-controls the soft falloff (1–64), `spread` expands the shape (0–64), and `offset`
-sets its horizontal and vertical displacement (−128–128 each), all in logical
-pixels. `color` is RGBA from 0 to 1; its alpha controls opacity. Shadow edits
-reload live and are preserved when saving monitor settings. Shadows are visual
-only and do not change window sizes, spacing, or input regions.
+Glass samples the actual scene behind each window, excluding that window's
+own contents, caption and shadow. Blur runs on the GPU; there is no CPU pixel
+readback. `blur_radius` accepts 0–64 logical pixels, `opacity` and `noise` accept
+0–1. The default fine grain stays fixed to the frame instead of shimmering.
+Set `glass.enabled = false` for a plain color frame. Backdrop snapshots are
+cached until lower surfaces, their geometry or frame settings change. A changing
+wallpaper updates the blur too. Individual-window sharing excludes frames.
+`python3 tools/tests/compositor_glass.py` checks real blur, transparency, grain,
+background updates and scaling on the private test display.
 
-### Window color halo
+Drop shadows follow each window's rounded outer frame. Their interiors are cut
+out so translucent windows keep their original background opacity. `enabled =
+false` disables shadows. `softness` controls falloff (1–64), `spread` expands the
+shape (0–64), and `offset` sets displacement (−128–128 each). Menus and tooltips
+remain free to extend beyond the window. Transparent corners do not receive
+pointer input. Individual-window sharing includes only client surfaces.
 
-Windows have a soft halo made from an enlarged, blurred copy of their own
-contents. It follows app repaints, moves and visual scaling, and fades to zero
-at its outer edge. The client interior stays unchanged, including translucent
-windows. Menus and tooltips are excluded from the halo source. Fullscreen
-windows omit the effect; halos are clipped to their owning output.
-
-```toml
-[decorations.halo]
-enabled = true
-width = 32
-opacity = 0.35
-```
-
-`width` accepts 1–128 logical pixels; `opacity` accepts 0–1. Edits reload live
-on a compositor built with halo support. The effect changes neither layout nor
-input regions. Its reduced-resolution image is cached until the app contents,
-size or halo settings change. Stationary windows cause no extra repaints.
-Individual-window screen sharing excludes decorations, including the halo.
-Use `python3 tools/tests/compositor_halo.py` in the development shell for the
-private pixel trial. Rendering code changes need a new compositor session;
-configuration reload cannot add the effect to an older running compositor.
+The former halo and focus ring have been removed. Old halo and ring settings
+are accepted for configuration compatibility and have no visual effect.
+`python3 tools/tests/compositor_frames.py` exercises the frame privately.
+IPC `geometry` and `target_geometry` describe the outer layout slot;
+`content_geometry` and `content_target_geometry` describe its client area.
 
 ### Unfocused window appearance
 

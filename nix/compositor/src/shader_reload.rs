@@ -8,9 +8,9 @@ use std::{
 pub struct Sources {
     pub rounded: String,
     pub coverage: String,
-    pub ring: String,
+    pub frame: String,
+    pub frost: String,
     pub shadow: String,
-    pub halo: String,
 }
 impl Sources {
     pub fn load(directory: Option<&std::path::Path>) -> anyhow::Result<Self> {
@@ -26,9 +26,9 @@ impl Sources {
                 "rounded-coverage.glsl",
                 include_str!("rounded-coverage.glsl"),
             )?,
-            ring: read("focus-ring.frag", include_str!("focus-ring.frag"))?,
+            frame: read("frame.frag", include_str!("frame.frag"))?,
+            frost: read("frost.frag", include_str!("frost.frag"))?,
             shadow: read("shadow.frag", include_str!("shadow.frag"))?,
-            halo: read("halo.frag", include_str!("halo.frag"))?,
         })
     }
     pub fn configured() -> anyhow::Result<Self> {
@@ -92,9 +92,9 @@ mod tests {
         for file in [
             "rounded.frag",
             "rounded-coverage.glsl",
-            "focus-ring.frag",
+            "frame.frag",
+            "frost.frag",
             "shadow.frag",
-            "halo.frag",
         ] {
             std::fs::write(directory.join(file), file).unwrap();
         }
@@ -105,7 +105,7 @@ mod tests {
             next: now,
         };
         assert!(!watch.changed(now));
-        std::fs::write(directory.join("halo.frag"), "edited halo").unwrap();
+        std::fs::write(directory.join("frame.frag"), "edited frame").unwrap();
         assert!(watch.changed(now + Duration::from_secs(1)));
         assert!(!watch.changed(now + Duration::from_secs(2)));
         std::fs::remove_file(directory.join("shadow.frag")).unwrap();

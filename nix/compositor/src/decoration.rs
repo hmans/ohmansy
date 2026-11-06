@@ -1,4 +1,4 @@
-//! Window masks, shadows and focus rings shared by native and nested rendering.
+//! Window masks, shadows and frames shared by native and nested rendering.
 use crate::{layout::WindowId, preferences::Decorations};
 use smithay::{
     backend::renderer::{
@@ -13,49 +13,68 @@ use smithay::{
 };
 use std::collections::{HashMap, HashSet};
 
-type MaskKey = (i32, i32, i32, i32, u32, u64, u32, u32, [u32; 3]);
+type MaskKey = (
+    i32,
+    i32,
+    i32,
+    i32,
+    u32,
+    u64,
+    u32,
+    u32,
+    [u32; 3],
+    (i32, i32, i32, i32, u32),
+);
 struct MaskId {
     window: WindowId,
     key: MaskKey,
     id: Id,
 }
-struct Ring {
+struct CachedBands {
     style: (Decorations, u64, i32, i32),
     elements: Vec<PixelShaderElement>,
 }
 pub struct Renderer {
-    pub halo: crate::halo::Renderer,
+    pub restore_draw_buffer: bool,
+    pub titles: crate::frame_title::Renderer,
+    pub frost: crate::frost::Renderer,
     rounded: GlesTexProgram,
     border: GlesPixelProgram,
     shadow: GlesPixelProgram,
     masks: HashMap<Id, MaskId>,
-    rings: HashMap<WindowId, Ring>,
-    shadows: HashMap<WindowId, Ring>,
+    frames: HashMap<WindowId, CachedBands>,
+    shadows: HashMap<WindowId, CachedBands>,
     used: HashSet<Id>,
 }
 impl Renderer {
     pub fn new(renderer: &mut GlesRenderer) -> anyhow::Result<Self> {
         let sources = crate::shader_reload::Sources::configured()?;
         Ok(Self {
-            halo: crate::halo::Renderer::new(renderer, &sources.halo)?,
+            restore_draw_buffer: false,
+            titles: crate::frame_title::Renderer::default(),
+            frost: crate::frost::Renderer::new(renderer, &sources.frost, &sources.coverage)?,
             rounded: renderer.compile_custom_texture_shader(
                 sources.rounded.replace("//_COVERAGE_", &sources.coverage),
                 &[
                     UniformName::new("draw_origin", UniformType::_2f),
                     UniformName::new("mask_rect", UniformType::_4f),
                     UniformName::new("radius", UniformType::_1f),
+                    UniformName::new("outer_rect", UniformType::_4f),
+                    UniformName::new("outer_radius", UniformType::_1f),
                     UniformName::new("saturation", UniformType::_1f),
                     UniformName::new("fog", UniformType::_1f),
                     UniformName::new("fog_color", UniformType::_3f),
                 ],
             )?,
             border: renderer.compile_custom_pixel_shader(
-                sources.ring.replace("//_COVERAGE_", &sources.coverage),
+                sources.frame.replace("//_COVERAGE_", &sources.coverage),
                 &[
                     UniformName::new("radius", UniformType::_1f),
+                    UniformName::new("inner_radius", UniformType::_1f),
                     UniformName::new("thickness", UniformType::_1f),
+                    UniformName::new("titlebar_height", UniformType::_1f),
                     UniformName::new("feather", UniformType::_1f),
-                    UniformName::new("ring_color", UniformType::_4f),
+                    UniformName::new("frame_color", UniformType::_4f),
                     UniformName::new("full_size", UniformType::_2f),
                     UniformName::new("piece_offset", UniformType::_2f),
                 ],
@@ -74,7 +93,7 @@ impl Renderer {
                 ],
             )?,
             masks: HashMap::new(),
-            rings: HashMap::new(),
+            frames: HashMap::new(),
             shadows: HashMap::new(),
             used: HashSet::new(),
         })
@@ -83,11 +102,12 @@ impl Renderer {
         self.used.clear();
     }
     pub fn finish_output(&mut self, live: &HashSet<WindowId>, owned: &HashSet<WindowId>) {
-        self.halo.retain(live, owned);
+        self.titles.retain(live);
+        self.frost.retain(live);
         self.masks.retain(|id, m| {
             live.contains(&m.window) && (!owned.contains(&m.window) || self.used.contains(id))
         });
-        self.rings.retain(|id, _| live.contains(id));
+        self.frames.retain(|id, _| live.contains(id));
         self.shadows.retain(|id, _| live.contains(id));
     }
     #[allow(clippy::too_many_arguments)]
@@ -97,12 +117,14 @@ impl Renderer {
         inner: WaylandSurfaceRenderElement<GlesRenderer>,
         bounds: Rectangle<i32, Logical>,
         radius: u32,
+        outer: Option<(Rectangle<i32, Logical>, u32)>,
         scale: f64,
         canvas: Point<i32, Physical>,
         amount: f32,
         inactive: &crate::preferences::Inactive,
     ) -> RoundedSurface {
         let geometry = inner.geometry(1.0.into());
+        let (outer_bounds, outer_radius) = outer.unwrap_or((bounds, radius));
         let saturation = 1.0 + (inactive.saturation - 1.0) * amount;
         let fog = inactive.fog * amount;
         let key = (
@@ -115,6 +137,13 @@ impl Renderer {
             saturation.to_bits(),
             fog.to_bits(),
             inactive.fog_color.map(f32::to_bits),
+            (
+                outer_bounds.loc.x - geometry.loc.x,
+                outer_bounds.loc.y - geometry.loc.y,
+                outer_bounds.size.w,
+                outer_bounds.size.h,
+                outer_radius,
+            ),
         );
         self.used.insert(inner.id().clone());
         let cache = self
@@ -131,6 +160,8 @@ impl Renderer {
         }
         let mut physical = bounds.to_physical_precise_round(scale);
         physical.loc += canvas;
+        let mut outer_physical = outer_bounds.to_physical_precise_round(scale);
+        outer_physical.loc += canvas;
         RoundedSurface {
             inner,
             id: cache.id.clone(),
@@ -139,6 +170,10 @@ impl Renderer {
             physical,
             radius: radius as f32 * scale as f32,
             logical_radius: radius,
+            outer_bounds,
+            outer_physical,
+            outer_radius: outer_radius as f32 * scale as f32,
+            logical_outer_radius: outer_radius,
             saturation,
             fog,
             fog_color: inactive.fog_color,
@@ -155,7 +190,7 @@ impl Renderer {
         let padding = (shadow.softness * 3 + shadow.spread) as i32
             + shadow.offset[0].abs().max(shadow.offset[1].abs())
             + 1;
-        let radius = (style.corner_radius as i32).min(bounds.size.w.min(bounds.size.h) / 2);
+        let radius = (style.outer_radius() as i32).min(bounds.size.w.min(bounds.size.h) / 2);
         let (w, h) = (bounds.size.w, bounds.size.h);
         // The interior is deliberately absent, including for translucent clients.
         // Only rounded corners and the bands outside the window need shading.
@@ -172,7 +207,7 @@ impl Renderer {
             Rectangle::new((w, radius).into(), (padding, h - 2 * radius).into()),
         ];
         let key = (style.clone(), scale.to_bits(), w, h);
-        let cache = self.shadows.entry(id).or_insert_with(|| Ring {
+        let cache = self.shadows.entry(id).or_insert_with(|| CachedBands {
             style: key.clone(),
             elements: pieces
                 .iter()
@@ -197,20 +232,23 @@ impl Renderer {
         cache.style = key;
         cache.elements.clone()
     }
-    pub fn ring(
+    pub fn frame(
         &mut self,
         id: WindowId,
         bounds: Rectangle<i32, Logical>,
         style: &Decorations,
         scale: f64,
     ) -> Vec<PixelShaderElement> {
-        let width = style.focus_ring_width as i32;
-        let area = Rectangle::new(
-            bounds.loc - Point::from((width, width)),
-            (bounds.size.w + 2 * width, bounds.size.h + 2 * width).into(),
-        );
+        let width = style.frame.width as i32;
+        let area = bounds;
         // Leave the large transparent center out of the fragment shader.
-        let band = (style.corner_radius as i32 + width + 1).min(area.size.h / 2);
+        let band = (style
+            .frame
+            .outer_corner_radius
+            .max(style.frame.inner_corner_radius) as i32
+            + style.frame.titlebar_height as i32
+            + 1)
+        .min(area.size.h / 2);
         let pieces = [
             Rectangle::new((0, 0).into(), (area.size.w, band).into()),
             Rectangle::new((0, area.size.h - band).into(), (area.size.w, band).into()),
@@ -221,7 +259,7 @@ impl Renderer {
             ),
         ];
         let key = (style.clone(), scale.to_bits(), area.size.w, area.size.h);
-        let cache = self.rings.entry(id).or_insert_with(|| Ring {
+        let cache = self.frames.entry(id).or_insert_with(|| CachedBands {
             style: key.clone(),
             elements: pieces
                 .iter()
@@ -231,7 +269,7 @@ impl Renderer {
                         Rectangle::new(area.loc + piece.loc, piece.size),
                         None,
                         1.0,
-                        ring_uniforms(style, scale, area.size, piece.loc),
+                        frame_uniforms(style, scale, area.size, piece.loc),
                         Kind::Unspecified,
                     )
                 })
@@ -240,7 +278,7 @@ impl Renderer {
         for (element, piece) in cache.elements.iter_mut().zip(pieces) {
             element.resize(Rectangle::new(area.loc + piece.loc, piece.size), None);
             if cache.style != key {
-                element.update_uniforms(ring_uniforms(style, scale, area.size, piece.loc));
+                element.update_uniforms(frame_uniforms(style, scale, area.size, piece.loc));
             }
         }
         cache.style = key;
@@ -254,7 +292,7 @@ fn shadow_uniforms(
     offset: Point<i32, Logical>,
 ) -> Vec<Uniform<'static>> {
     vec![
-        Uniform::new("radius", style.corner_radius as f32),
+        Uniform::new("radius", style.outer_radius() as f32),
         Uniform::new("softness", style.shadow.softness as f32),
         Uniform::new("spread", style.shadow.spread as f32),
         Uniform::new(
@@ -267,17 +305,19 @@ fn shadow_uniforms(
         Uniform::new("feather", 0.5 / scale as f32),
     ]
 }
-fn ring_uniforms(
+fn frame_uniforms(
     style: &Decorations,
     scale: f64,
     size: smithay::utils::Size<i32, Logical>,
     offset: Point<i32, Logical>,
 ) -> Vec<Uniform<'static>> {
     vec![
-        Uniform::new("radius", style.corner_radius as f32),
-        Uniform::new("thickness", style.focus_ring_width as f32),
+        Uniform::new("radius", style.outer_radius() as f32),
+        Uniform::new("inner_radius", style.frame.inner_corner_radius as f32),
+        Uniform::new("thickness", style.frame.width as f32),
+        Uniform::new("titlebar_height", style.frame.titlebar_height as f32),
         Uniform::new("feather", 0.5 / scale as f32),
-        Uniform::new("ring_color", style.focus_ring_color),
+        Uniform::new("frame_color", style.frame.active_color),
         Uniform::new("full_size", (size.w as f32, size.h as f32)),
         Uniform::new("piece_offset", (offset.x as f32, offset.y as f32)),
     ]
@@ -292,6 +332,10 @@ pub struct RoundedSurface {
     physical: Rectangle<i32, Physical>,
     radius: f32,
     logical_radius: u32,
+    outer_bounds: Rectangle<i32, Logical>,
+    outer_physical: Rectangle<i32, Physical>,
+    outer_radius: f32,
+    logical_outer_radius: u32,
     saturation: f32,
     fog: f32,
     fog_color: [f32; 3],
@@ -318,6 +362,15 @@ impl RoundedSurface {
             .to_physical_precise_round(scale);
         self.physical.loc += canvas;
         self.radius *= factor as f32;
+        let outer = self.outer_bounds.to_physical_precise_round(1.0);
+        let outer = Rectangle::new(
+            (outer.loc - center).to_f64().upscale(factor).to_i32_round() + center,
+            (outer.size.to_f64() * factor).to_i32_round(),
+        );
+        self.outer_physical = Rectangle::new(outer.loc.to_logical(1), outer.size.to_logical(1))
+            .to_physical_precise_round(scale);
+        self.outer_physical.loc += canvas;
+        self.outer_radius *= factor as f32;
         self
     }
 }
@@ -348,7 +401,8 @@ impl Element for RoundedSurface {
         // Only advertise the fully covered central cross; rounded pixels need blending.
         let mut regions = Vec::new();
         let bounds = self.bounds.to_physical_precise_round(scale);
-        let radius = (self.logical_radius as f64 * scale.x).ceil() as i32 + 1;
+        let radius =
+            (self.logical_radius.max(self.logical_outer_radius) as f64 * scale.x).ceil() as i32 + 1;
         let safe = [
             Rectangle::new(
                 bounds.loc + Point::from((radius, 0)),
@@ -401,6 +455,16 @@ impl RenderElement<GlesRenderer> for RoundedSurface {
                     ),
                 ),
                 Uniform::new("radius", self.radius),
+                Uniform::new("outer_radius", self.outer_radius),
+                Uniform::new(
+                    "outer_rect",
+                    (
+                        self.outer_physical.loc.x as f32,
+                        self.outer_physical.loc.y as f32,
+                        self.outer_physical.size.w as f32,
+                        self.outer_physical.size.h as f32,
+                    ),
+                ),
                 Uniform::new("saturation", self.saturation),
                 Uniform::new("fog", self.fog),
                 Uniform::new("fog_color", self.fog_color),

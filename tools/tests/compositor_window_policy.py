@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise focus, launcher reuse, rings and real GTK transient dialogs."""
+"""Exercise focus, launcher reuse, frames and real GTK transient dialogs."""
 import json
 import os
 from pathlib import Path
@@ -20,7 +20,7 @@ def run():
     client = artifacts / 'client'
     subprocess.run(['cc', '-Wall', '-Wextra', '-Werror', str(Path(__file__).with_name('compositor_window_policy_client.c')), '-o', str(client), *flags], check=True)
     config = artifacts / 'config.toml'
-    config.write_text('[animations]\nenabled=false\n[decorations]\nfocus_ring_color=[1.0,0.0,0.0,1.0]\ninactive_ring_color=[0.0,1.0,0.0,1.0]\ninactive_ring_width=2\n[decorations.inactive]\nenabled=false\n')
+    config.write_text('[animations]\nenabled=false\n[decorations.frame]\nactive_color=[1.0,0.0,0.0,1.0]\ninactive_color=[0.0,1.0,0.0,1.0]\n[decorations.inactive]\nenabled=false\n')
     control = trial.Control(artifacts / 'control.sock')
     command = artifacts / 'command'
     original = {w['id']: w['pid'] for w in trial.parent_windows()}
@@ -62,7 +62,7 @@ def run():
             dialog = trial.wait_for(lambda: title('Shine policy dialog'))
             trial.wait_for(lambda: focus(dialog['id']))
             assert title('Shine policy parent')['target_geometry'] == parent_geometry
-            assert dialog['target_geometry'][2] == 420, dialog
+            assert dialog['content_target_geometry'][2] == 420, dialog
             assert dialog['target_geometry'][3] < parent_geometry[3], dialog
             control.send_keys([30])
             trial.wait_for(lambda: command.with_suffix('.key').exists(), description='dialog keyboard input')
@@ -82,13 +82,13 @@ def run():
             assert title('Shine policy parent')['target_geometry']==parent_geometry
             control('focus',parent['id'])
             assert focus(dialog['id']), 'Modal dialog must retain keyboard focus above parent'
-            image = artifacts / 'rings.png'
+            image = artifacts / 'frames.png'
             control('screenshot', path=str(image))
             trial.wait_for(image.exists)
             with Image.open(image) as screenshot:
                 colors = screenshot.convert('RGB').getcolors(screenshot.width*screenshot.height)
-                assert sum(n for n,(r,g,b) in colors if r>180 and g<70 and b<70)>100, 'active ring missing'
-                assert sum(n for n,(r,g,b) in colors if g>180 and r<70 and b<70)>100, 'inactive ring missing'
+                assert sum(n for n,(r,g,b) in colors if r>180 and g<70 and b<70)>100, 'active frame missing'
+                assert sum(n for n,(r,g,b) in colors if g>180 and r<70 and b<70)>100, 'inactive frame missing'
             command.write_text('close')
             trial.wait_for(lambda: not title('Shine policy dialog'))
             trial.wait_for(lambda: focus(parent['id']), description='dialog returns focus to parent')
@@ -120,13 +120,13 @@ def run():
             command.write_text('close2')
             trial.wait_for(lambda: not title('Shine policy dialog'))
             trial.wait_for(lambda: focus(parent['id']))
-            (artifacts / 'verification.json').write_text(json.dumps({'new_window_focus':True,'close_left':True,'move_follow':True,'launcher_reuse':True,'rings':True,'transient_dialogs_and_input':True,'unmap_remap':True}))
+            (artifacts / 'verification.json').write_text(json.dumps({'new_window_focus':True,'close_left':True,'move_follow':True,'launcher_reuse':True,'frames':True,'transient_dialogs_and_input':True,'unmap_remap':True}))
         finally:
             if process.poll() is None:
                 control('quit')
                 process.wait(timeout=10)
             assert {w['id']:w['pid'] for w in trial.parent_windows()} == original
-    print('PASS: window focus, launcher reuse, rings, workspace following and floating dialog input')
+    print('PASS: window focus, launcher reuse, frames, workspace following and floating dialog input')
 
 
 if __name__ == '__main__':

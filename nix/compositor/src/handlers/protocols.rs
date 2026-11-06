@@ -40,7 +40,12 @@ delegate_viewporter!(Smallvil);
 
 impl XdgDecorationHandler for Smallvil {
     fn new_decoration(&mut self, surface: ToplevelSurface) {
-        surface.with_pending_state(|state| state.decoration_mode = Some(Mode::ClientSide));
+        let mode = if self.output_settings.decorations.frame.enabled {
+            Mode::ServerSide
+        } else {
+            Mode::ClientSide
+        };
+        surface.with_pending_state(|state| state.decoration_mode = Some(mode));
     }
     fn request_mode(&mut self, surface: ToplevelSurface, _mode: Mode) {
         self.new_decoration(surface.clone());

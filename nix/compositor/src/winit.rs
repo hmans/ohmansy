@@ -161,7 +161,7 @@ pub fn init_winit(
                         }
                         // Compilation also makes EGL surfaceless, including on
                         // failure. Restore the nested draw buffer below.
-                        decorations.halo.offscreen_rendered = true;
+                        decorations.restore_draw_buffer = true;
                     }
                     state.import_buffers(backend.renderer());
                     state.space.refresh();
@@ -205,7 +205,7 @@ pub fn init_winit(
                             );
                             left += output.current_mode().unwrap().size.w;
                         }
-                        if std::mem::take(&mut decorations.halo.offscreen_rendered) {
+                        if std::mem::take(&mut decorations.restore_draw_buffer) {
                             // Surfaceless EGL passes leave the default draw buffer
                             // at NONE. Restore BACK on the actual window surface
                             // before clearing or drawing any output elements.

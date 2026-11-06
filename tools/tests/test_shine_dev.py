@@ -101,7 +101,7 @@ with socket.socket(socket.AF_UNIX) as listener:
                     connection = root / '.local/shine-dev/connection.json'
                     wait_for(connection.exists)
                     first = json.loads(connection.read_text())['pid']
-                    (source / 'halo.frag').write_text('shader-only edit')
+                    (source / 'frame.frag').write_text('shader-only edit')
                     time.sleep(.8)
                     self.assertEqual(len([e for e in records() if e['event']=='build']), 1)
                     rust.write_text('broken')

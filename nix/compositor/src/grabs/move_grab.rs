@@ -34,10 +34,11 @@ impl PointerGrab<Smallvil> for MoveSurfaceGrab {
             if let Some(owner) = data.layout.owner(id) {
                 if data.layout.monitors[owner].layout.floating(id).is_some() {
                     let origin = data.layout.monitors[owner].origin;
+                    let (side, top) = data.output_settings.decorations.frame.insets(false);
                     data.layout.monitors[owner].layout.move_floating(
                         id,
-                        new_location.x.round() as i32 - origin.0,
-                        new_location.y.round() as i32 - origin.1,
+                        new_location.x.round() as i32 - origin.0 - side,
+                        new_location.y.round() as i32 - origin.1 - top,
                     );
                     data.queue_window_positions();
                     return;

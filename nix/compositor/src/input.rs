@@ -86,6 +86,40 @@ impl Smallvil {
         let keyboard = self.seat.get_keyboard().unwrap();
 
         let serial = SERIAL_COUNTER.next_serial();
+        let title_drag =
+            if button == 0x110 && button_state == ButtonState::Pressed && !pointer.is_grabbed() {
+                use smithay::wayland::shell::wlr_layer::Layer;
+                if self
+                    .layer_under(pointer.current_location(), &[Layer::Overlay, Layer::Top])
+                    .is_some()
+                {
+                    None
+                } else {
+                    self.window_under(pointer.current_location())
+                        .and_then(|(window, location)| {
+                            let id = self.window_id(window.toplevel()?.wl_surface())?;
+                            let frame = &self.output_settings.decorations.frame;
+                            if !frame.enabled || self.layout.fullscreen_for(id) {
+                                return None;
+                            }
+                            let point = self.window_input_point(
+                                window,
+                                pointer.current_location() - location.to_f64(),
+                            );
+                            let bounds = frame.bounds(window.geometry(), false);
+                            (self.surface_under(pointer.current_location()).is_none()
+                                && point.y < window.geometry().loc.y as f64
+                                && crate::decoration::contains(
+                                    bounds,
+                                    self.output_settings.decorations.outer_radius(),
+                                    point,
+                                ))
+                            .then(|| (window.clone(), self.space.element_location(window).unwrap()))
+                        })
+                }
+            } else {
+                None
+            };
         let scaled_click = if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
             self.window_under(pointer.current_location())
                 .and_then(|(window, location)| {
@@ -150,7 +184,22 @@ impl Smallvil {
                 time,
             },
         );
-        if let Some((window, surface_offset)) = scaled_click {
+        if let Some((window, initial_window_location)) = title_drag {
+            pointer.set_grab(
+                self,
+                crate::grabs::MoveSurfaceGrab {
+                    start_data: smithay::input::pointer::GrabStartData {
+                        focus: None,
+                        button,
+                        location: pointer.current_location(),
+                    },
+                    window,
+                    initial_window_location,
+                },
+                serial,
+                smithay::input::pointer::Focus::Clear,
+            );
+        } else if let Some((window, surface_offset)) = scaled_click {
             if let Some(start_data) = pointer.grab_start_data() {
                 // Replace only the implicit click grab; clients may have installed
                 // their own popup or drag grab before this button arrived.

@@ -26,6 +26,8 @@ let
       pkgs.libinput
       pkgs.seatd
       pkgs.udev
+      pkgs.cairo
+      pkgs.pango
     ];
   };
   # Only Cargo manifests, the lock file, toolchain and build inputs determine

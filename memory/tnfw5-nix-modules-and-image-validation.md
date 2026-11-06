@@ -7,6 +7,90 @@ data:
 id: tnfw5
 title: Nix modules and image validation
 ---
+## Shine window frames replace halos and focus rings (2026-11-06)
+
+`decorations.frame` defaults to 7 logical px sides/bottom and a 30 px top edge.
+Focused frames use muted purple, inactive frames dark slate. Layout slots are
+outer rectangles; `apply_positions` subtracts insets for client configures and
+maps clients inside them. Size hints, floating dialogs, move/resize grabs and
+width presets account for those insets. Fullscreen windows omit the frame.
+Xdg-decoration clients negotiate ServerSide; integrated client headerbars can
+remain as app content. Frame enablement is part of the configure cache key so
+fixed-size apps still renegotiate decoration mode when toggled.
+
+
+Measurement settings live together under `decorations.frame`: `width`,
+`titlebar_height`, `title_font_size`, `icon_width`, `icon_height`, `title_padding`,
+`icon_title_gap`, `outer_corner_radius` and `inner_corner_radius`. Defaults use
+7/30 px geometry, 13 px text, 18×18 px icons, 11 px padding, 7 px gap and 10/8 px
+radii, matching the owner's chosen frame measurements. Font size accepts fractions. Caption caches include these measurements;
+SVG icons are rasterized for their requested physical density. Independent inner
+and outer masks intersect for client rendering and input, preventing square
+client corners from leaking outside a rounded outer frame. Shadow geometry uses
+the outer radius; `decorations.corner_radius` applies with frames disabled.
+
+The measurement follow-up passed 57 Rust tests, fmt/strict Clippy, the Git-backed
+Nix compositor build and packaged example validation. Private CPU trials passed
+live font-only/icon-only cache updates, rectangular icons, spacing, independent
+radii, transparent-corner input, default 100/125/200% scales, inactive effects
+and shadows. No hardware-rendered or installed-session activation was performed.
+
+`frame.frag` renders four rounded bands, cutting out the client's rounded
+interior. The top band includes the inner corner radius below the titlebar.
+`frame_title.rs` caches Pango/Cairo Inter text and desktop-entry PNG/SVG icons,
+uses fallback glyphs and ellipsizes titles, and uploads only changed caption
+buffers. Normal scene composition remains GPU accelerated. The old window-content halo
+remains removed; background blur for frosted frames is described below.
+Input inverse transforms share the outer frame's center. Frame clicks focus;
+top-edge drags move floats or reorder columns, without reaching client surfaces
+or wallpaper. Popups retain priority above the frame. IPC geometry remains the
+outer slot, with content_geometry/content_target_geometry for the client area.
+
+Verification: 57 Rust tests, formatting, strict Clippy and the preview lifecycle
+tests passed. Private CPU-rendered trials passed frame pixels at 100/125/200%,
+icon/title updates, inner corners, focus, dragging, fullscreen and idle; also
+window policy/dialog input, shadows/translucency, inactive effects, client drags,
+and animated column movement. Hardware rendering was not exercised, to preserve
+the desktop during the separate freeze investigation. The Git-backed Nix package
+built; no installed activation, native compositor restart or reboot was done.
+A new `mise run shine-dev` preview can load this Rust change without changing
+the login compositor. Existing previews must rebuild/restart their child.
+
+## Frosted glass frames (2026-11-06)
+
+Frames default to actual backdrop blur, tinted transparency and stationary fine
+grain. `decorations.frame.glass` configures enabled, blur_radius (0–64 logical px,
+default 12), opacity (0–1, default 0.9), and noise (0–1, default 0.025).
+Frame color alpha controls tint strength: active 0.55 and inactive 0.40.
+All measurement values were promoted from the owner's frame section; machine
+outputs, account paths, keyboard layout, browser and bindings were not promoted.
+Existing personal frame measurements pick up glass defaults without file edits.
+
+`scene.rs` builds windows bottom-to-top, retaining front-to-back render ordering.
+`frost.rs` renders each lower scene into a GPU texture, excluding the current
+window's client, caption and shadow. `frost.frag` samples a weighted Gaussian
+kernel and composites only the rounded frame. No CPU pixel readback or sampling
+of a previous display framebuffer occurs, preventing self-feedback. Snapshots
+cache by output/window, lower element IDs/commits/geometry/UV/alpha, frame style,
+visual scale, canvas offset and output dimensions. Captions and clients stay
+unblurred. Sampling follows the window's actual visual position during inactive
+scaling. Fully offscreen frames skip snapshot work. Shader reload also watches
+frost.frag; snapshot work requests nested EGL draw-buffer restoration before
+display rendering, using the existing GlesFrame restoration path.
+
+The full shine-check --no-graphics passed: 57 Rust tests, formatting/strict Clippy,
+2 preview lifecycle tests and the Git-backed Nix compositor build. The packaged
+example config validated. Private CPU trials passed genuine backdrop-color
+mixing, translucency/tint, bounded stationary grain, unchanged client pixels,
+background repaint invalidation, 100/125/200% scale, two outputs and window moves,
+fullscreen and idle. Solid frame measurement and window-policy/dialog trials
+also passed. Floating terminal clients may round configure sizes to their cell
+grid; pixel tests derive frame bounds from committed client sizes, not requested
+slots. At large scale a work-area-filling frame can have wallpaper behind its
+top edge, so the backdrop trial checks a side edge over the background app.
+Physical-GPU performance, native DRM behavior and installed activation remain
+unverified. No compositor restart, OS activation or reboot was performed.
+
 ## Pointer-lock deadlock during client drags (2026-11-06)
 
 A real GTK Wayland drag with an icon reproducibly stalls the previously installed
@@ -134,43 +218,21 @@ reports retain readable thread wait channels and the access errors. No root
 cause was established, no speculative synchronization change was applied,
 and no installed-system activation or compositor restart was performed.
 
-## Shine content-colored window halos (2026-11-06)
+## Historical halo experiment and package inclusion (2026-11-06)
 
+The halo experiment was removed in favor of window frames later on this date.
+Its initial installed rebuild failed because untracked `halo.rs`/`halo.frag`
+were excluded from Nix's Git snapshot. `git add -N` and a Git-backed package
+build caught and corrected that error; Cargo checks alone were insufficient.
+Keep the package-build and safe `os-test` requirements in AGENTS.md and the
+maintenance skill. A package build does not prove installed activation.
 
-Packaging follow-up: the first installed-system rebuild failed because new
-`halo.rs`/`halo.frag` files were untracked and absent from Nix's Git snapshot.
-`git add -N` now includes the new source/test files without staging contents.
-The Git-backed `nix build .#compositor` subsequently passed, and the packaged
-executable's `--help` ran successfully. Development Cargo checks alone missed
-this packaging failure. AGENTS.md, Linux development docs and the shipped
-maintenance skill now require package verification and safe `os-test` before
-handoff to `os-boot`. Installed activation remains untested because local sudo
-authentication was unavailable. Never treat packaged build success as activation.
-
-Shine defaults to a 32 logical pixel halo at 0.35 opacity. Live settings are
-`decorations.halo.enabled`, `width` (1–128) and `opacity` (0–1). The effect
-uses a quarter-resolution surface-tree image, enlarged and Gaussian blurred
-on the GPU. `halo.rs` caches the result until content, size or style changes;
-four separately identified bands exclude the client interior, preserving
-translucent apps. Halos share window visual transforms and output clipping.
-Fullscreen omits them; popups and decorations are excluded from the source.
-Individual-window capture continues to omit decorations.
-
-A private pixel trial exposed the default EGL window draw buffer becoming
-NONE after surfaceless offscreen passes. The nested backend restores BACK on
-the actual window surface before rendering after a halo cache rebuild. Do not
-use `GlesRenderer::with_context` to restore window state: it makes the context
-surfaceless again. Use `GlesFrame::with_context` with the window target current.
-
-Verified a debug build, 54 Rust tests, formatting and strict Clippy. The private
-`compositor_halo.py` trial passed color/orientation/falloff pixels, client
-repaints, unchanged geometry/interiors, 100–200% scale, translucent clients,
-two monitors, output clipping, live settings/disable, fullscreen, hidden
-workspaces and idle. Existing shadow, corner/ring and inactive-effect trials
-also passed with halos explicitly disabled in their isolated fixtures. A halo
-screenshot was visually inspected. No installed-system activation or physical
-DRM compositor restart was performed; a new session/build is required to add
-this rendering code to an older running compositor.
+The old halo pass made EGL surfaceless and left the default draw buffer at
+NONE. The nested backend still restores BACK after shader recompilation,
+including failed reload attempts, through `GlesFrame::with_context` with the
+window target current. `GlesRenderer::with_context` would make EGL surfaceless
+again. Halo shaders, offscreen passes, settings and their pixel trial are gone;
+old config tables are ignored so existing personal settings still load.
 
 ## Shine favorite browser shortcut (2026-11-06)
 

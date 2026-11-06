@@ -14,6 +14,8 @@ uniform float alpha;
 uniform vec2 draw_origin;
 uniform vec4 mask_rect;
 uniform float radius;
+uniform vec4 outer_rect;
+uniform float outer_radius;
 uniform float saturation;
 uniform float fog;
 uniform vec3 fog_color;
@@ -33,6 +35,8 @@ void main() {
     p += draw_origin - mask_rect.xy;
     vec2 half_size = mask_rect.zw * 0.5;
     float coverage = rounded_coverage(p - half_size, half_size, radius, 1.0);
+    vec2 outer_p = p + mask_rect.xy - outer_rect.xy;
+    coverage = min(coverage, rounded_coverage(outer_p - outer_rect.zw * 0.5, outer_rect.zw * 0.5, outer_radius, 1.0));
     vec4 color = texture2D(tex, v_coords);
 #if defined(NO_ALPHA)
     color.a = 1.0;

@@ -33,7 +33,7 @@ enabled=false
 [decorations]
 corner_radius={radius}
 focus_ring_width=0
-[decorations.halo]
+[decorations.frame]
 enabled=false
 [decorations.shadow]
 enabled={str(enabled).lower()}

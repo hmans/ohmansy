@@ -33,7 +33,8 @@ render_elements! {
     Surface=WaylandSurfaceRenderElement<GlesRenderer>,
     Rounded=crate::decoration::RoundedSurface,
     Decoration=smithay::backend::renderer::gles::element::PixelShaderElement,
-    Halo=crate::halo::ElementType,
+    Title=MemoryRenderBufferRenderElement<GlesRenderer>,
+    Frost=crate::frost::ElementType,
 }
 render_elements! {
     pub SceneElement<=GlesRenderer>;
@@ -249,25 +250,36 @@ impl Smallvil {
             elements.extend(render_layers(renderer, &[Layer::Top]));
         }
         decorations.begin_output();
+        let background = render_layers(renderer, &[Layer::Bottom, Layer::Background]);
+        let mut windows: Vec<SceneElement> = Vec::new();
         let owned = self
             .windows
             .keys()
             .copied()
             .filter(|id| self.layout.owner(*id) == Some(index))
             .collect();
-        for window in self.space.elements().rev() {
+        // Build bottom-to-top so glass snapshots contain only the scene behind
+        // each window. Final elements remain ordered front-to-back.
+        for window in self.space.elements() {
             let Some(id) = self.window_id(window.toplevel().unwrap().wl_surface()) else {
                 continue;
             };
             if self.layout.owner(id) != Some(index) {
                 continue;
             }
+            let fullscreen = self.layout.fullscreen_for(id);
             let location =
                 self.space.element_location(window).unwrap() - window.geometry().loc - origin;
             let surface = window.toplevel().unwrap().wl_surface();
             let bounds = Rectangle::new(location + window.geometry().loc, window.geometry().size);
-            let center = (bounds.loc + Point::from((bounds.size.w / 2, bounds.size.h / 2)))
-                .to_physical_precise_round(1.0);
+            let frame_bounds = self
+                .output_settings
+                .decorations
+                .frame
+                .bounds(bounds, fullscreen);
+            let center = (frame_bounds.loc
+                + Point::from((frame_bounds.size.w / 2, frame_bounds.size.h / 2)))
+            .to_physical_precise_round(1.0);
             let visual_scale = self.window_visual_scale(id);
             let mut visual = Vec::new();
             let amount = self.inactive_amount(id) as f32;
@@ -295,23 +307,36 @@ impl Smallvil {
                         Rectangle::new(geometry.loc.to_logical(1), geometry.size.to_logical(1));
                     visual.push(WindowVisual::Rounded(
                         decorations
-                            .rounded(id, element, bounds, 0, scale, canvas, amount, inactive)
+                            .rounded(
+                                id, element, bounds, 0, None, scale, canvas, amount, inactive,
+                            )
                             .rescale(center, visual_scale, scale, canvas),
                     ));
                 }
             }
             let style = &self.output_settings.decorations;
-            if !fullscreen {
+            if !fullscreen && style.frame.enabled {
                 let mut ring_style = style.clone();
                 if self.layout.focused() != Some(id)
                     || self.seat.get_keyboard().unwrap().current_focus().is_none()
                 {
-                    ring_style.focus_ring_width = style.inactive_ring_width;
-                    ring_style.focus_ring_color = style.inactive_ring_color;
+                    ring_style.frame.active_color = style.frame.inactive_color;
                 }
-                if ring_style.focus_ring_width > 0 {
-                    for ring in decorations.ring(id, bounds, &ring_style, scale) {
-                        visual.push(WindowVisual::Decoration(ring));
+                {
+                    if let Some(title) = decorations.titles.element(
+                        renderer,
+                        id,
+                        window,
+                        frame_bounds,
+                        &ring_style.frame,
+                        scale,
+                    ) {
+                        visual.push(WindowVisual::Title(title));
+                    }
+                    if !style.frame.glass.enabled {
+                        for ring in decorations.frame(id, frame_bounds, &ring_style, scale) {
+                            visual.push(WindowVisual::Decoration(ring));
+                        }
                     }
                 }
             }
@@ -331,7 +356,11 @@ impl Smallvil {
                         id,
                         element,
                         bounds,
-                        style.corner_radius,
+                        style.inner_radius(),
+                        style
+                            .frame
+                            .enabled
+                            .then_some((frame_bounds, style.outer_radius())),
                         scale,
                         canvas,
                         amount,
@@ -349,41 +378,60 @@ impl Smallvil {
             }
             // Elements are ordered front to back: each shadow sits below its
             // own window and above windows behind it, with output-local clipping.
+            if !fullscreen
+                && style.frame.enabled
+                && style.frame.glass.enabled
+                && frame_bounds.overlaps(Rectangle::from_size(crop.size.to_logical(1)))
+            {
+                let mut glass = style.frame.clone();
+                if self.layout.focused() != Some(id)
+                    || self.seat.get_keyboard().unwrap().current_focus().is_none()
+                {
+                    glass.active_color = glass.inactive_color;
+                }
+                match decorations.frost.element(
+                    renderer,
+                    &output.name(),
+                    id,
+                    frame_bounds,
+                    &glass,
+                    scale,
+                    visual_scale,
+                    canvas,
+                    crop.size.to_logical(1).to_physical_precise_round(scale),
+                    &windows,
+                    &background,
+                ) {
+                    Ok(frame) => visual.push(WindowVisual::Frost(frame)),
+                    Err(error) => {
+                        eprintln!("Window glass unavailable: {error:#}");
+                        let mut fallback = style.clone();
+                        fallback.frame = glass;
+                        for frame in decorations.frame(id, frame_bounds, &fallback, scale) {
+                            visual.push(WindowVisual::Decoration(frame));
+                        }
+                    }
+                }
+            }
             if !fullscreen && style.shadow.enabled && style.shadow.color[3] > 0.0 {
-                for shadow in decorations.shadow(id, bounds, style, scale) {
+                for shadow in decorations.shadow(id, frame_bounds, style, scale) {
                     visual.push(WindowVisual::Decoration(shadow));
                 }
             }
-            if !fullscreen && style.halo.enabled && style.halo.opacity > 0.0 {
-                let surfaces = render_elements_from_surface_tree(
-                    renderer,
-                    surface,
-                    Point::<i32, smithay::utils::Logical>::from((
-                        -window.geometry().loc.x,
-                        -window.geometry().loc.y,
-                    ))
-                    .to_physical_precise_round(0.25),
-                    0.25,
-                    1.0,
-                    Kind::Unspecified,
-                );
-                match decorations
-                    .halo
-                    .element(renderer, id, bounds, &style.halo, surfaces)
-                {
-                    Ok(halo) => visual.extend(halo.into_iter().map(WindowVisual::Halo)),
-                    Err(error) => eprintln!("Window halo unavailable: {error:#}"),
-                }
-            }
+            let mut current = Vec::new();
             for element in visual {
                 let element = RescaleRenderElement::from_element(element, center, visual_scale);
                 if let Some(element) = CropRenderElement::from_element(element, 1.0, crop) {
-                    elements.push(SceneElement::Visual(element));
+                    current.push(SceneElement::Visual(element));
                 }
             }
+            windows.splice(0..0, current);
         }
+        decorations.restore_draw_buffer |=
+            std::mem::take(&mut decorations.frost.offscreen_rendered);
         decorations.finish_output(&self.windows.keys().copied().collect(), &owned);
-        elements.extend(render_layers(renderer, &[Layer::Bottom, Layer::Background]));
+        elements.extend(windows);
+        elements.extend(background);
         elements
             .into_iter()
             .map(|element| RescaleRenderElement::from_element(element, (0, 0).into(), scale))

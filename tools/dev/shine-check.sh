@@ -27,7 +27,7 @@ nix develop --no-update-lock-file .#spatial --command \
 nix build --no-update-lock-file --out-link .local/shine-checked-package .#compositor
 
 if $graphics; then
-  for trial in compositor_halo.py compositor_decorations.py compositor_inactive.py; do
+  for trial in compositor_frames.py compositor_glass.py compositor_inactive.py; do
     nix develop --no-update-lock-file .#spatial --command \
       env OHMANSY_SPATIAL_SHELL=1 OHMANSY_REQUIRE_HARDWARE_RENDERER=1 \
       python3 "tools/tests/$trial"

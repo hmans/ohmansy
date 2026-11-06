@@ -26,8 +26,8 @@ default_column_width={{pixels=200}}
 [animations]
 enabled={str(enabled).lower()}
 duration_ms={duration}
-[decorations]
-focus_ring_color=[0.67,0.57,0.78,1.0]
+[decorations.frame]
+active_color=[0.67,0.57,0.78,1.0]
 ''')
         temporary.replace(config)
 
@@ -85,12 +85,12 @@ focus_ring_color=[0.67,0.57,0.78,1.0]
             assert sum(w['moving'] for w in mid['windows']) == 2, mid
             assert mid['focused'] == mid['keyboard_focus'] == ids[0]
             pixel = screenshot('mid-swap')
-            # Only the focused ring should be present, at an intermediate position.
+            # Only the focused frame has this color, at an intermediate position.
             row = start[1] + 50
             ring = [x for x in range(mid['viewport_size'][0])
                     if all(abs(a - b) < 5 for a, b in zip(pixel(x, row), (171, 145, 199)))]
-            assert ring and start[0] - 2 < min(ring) < selected['target_geometry'][0] - 2, ring
-            assert abs(max(ring) - min(ring) + 1 - (start[2] + 4)) <= 2, ring
+            assert ring and start[0] < min(ring) < selected['target_geometry'][0], ring
+            assert abs(max(ring) - min(ring) + 1 - start[2]) <= 2, ring
             wait_settled()
             assert {w['id']: w['client_geometry'][2:] for w in control()['windows']} == sizes, 'Moving resized a client'
             assert all(w['geometry'] == w['target_geometry'] for w in control()['windows'])

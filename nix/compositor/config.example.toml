@@ -39,10 +39,26 @@ default_column_width = { proportion = 0.62 }
 
 [decorations]
 corner_radius = 14
-focus_ring_width = 2
-focus_ring_color = [0.55, 0.50, 0.62, 0.75] # RGBA, each from 0 to 1
-inactive_ring_width = 1
-inactive_ring_color = [0.55, 0.55, 0.60, 0.55]
+
+[decorations.frame]
+enabled = true
+width = 7 # Sides and bottom, logical pixels (1–16)
+titlebar_height = 30 # Top edge for icon and title (20–64)
+title_font_size = 13.0 # Logical pixels (4–64)
+icon_width = 18 # Logical pixels (1–128)
+icon_height = 18 # Logical pixels (1–128)
+title_padding = 11 # Left/right caption padding (0–128)
+icon_title_gap = 7 # Space between icon and text (0–128)
+outer_corner_radius = 10 # Frame silhouette, including its shadow (0–128)
+inner_corner_radius = 8 # Client content cutout (0–128)
+active_color = [0.317647, 0.250980, 0.372549, 0.55]
+inactive_color = [0.145098, 0.156863, 0.207843, 0.40]
+
+[decorations.frame.glass]
+enabled = true
+blur_radius = 12
+opacity = 0.9
+noise = 0.025
 
 [decorations.shadow]
 enabled = true
@@ -50,11 +66,6 @@ softness = 12 # Falloff scale in logical pixels (1–64)
 spread = 2 # Expand the shadow before softening (0–64)
 offset = [0, 6] # Horizontal and vertical logical pixels (−128–128)
 color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
-
-[decorations.halo]
-enabled = true
-width = 32 # Logical pixels (1–128)
-opacity = 0.35 # Strength of the blurred window colors (0–1)
 
 [decorations.inactive]
 # Numeric values outside the ranges below are clamped when loaded.

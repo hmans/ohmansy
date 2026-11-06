@@ -103,7 +103,12 @@ impl Smallvil {
         else {
             return point;
         };
-        let bounds = window.geometry().to_f64();
+        let bounds = self
+            .output_settings
+            .decorations
+            .frame
+            .bounds(window.geometry(), self.layout.fullscreen_for(id))
+            .to_f64();
         let center = bounds.loc + Point::from((bounds.size.w / 2.0, bounds.size.h / 2.0));
         center + (point - center).downscale(self.window_visual_scale(id))
     }

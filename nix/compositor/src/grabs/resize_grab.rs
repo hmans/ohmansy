@@ -136,24 +136,32 @@ impl PointerGrab<Smallvil> for ResizeSurfaceGrab {
             let owner = data.layout.owner(id).unwrap();
             if data.layout.monitors[owner].layout.floating(id).is_some() {
                 let origin = data.layout.monitors[owner].origin;
-                let x = self.initial_rect.loc.x - origin.0
+                let (side, top) = data.output_settings.decorations.frame.insets(false);
+                let x = self.initial_rect.loc.x - origin.0 - side
                     + if self.edges.intersects(ResizeEdge::LEFT) {
                         self.initial_rect.size.w - self.last_window_size.w
                     } else {
                         0
                     };
-                let y = self.initial_rect.loc.y - origin.1
+                let y = self.initial_rect.loc.y - origin.1 - top
                     + if self.edges.intersects(ResizeEdge::TOP) {
                         self.initial_rect.size.h - self.last_window_size.h
                     } else {
                         0
                     };
                 let layout = &mut data.layout.monitors[owner].layout;
-                layout.resize_floating(id, self.last_window_size.w, self.last_window_size.h);
+                layout.resize_floating(
+                    id,
+                    self.last_window_size.w + side * 2,
+                    self.last_window_size.h + top + side,
+                );
                 layout.move_floating(id, x, y);
             } else {
-                data.layout.set_width(id, self.last_window_size.w);
-                self.last_window_size.h = (data.layout.size.1 - data.layout.gap * 2).max(1);
+                let (side, top) = data.output_settings.decorations.frame.insets(false);
+                data.layout
+                    .set_width(id, self.last_window_size.w + side * 2);
+                self.last_window_size.h =
+                    (data.layout.size.1 - data.layout.gap * 2 - top - side).max(1);
             }
             data.queue_window_positions();
         }
