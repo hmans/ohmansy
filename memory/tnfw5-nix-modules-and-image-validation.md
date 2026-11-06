@@ -9,6 +9,60 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine ScreenCast portals (2026-11-06)
+
+Portal restarts in session setup must use `systemctl --user --no-block`.
+The compositor synchronously waits for setup before entering its Wayland event
+loop. A blocking restart of a portal that needs Wayland replies deadlocks a
+relogin before the terminal and shell start. The initial portal change made
+this mistake: the installed system's previous-boot journal showed portal
+startup stuck immediately after logout/login, while rebooting with no retained
+portal services avoided it. The current physical login exposes ScreenCast.
+The DRM VM check now keeps a Type=notify portal fixture alive across logout;
+its restart waits for a real Wayland round trip before readiness. Password
+relogin must start both the portal and shell. This passed with nonblocking
+restarts. Do not use a newly-created socket alone as proof that login is ready.
+
+After the user rebuilt and relogged, the physical NVIDIA session was verified
+running the nonblocking setup. Both monitor bars and wallpapers were mapped,
+rendered-frame counts kept advancing, and all portal services were active with
+the current Wayland/session variables. Live ScreenCast, FileChooser and Settings
+introspection passed. Direct wlr-screencopy captures succeeded on both physical
+outputs (3440x1440 and 2560x1440); rendering continued afterward. The private
+picker selection/cancellation trial passed again. A full Chatto/PipeWire stream
+was not started, in keeping with the requested cancellation-only portal trial.
+
+Shine is Smithay-based, not Niri or wlroots. A portal package alone could not
+fix capture: it previously exposed no screen-copy protocol. `screencopy.rs`
+now supplies wlr-screencopy v3 with XRGB shared-memory full-output frames,
+optional embedded cursors, size/range checks and disconnected/resized-source
+failure. Both DRM and nested render paths use the existing screenshot renderer.
+Regions, individual windows and DMA-BUF capture buffers are unsupported.
+
+`compositor.nix` enables the wlr portal and declares `ohmansy-portals.conf`:
+ScreenCast uses wlr, general portals retain GTK, and secrets use GNOME Keyring
+when enabled. Niri retains its separate GNOME portal selection. The login
+wrapper imports Wayland/session variables into D-Bus and systemd before
+reconnecting active portals; nested previews retain a private bus.
+
+Pinned xdg-desktop-portal-wlr 0.8.2 calls `xdpw_gbm_device_create(NULL)` when
+software rendering has no DMA-BUF device feedback, then dereferences it.
+The version-scoped `portal-wlr-shm.patch` allows its existing shm path instead.
+The private test bus now uses an explicit config because application sandboxes
+may expose an unusable `/etc/dbus-1/session.conf` stub.
+
+The native compositor, session, patched backend and customization check built;
+36 Rust tests, strict Clippy and the full screenshot/clipboard/Satty regression
+passed. The real private-display application
+trial passed ScreenCast introspection, retained FileChooser, a 1920x1200 shm
+image, picker Escape cancellation and accepting a display then closing the
+session before Start. No portal stream was started. See the repeatable trial
+in `docs/compositor-development.md` and `tools/tests/compositor_portals.py`.
+This is nested runtime evidence, not an installed-system activation or physical
+GPU streaming test. The running login compositor and user portals were preserved.
+Installing the new compositor requires logout/login; service restarts alone
+only suffice for later portal configuration changes. No reboot is required.
+
 ## Ribbon shader cost and runtime fidelity (2026-11-06)
 
 The background skips its 27 particle candidates when proximity is below

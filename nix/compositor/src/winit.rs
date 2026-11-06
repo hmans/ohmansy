@@ -143,6 +143,7 @@ pub fn init_winit(
                     state.maintain_scene();
                     for output in &outputs {
                         state.capture_output(backend.renderer(), output, &mut decorations);
+                        state.copy_output(backend.renderer(), output, &mut decorations);
                     }
                     state.needs_redraw = false;
                     let size = backend.window_size();

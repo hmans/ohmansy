@@ -144,6 +144,7 @@
       nixosConfigurations.installer-x86_64 = pcInstaller;
       nixosConfigurations.live-nvidia-x86_64 = pcNvidia;
       packages.${pcSystem} = desktopPackages pcPkgs // {
+        portal-test-tools = import ./nix/tests/portal-tools.nix { pkgs = pcLive.pkgs; };
         installed-system-nvidia = pcInstalledNvidia.config.system.build.toplevel;
         iso = pcLive.config.system.build.isoImage;
         iso-nvidia = pcNvidia.config.system.build.isoImage;
@@ -195,6 +196,7 @@
         };
       };
       packages.${system} = desktopPackages pkgs // {
+        portal-test-tools = import ./nix/tests/portal-tools.nix { pkgs = live.pkgs; };
         installation = import ./nix/modules/installation-package.nix { inherit pkgs; };
         vm-image = appliance.config.system.build.image;
         iso = live.config.system.build.isoImage;

@@ -77,6 +77,7 @@ pub struct Smallvil {
     pub shortcut_modifier: crate::input::ShortcutModifier,
     pub screenshot: Option<std::path::PathBuf>,
     pub capture: crate::screenshot::State,
+    pub screencopy: Vec<crate::screencopy::Pending>,
     pub commits: u64,
     pub rendered_frames: u64,
     pub forwarded_keys: u64,
@@ -110,6 +111,7 @@ impl Smallvil {
         let compositor_state = CompositorState::new::<Self>(&dh);
         let xdg_shell_state = XdgShellState::new::<Self>(&dh);
         let shm_state = ShmState::new::<Self>(&dh, vec![]);
+        crate::screencopy::init(&dh);
         let output_manager_state = OutputManagerState::new_with_xdg_output::<Self>(&dh);
         let mut seat_state = SeatState::new();
         let data_device_state = DataDeviceState::new::<Self>(&dh);
@@ -198,6 +200,7 @@ impl Smallvil {
             shortcut_modifier: Default::default(),
             screenshot: None,
             capture: Default::default(),
+            screencopy: Vec::new(),
             commits: 0,
             rendered_frames: 0,
             forwarded_keys: 0,

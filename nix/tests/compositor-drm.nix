@@ -84,6 +84,22 @@ pkgs.testers.runNixOSTest {
     security.pam.services.greetd.enableGnomeKeyring = true;
     fonts.packages = [ pkgs.dejavu_fonts ];
     environment.systemPackages = [ pkgs.foot pkgs.python3 pkgs.kbd pkgs.openssh ];
+    # Model a portal left running across logout. On restart it cannot become
+    # ready until the new compositor dispatches a Wayland round trip. A blocking
+    # restart in SESSION_SETUP deadlocks the second login before its event loop.
+    systemd.user.services.xdg-desktop-portal = {
+      serviceConfig = {
+        Type = "notify";
+        NotifyAccess = "all";
+        TimeoutStartSec = 120;
+        ExecStart = pkgs.writeShellScript "shine-portal-readiness-fixture" ''
+          set -eu
+          ${pkgs.wayland-utils}/bin/wayland-info >/dev/null
+          ${pkgs.systemd}/bin/systemd-notify --ready
+          exec ${pkgs.coreutils}/bin/sleep infinity
+        '';
+      };
+    };
     services.greetd = {
       enable = true;
       settings = let
@@ -336,6 +352,8 @@ pkgs.testers.runNixOSTest {
     assert next(w for w in state['windows'] if w['id'] == ident)['client_geometry'][2:] == dimensions
     time.sleep(.5)
     machine.screenshot("shine-two-monitors")
+    as_user('systemctl --user start xdg-desktop-portal.service')
+    assert as_user('systemctl --user is-active xdg-desktop-portal.service').strip() == 'active'
     control("quit")
     machine.wait_until_succeeds('test ! -e /run/user/1000/shine.sock', timeout=15)
     for attempt in range(100):
@@ -352,6 +370,18 @@ pkgs.testers.runNixOSTest {
     machine.wait_until_succeeds("grep -aq 'Password:' /dev/vcs1", timeout=20)
     machine.send_chars('shinefixture\n')
     machine.wait_for_file('/run/user/1000/shine.sock', timeout=30)
+    # The socket is created before setup; require an IPC response and shell
+    # layers too, proving the event loop and desktop actually started.
+    machine.wait_until_succeeds("runuser -u alice -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus systemctl --user is-active xdg-desktop-portal.service", timeout=20)
+    assert control()['backend'] == 'drm'
+    for attempt in range(100):
+        state = control()
+        if all(any(layer['namespace'] == 'ohmansy-shine-bar' for layer in output['layers'])
+            for output in state['outputs']):
+            break
+        time.sleep(.1)
+    assert all(any(layer['namespace'] == 'ohmansy-shine-bar' for layer in output['layers'])
+        for output in state['outputs']), state
     # Ask the bus itself, without activating Secret Service as a side effect.
     machine.wait_until_succeeds("runuser -u alice -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus sh -c 'busctl --user call org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus NameHasOwner s org.freedesktop.secrets | grep -qx \"b true\"'", timeout=15)
     locked = as_user('busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/login org.freedesktop.Secret.Collection Locked').strip()

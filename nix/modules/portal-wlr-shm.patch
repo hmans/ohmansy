@@ -1,0 +1,7 @@
+--- a/src/screencast/screencast_common.c
++++ b/src/screencast/screencast_common.c
+@@ -25 +25,4 @@
+ struct gbm_device *xdpw_gbm_device_create(drmDevice *device) {
++	if (!device) {
++		return NULL;
++	}

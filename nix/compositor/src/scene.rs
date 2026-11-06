@@ -5,6 +5,7 @@ use crate::Smallvil;
 pub enum RenderPurpose {
     Display,
     Capture,
+    CaptureWithCursor,
 }
 use smithay::{
     backend::{
@@ -198,7 +199,7 @@ impl Smallvil {
         let layers: Vec<_> = layer_map
             .layers()
             .filter(|layer| {
-                purpose != RenderPurpose::Capture
+                purpose == RenderPurpose::Display
                     || layer.namespace() != "ohmansy-screenshot-result"
             })
             .filter_map(|layer| {

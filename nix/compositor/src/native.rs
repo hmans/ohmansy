@@ -368,6 +368,7 @@ impl Native {
         }
         for head in &mut self.heads {
             state.capture_output(&mut self.renderer, &head.output, &mut self.decorations);
+            state.copy_output(&mut self.renderer, &head.output, &mut self.decorations);
             let original_mode = head.mode;
             if !head.pending && head.failed_revision != Some(state.config_revision) {
                 let info = state.output_info.get(&head.output.name()).unwrap();

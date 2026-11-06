@@ -73,6 +73,7 @@ struct Worker {
 
 #[derive(Default)]
 pub struct State {
+    cursors: crate::scene::Cursors,
     pending: Option<Request>,
     worker: Option<Worker>,
     next_id: u64,
@@ -157,46 +158,7 @@ impl crate::Smallvil {
             return;
         }
         let request = self.capture.pending.take().unwrap();
-        let result = (|| -> Result<image::RgbaImage> {
-            let size = output
-                .current_mode()
-                .context("Monitor has no current mode")?
-                .size;
-            let mut texture: GlesTexture =
-                renderer.create_buffer(Fourcc::Abgr8888, (size.w, size.h).into())?;
-            let elements = self.output_elements(
-                renderer,
-                output,
-                None,
-                decorations,
-                (0, 0).into(),
-                crate::scene::RenderPurpose::Capture,
-            );
-            let mut framebuffer = renderer.bind(&mut texture)?;
-            // PNG rows run top to bottom, while an OpenGL offscreen target has
-            // its origin at the bottom. Match the nested framebuffer's Y flip.
-            let mut damage = OutputDamageTracker::new(size, 1.0, Transform::Flipped180);
-            damage.render_output(
-                renderer,
-                &mut framebuffer,
-                0,
-                &elements,
-                [0.035, 0.035, 0.055, 1.0],
-            )?;
-            let mapping = renderer.copy_framebuffer(
-                &framebuffer,
-                Rectangle::from_size((size.w, size.h).into()),
-                Fourcc::Abgr8888,
-            )?;
-            let bytes = renderer.map_texture(&mapping)?;
-            let mut image =
-                image::RgbaImage::from_raw(size.w as u32, size.h as u32, bytes.to_vec())
-                    .context("Invalid screenshot buffer")?;
-            if mapping.flipped() {
-                image::imageops::flip_vertical_in_place(&mut image);
-            }
-            Ok(image)
-        })();
+        let result = self.render_capture(renderer, output, decorations, false);
         match result {
             Ok(image) => {
                 let socket = self.socket_name.clone();
@@ -222,6 +184,58 @@ impl crate::Smallvil {
                 });
             }
         }
+    }
+
+    pub fn render_capture(
+        &mut self,
+        renderer: &mut GlesRenderer,
+        output: &Output,
+        decorations: &mut crate::decoration::Renderer,
+        cursor: bool,
+    ) -> Result<image::RgbaImage> {
+        let size = output
+            .current_mode()
+            .context("Monitor has no current mode")?
+            .size;
+        let mut texture: GlesTexture =
+            renderer.create_buffer(Fourcc::Abgr8888, (size.w, size.h).into())?;
+        let mut cursors = std::mem::take(&mut self.capture.cursors);
+        let elements = self.output_elements(
+            renderer,
+            output,
+            Some(&mut cursors),
+            decorations,
+            (0, 0).into(),
+            if cursor {
+                crate::scene::RenderPurpose::CaptureWithCursor
+            } else {
+                crate::scene::RenderPurpose::Capture
+            },
+        );
+        self.capture.cursors = cursors;
+        let mut framebuffer = renderer.bind(&mut texture)?;
+        // PNG rows run top to bottom, while an OpenGL offscreen target has
+        // its origin at the bottom. Match the nested framebuffer's Y flip.
+        let mut damage = OutputDamageTracker::new(size, 1.0, Transform::Flipped180);
+        damage.render_output(
+            renderer,
+            &mut framebuffer,
+            0,
+            &elements,
+            [0.035, 0.035, 0.055, 1.0],
+        )?;
+        let mapping = renderer.copy_framebuffer(
+            &framebuffer,
+            Rectangle::from_size((size.w, size.h).into()),
+            Fourcc::Abgr8888,
+        )?;
+        let bytes = renderer.map_texture(&mapping)?;
+        let mut image = image::RgbaImage::from_raw(size.w as u32, size.h as u32, bytes.to_vec())
+            .context("Invalid screenshot buffer")?;
+        if mapping.flipped() {
+            image::imageops::flip_vertical_in_place(&mut image);
+        }
+        Ok(image)
     }
 }
 

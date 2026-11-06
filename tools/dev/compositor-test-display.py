@@ -134,7 +134,18 @@ def run():
         env['WAYLAND_DISPLAY'] = state['wayland_display']
         env['OHMANSY_COMPOSITOR_CONTROL'] = control.path
         # Activated helpers must inherit the private display and XDG directories.
-        bus = launch(['dbus-daemon', '--session', '--nofork', '--nopidfile',
+        # Do not depend on /etc/dbus-1/session.conf: an application sandbox can
+        # expose a stub there even when the packaged daemon is available.
+        bus_config = artifacts / 'bus.conf'
+        bus_config.write_text('''<busconfig>
+          <type>session</type><listen>unix:tmpdir=/tmp</listen>
+          <auth>EXTERNAL</auth><standard_session_servicedirs/>
+          <policy context="default">
+            <allow own="*"/><allow send_destination="*"/>
+            <allow receive_sender="*"/>
+          </policy>
+        </busconfig>''')
+        bus = launch(['dbus-daemon', f'--config-file={bus_config}', '--nofork', '--nopidfile',
             f'--address={env["DBUS_SESSION_BUS_ADDRESS"]}'], 'bus.log')
         wait_ready(bus, lambda: (Path(runtime) / 'bus').is_socket(), 'private D-Bus session')
         if not (Path(runtime) / env['WAYLAND_DISPLAY']).is_socket():

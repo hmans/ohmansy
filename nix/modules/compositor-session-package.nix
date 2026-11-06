@@ -34,6 +34,13 @@ let
         # applications activate a replacement daemon with a locked keyring.
         ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon --start --components=secrets,pkcs11 >/dev/null
       ''}
+      # A user manager can retain portals from the greeter or another desktop.
+      # Reconnect active backends only after publishing this session's socket.
+      # Setup runs before Wayland dispatch. Waiting for a backend that needs a
+      # Wayland round trip would deadlock login before the shell can start.
+      ${pkgs.systemd}/bin/systemctl --user --no-block try-restart \
+        xdg-desktop-portal-wlr.service xdg-desktop-portal-gtk.service || true
+      ${pkgs.systemd}/bin/systemctl --user --no-block try-restart xdg-desktop-portal.service || true
       exit 0
     fi
     # A preview must never replace the parent desktop's activation environment.

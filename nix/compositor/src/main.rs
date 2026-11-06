@@ -13,6 +13,7 @@ mod output_config;
 mod output_control;
 mod preferences;
 mod scene;
+mod screencopy;
 mod screenshot;
 mod state;
 mod winit;
@@ -352,8 +353,9 @@ fn main() -> Result<()> {
             let _ = child.wait();
         });
     } else if session_mode {
-        // The session wrapper creates a private D-Bus session. Update only that
-        // bus, after our own Wayland socket exists; never import into systemd.
+        // Publish our socket to the login activation environment (or the
+        // preview's private bus). Setup must not wait for Wayland clients:
+        // their round trips cannot complete until the event loop starts below.
         let setup = std::env::var("OHMANSY_COMPOSITOR_SESSION_SETUP")
             .context("Start session mode through ohmansy-compositor-session")?;
         let status = std::process::Command::new(setup)

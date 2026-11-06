@@ -34,7 +34,7 @@ with a static fallback when ribbon rendering is unavailable. Foot's shared
 defaults provide a translucent background; Shine does not yet blur it.
 Niri's panel, wallpaper service, and other services remain tied to Niri.
 
-This session is experimental: it has no screen locking, screen sharing, IME,
+This session is experimental: it has no screen locking, IME,
 X11 support, or complete desktop portal integration. Keep Niri available as the
 alternative desktop. Normal logins use the regular user D-Bus, so applications can
 reach the login keyring. Once its Wayland socket is ready, Shine publishes the
@@ -48,6 +48,61 @@ applications, retaining the keyring unlock from password login.
 Nested previews use a separate private bus and preserve the parent desktop's
 activation environment. Keyring unlock dialogs can appear in a normal login;
 autologin does not provide a password to unlock an encrypted keyring.
+
+### Screen sharing
+
+Shine exposes whole displays through `wlr-screencopy` and
+`xdg-desktop-portal-wlr`. The `ohmansy-portals.conf` configuration selects wlr
+for ScreenCast, GTK for file choosers and other general portals, and GNOME
+Keyring for secrets when enabled. Niri keeps its own GNOME capture backend.
+The system picker lists connected displays; Escape cancels without starting
+capture. Individual-window and region sharing are not supported by Shine's
+capture protocol. Capture uses shared memory, with a default limit of 30 FPS.
+
+Rebuild the installed machine configuration with the updated sources, preserving
+its hardware and account configuration. Then log out and back in: the running
+compositor cannot gain a new Wayland protocol through a portal restart. The
+session wrapper imports `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`,
+`XDG_SESSION_DESKTOP` and `XDG_SESSION_TYPE` into D-Bus and systemd after its
+Wayland socket is ready, then queues restarts of active portal services without
+waiting for them. Waiting here would deadlock startup because portals need
+Wayland replies from the compositor's event loop. No reboot
+is needed for the screen-sharing change alone.
+
+For later portal-configuration-only changes, restarting
+`xdg-desktop-portal-wlr.service`, `xdg-desktop-portal-gtk.service` and then
+`xdg-desktop-portal.service` with `systemctl --user restart` is sufficient if
+the compositor already supports capture and the session environment is current.
+Restarting portals interrupts active portal requests and screen shares.
+
+Verify the application-facing interface after login:
+
+```sh
+busctl --user introspect \
+  org.freedesktop.portal.Desktop \
+  /org/freedesktop/portal/desktop \
+  org.freedesktop.portal.ScreenCast
+```
+
+The result must include `CreateSession`, `SelectSources` and `Start`. Open
+screen sharing in an application, highlight a display in the system picker,
+then press Escape. No capture should start. The separate Chatto capture-denial
+callback bug is outside this system configuration.
+
+For the automated private-display trial, build the development compositor with
+the normal compositor build task, then run:
+
+```sh
+nix build .#portal-test-tools --out-link .local/portal-test-tools
+OHMANSY_PORTAL_TOOLS="$PWD/.local/portal-test-tools" \
+  python3 tools/dev/compositor-test-display.py -- \
+  .local/portal-test-tools/bin/python3 tools/tests/compositor_portals.py
+```
+
+This checks a real shared-memory output image, the public ScreenCast methods,
+the retained file chooser, picker cancellation, and selecting a display then
+closing the session before `Start`. Its private PipeWire server and D-Bus
+session do not change the logged-in desktop's services or activation environment.
 
 To omit it from a host configuration:
 
