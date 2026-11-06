@@ -9,6 +9,22 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Browser interface font defaults (2026-11-06)
+
+`desktop.nix` defaults Fontconfig sans-serif to Inter, aliases system-ui to
+Inter, and supplies Inter 11 through GTK 3/4 settings and the dconf interface
+font default. Chromium/Electron system-ui follows GTK; `fc-match system-ui`
+alone does not prove a browser rendered that family. Browser-specific generic
+sans-serif preferences can still select Arial/Liberation Sans, and websites'
+explicit font families remain intact.
+
+Native customization check passed. A real Chromium Wayland instance on the
+private headless display reported Inter-Regular through CDP
+CSS.getPlatformFontsForNode for system-ui text. Its separate sans-serif sample
+reported Liberation Sans. The user trial updated GTK/dconf and user Fontconfig
+with backups; fc-match returned Inter for sans-serif/system-ui while serif and
+monospace stayed DejaVu. No browser windows were restarted or OS activated.
+
 ## Shine monitor controls (2026-11-06)
 
 Shine's bar has a Displays button opening the existing DisplayView/DisplayState

@@ -46,6 +46,10 @@ also apply to existing greeter and first-boot buttons.
 ## Type and surfaces
 
 Use Inter through `Theme.fontFamily`. Shared controls use `Theme.radius` (14 px).
+The desktop also defaults Fontconfig sans-serif and system-ui to Inter and
+GTK's interface font to Inter 11, so browser and Electron UI follow the shell.
+Websites that specify their own fonts retain them. Installed systems need a
+rebuild to receive these defaults; running browsers may need a restart.
 Glass surfaces retain their translucent treatment where graphics support it,
 while software rendering preserves the same muted color hierarchy.
 
