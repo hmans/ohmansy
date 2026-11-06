@@ -69,7 +69,6 @@ overview {
 }
 cursor { xcursor-theme "Bibata-Modern-Classic"; xcursor-size 24; }
 prefer-no-csd
-spawn-at-startup "mako"
 window-rule {
     geometry-corner-radius 12
     clip-to-geometry true

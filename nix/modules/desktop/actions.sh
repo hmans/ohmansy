@@ -56,7 +56,7 @@ case "${1:-}" in
     printf '%s\t' "$2" | cliphist decode > "$clipboard_tmp"
     wl-copy < "$clipboard_tmp"
     ;;
-  notifications) exec makoctl history -j ;;
+  notifications) exec quickshell ipc --path /etc/xdg/quickshell/ohmansy/shell.qml call notifications history ;;
   lock) exec systemctl --user start ohmansy-lock.service ;;
   power-action)
     case "${2:-}" in

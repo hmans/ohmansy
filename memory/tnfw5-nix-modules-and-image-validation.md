@@ -258,6 +258,46 @@ repeated dismissal/focus restoration, two outputs and shell lifecycle. An
 interactive nested preview was started for user testing. No installed-system
 activation, login compositor replacement, image build or boot was performed.
 
+## Shared Quickshell notifications (2026-11-06)
+
+`nix/modules/notifications/` supplies `Ohmansy.Notifications` to Shine and Niri
+through `quickshell-ui.nix`. Cards and history use the actual shared UI components,
+replacing Mako and its duplicated style settings. Notification layers retain
+their roles while empty, with transparent content and an empty input mask.
+Popups never request keyboard focus; explicitly opening history does.
+
+Quickshell 0.3's `NotificationAction.invoke()` sends no activation token.
+`notifications/native/NotificationSupport.cpp` uses Qt's native Wayland display,
+last input seat and serial to request an xdg-activation token. It sends the
+standard D-Bus `ActivationToken` signal from the same process/connection before
+invoking the action. The compositor retains serial validation and token expiry;
+no focus bypass or compositor change is required. The helper keeps a guarded
+action pointer while awaiting the token and falls back to action-only invocation
+if the protocol is absent or a response times out.
+
+The native helper atomically saves at most 100 history snapshots and the quiet
+preference to a mode-0600 file under the user's XDG state directory. Transient
+notifications are omitted. History stores text, not actions or activation tokens.
+QML reloads retain active notification objects; process restarts restore history.
+Quickshell 0.3 passes protocol milliseconds through `expireTimeout`, despite its
+header comment saying seconds. Its native `QVariantList` loads as a QML sequence,
+so convert it with `Array.from` before using JavaScript array checks or methods.
+
+The native helper and desktop packages built, and the customization check passed.
+`tools/tests/compositor_notifications.py` passed real clicks across monitors and
+workspaces, background-focus rejection, replay/expiry rejection, dismissal versus
+action propagation, protocol close reasons, replacement, expiry, transient
+messages, Do Not Disturb, QML reload and process-restart history. The full private
+Shine shell trial passed, including software fallback. A separate private Niri
+session rendered the full Niri shell's notifications and history successfully.
+These checks do not constitute a system rebuild or boot.
+
+The running desktop was switched from Mako to a Quickshell notification-only
+preview and its existing history imported. This avoids replacing a live panel
+being edited in another worktree. The compositor, panel and app windows remain
+running. The integrated source defaults need an installed-system rebuild for
+persistence. Runtime preview details belong in ignored `.local/SESSION.md`.
+
 ## Shine notification activation (2026-11-06)
 
 Shine implements xdg-activation-v1 in `handlers/activation.rs`. A client can
@@ -266,9 +306,10 @@ that Shine delivered to that same client on its seat. The input grant is
 consumed on token creation; tokens are single-use and expire after ten seconds.
 Activation focuses the exact surface selected by the app through the existing
 monitor/workspace navigation, without moving the window. A notification click
-belongs to Mako, so token issuance must not require keyboard focus on Mako.
+belongs to the notification shell, so token issuance must not require keyboard
+focus on that shell.
 
-Apps must offer a notification action and consume Mako's ActivationToken signal.
+Apps must offer a notification action and consume the ActivationToken signal.
 The pinned GLib 2.88.3 GNotification backend ignores that signal; its action can
 run without focus. Do not weaken serial validation to work around it. The GTK
 trial handles the standard D-Bus token directly before presenting its window.
@@ -276,11 +317,11 @@ Apps with no action or no token handling cannot reliably identify a destination.
 
 38 Rust tests, formatting, strict Clippy, the development build, and the
 packaged `nix build .#compositor` passed.
-`tools/tests/compositor_notifications.py` passed real Mako clicks on a private
+The original Mako-based activation trial passed real clicks on a private
 headless display with a two-window GTK client: exact-window keyboard focus
 across monitors/workspaces, unchanged destination, rejected background present,
 replay, and unused-token expiry. The spatial dev shell supplies GTK development
-headers and Mako for this trial. No installed-system activation or login
+headers for the current Quickshell trial described above. No installed-system activation or login
 compositor restart was performed. See the compositor guide for user behavior.
 
 ## Ribbon shader cost and runtime fidelity (2026-11-06)
@@ -785,7 +826,8 @@ Machine-specific storage and credentials belong to host configurations, not
 The desktop panel uses Quickshell 0.3.0 from the locked Nixpkgs source. Its
 QML lives in `nix/modules/desktop/quickshell/`; the user service starts and
 stops with `niri.service`. This first migration ports flakey's panel, Niri
-state, and audio controls. Mako remains separate. The installer
+state, and audio controls. Notifications now use the shared Quickshell module
+described above. The installer
 module supplies `OHMANSY_INSTALLER` only to the live installer panel.
 No runtime file or flake input points to the ignored reference checkout.
 
@@ -987,7 +1029,7 @@ Desktop shortcut migration (2026-11-02): all 58 active reference Niri bindings
 are present; see docs/keyboard-shortcuts.md for the current map. The packaged
 desktop helper (named `ohmansy-desktop`) supplies fixed actions and Quickshell
 menu modes; it never evaluates history content or window titles as commands.
-Cliphist runs as a Niri user service, Mako retains notification history, and
+Cliphist runs as a Niri user service, Quickshell retains notification history, and
 Swaylock uses PAM with a forking service to establish the lock before suspend.
 Quickshell IPC uses `openMenu`: a `show` method collides with its CLI subcommand.
 SSH IPC must use the same WAYLAND_DISPLAY as the desktop. Set the IconTheme

@@ -9,13 +9,16 @@ Search accepts abbreviations, with exact names and prefixes ranked first. Use
 arrows and Enter to open a result; Escape, Mod+Space, or an outside click closes
 the launcher. The first commands open Displays or a terminal and select light or
 dark appearance. Its internal providers contribute items to one shared search;
-external extensions and nested views are not implemented yet.
+external extensions and nested views are not implemented yet. Search for
+**Notifications** to open notification history and Do Not Disturb.
 
 Quickshell supplies the per-monitor panel, workspace buttons, clock, audio
 controls, network status, and system tray. Its QML files are in
 `nix/modules/desktop/quickshell/`. The shared launcher source is in
-`nix/modules/launcher/`, using the existing `Ohmansy.Ui` design system. Mako handles
-notifications. The panel runs as a user service tied to the Niri session.
+`nix/modules/launcher/`, using the existing `Ohmansy.Ui` design system.
+`nix/modules/notifications/` supplies notifications, history, and Do Not Disturb
+for both shells with the same shared components. The panel runs as a user
+service tied to the Niri session.
 
 Fish is the default interactive shell. Hosts and individual accounts can
 override the shell through the standard NixOS user options.

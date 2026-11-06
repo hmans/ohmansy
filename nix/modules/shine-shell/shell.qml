@@ -11,6 +11,7 @@ import QtQuick.Layouts
 import Ohmansy.Ui
 import Ohmansy.Displays as Displays
 import Ohmansy.Launcher as Launcher
+import Ohmansy.Notifications as Notifications
 import Ohmansy.Desktop as Desktop
 
 ShellRoot {
@@ -23,6 +24,10 @@ ShellRoot {
     property string screenshotOutput: ""
     property bool displaysOpen: false
     property string launcherScreen: ""
+    Notifications.NotificationService {
+        id: notifications
+        focusedOutput: (root.state.outputs.find(output => output.focused) || root.state.outputs[0] || {}).name || Quickshell.screens[0]?.name || ""
+    }
     Desktop.AudioState { id: audio }
     Desktop.AppearanceState { id: appearance }
     ColorPalette { id: barColors; dark: appearance.effectivePreference === "prefer-dark" }
@@ -49,6 +54,7 @@ ShellRoot {
             onDismissed: root.launcherScreen = ""
             onCommandRequested: command => {
                 if (command === "displays") { root.displaysOpen = true; displayState.refresh(); }
+                else if (command === "notifications") notifications.historyOutput = modelData.name;
                 else if (command === "terminal") root.request("terminal", modelData.name, null);
                 else if (command === "prefer-dark" || command === "prefer-light")
                     appearance.select(command);
@@ -218,6 +224,13 @@ ShellRoot {
             RowLayout {
                 anchors { right: parent.right; verticalCenter: parent.verticalCenter; rightMargin: 14 }
                 spacing: 6
+                BarIcon {
+                    text: notifications.doNotDisturb ? "Notifications · Do Not Disturb" : "Notifications"
+                    icon.name: "preferences-system-notifications-symbolic"
+                    checkable: true
+                    checked: notifications.historyOutput === bar.modelData.name
+                    onClicked: notifications.historyOutput = notifications.historyOutput ? "" : bar.modelData.name
+                }
                 BarIcon {
                     text: "Light mode"
                     icon.name: "weather-clear-symbolic"
