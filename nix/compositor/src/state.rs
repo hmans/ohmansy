@@ -91,6 +91,8 @@ pub struct Smallvil {
     // Smithay State
     pub compositor_state: CompositorState,
     pub xdg_shell_state: XdgShellState,
+    pub activation_state: smithay::wayland::xdg_activation::XdgActivationState,
+    pub(crate) activation_input: crate::handlers::activation::RecentInput,
     pub layer_shell_state: smithay::wayland::shell::wlr_layer::WlrLayerShellState,
     pub shm_state: ShmState,
     pub output_manager_state: OutputManagerState,
@@ -209,6 +211,10 @@ impl Smallvil {
 
             compositor_state,
             xdg_shell_state,
+            activation_state: smithay::wayland::xdg_activation::XdgActivationState::new::<Self>(
+                &dh,
+            ),
+            activation_input: Default::default(),
             shm_state,
             output_manager_state,
             seat_state,

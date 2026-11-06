@@ -63,6 +63,31 @@ GPU streaming test. The running login compositor and user portals were preserved
 Installing the new compositor requires logout/login; service restarts alone
 only suffice for later portal configuration changes. No reboot is required.
 
+## Shine notification activation (2026-11-06)
+
+Shine implements xdg-activation-v1 in `handlers/activation.rs`. A client can
+obtain a token only using a recent pointer-button or forwarded key-press serial
+that Shine delivered to that same client on its seat. The input grant is
+consumed on token creation; tokens are single-use and expire after ten seconds.
+Activation focuses the exact surface selected by the app through the existing
+monitor/workspace navigation, without moving the window. A notification click
+belongs to Mako, so token issuance must not require keyboard focus on Mako.
+
+Apps must offer a notification action and consume Mako's ActivationToken signal.
+The pinned GLib 2.88.3 GNotification backend ignores that signal; its action can
+run without focus. Do not weaken serial validation to work around it. The GTK
+trial handles the standard D-Bus token directly before presenting its window.
+Apps with no action or no token handling cannot reliably identify a destination.
+
+38 Rust tests, formatting, strict Clippy, the development build, and the
+packaged `nix build .#compositor` passed.
+`tools/tests/compositor_notifications.py` passed real Mako clicks on a private
+headless display with a two-window GTK client: exact-window keyboard focus
+across monitors/workspaces, unchanged destination, rejected background present,
+replay, and unused-token expiry. The spatial dev shell supplies GTK development
+headers and Mako for this trial. No installed-system activation or login
+compositor restart was performed. See the compositor guide for user behavior.
+
 ## Ribbon shader cost and runtime fidelity (2026-11-06)
 
 The background skips its 27 particle candidates when proximity is below
@@ -1248,3 +1273,22 @@ A long-lived agent can retain a dead Niri IPC path after login even while its
 Wayland socket belongs to Shine. The test helper now falls back, after Niri IPC
 fails, to a unique live Shine control socket matching the inherited Wayland
 display. It never assumes the desktop label alone identifies the active server.
+
+
+## Shared agent skills (2026-11-06)
+
+`nix/modules/agent-skills.nix` ships provider-neutral Agent Skills content from
+`skills/`, enabled by the default module and exported as `nixosModules.agentSkills`.
+The canonical `/etc/ohmansy/skills` entries and Codex/Claude Code discovery
+entries point to the same store directories. Claude Code's Linux path is
+`/etc/claude-code/.claude/skills`; Codex uses `/etc/codex/skills`. There is no
+universal system-wide discovery path in the Agent Skills specification.
+No user service, skeleton copy, or home-directory mutation is needed for these
+clients; existing and future users read the shared content. Hosts can opt out
+with `ohmansy.agentSkills.enable = false`. Agent binaries remain user-installed.
+
+The initial `ohmansy-maintenance` skill covers installed configuration, software,
+service diagnostics, updates and recovery. Skill validation, native customization
+checks (shared sources and opt-out), and native flake evaluation passed. A
+standalone module's `/etc` output built successfully. These checks do not prove
+live client discovery; no OS activation or desktop restart was performed.

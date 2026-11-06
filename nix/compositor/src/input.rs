@@ -108,6 +108,7 @@ impl Smallvil {
             }
         };
 
+        self.record_activation_input(serial, pointer.current_focus());
         pointer.button(
             self,
             &ButtonEvent {
@@ -192,7 +193,13 @@ impl Smallvil {
                 }
             }
             Some(KeyAction::Vt(vt)) => self.vt_request = Some(vt),
-            None if pressed => self.forwarded_keys += 1,
+            None if pressed => {
+                self.forwarded_keys += 1;
+                self.record_activation_input(
+                    serial,
+                    self.seat.get_keyboard().unwrap().current_focus(),
+                );
+            }
             _ => (),
         }
     }

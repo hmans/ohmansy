@@ -6,6 +6,7 @@ let
     modules = modules ++ [ { system.stateVersion = "26.05"; } ];
   }).config;
   defaults = evaluate [ ohmansyModules.default ];
+  noAgentSkills = evaluate [ ohmansyModules.default { ohmansy.agentSkills.enable = false; } ];
   hostOwnedState = (lib.nixosSystem {
     inherit system;
     modules = [ ohmansyModules.default { system.stateVersion = "25.11"; } ];
@@ -65,6 +66,13 @@ let
   '';
 in
 assert hostOwnedState.system.stateVersion == "25.11";
+assert defaults.environment.etc."ohmansy/skills/ohmansy-maintenance".source
+  == defaults.environment.etc."codex/skills/ohmansy-maintenance".source;
+assert defaults.environment.etc."ohmansy/skills/ohmansy-maintenance".source
+  == defaults.environment.etc."claude-code/.claude/skills/ohmansy-maintenance".source;
+assert !(noAgentSkills.environment.etc ? "ohmansy/skills/ohmansy-maintenance");
+assert !(noAgentSkills.environment.etc ? "codex/skills/ohmansy-maintenance");
+assert !(noAgentSkills.environment.etc ? "claude-code/.claude/skills/ohmansy-maintenance");
 assert defaults.programs.firefox.enable && defaults.programs.fish.enable;
 assert defaults.programs.chromium.enable && softwareOnly.programs.chromium.enable;
 assert builtins.elem pkgs.chromium defaults.environment.systemPackages;

@@ -1,0 +1,41 @@
+name: ohmansy checks
+on:
+  push:
+    branches: [main]
+    paths: ['flake.nix', 'flake.lock', 'nix/**', 'app/runtime/**', 'tools/**', '.github/**']
+  pull_request:
+    paths: ['flake.nix', 'flake.lock', 'nix/**', 'app/runtime/**', 'tools/**', '.github/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Allow the Nix evaluator's user namespace
+        run: sudo apparmor_parser -r .github/nix-userns.apparmor
+      - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            max-jobs = 2
+      - name: Evaluate configurations and checks without building images or VMs
+        run: nix flake check --no-update-lock-file --no-build
+      - name: Test tooling and packaging
+        if: matrix.runner == 'ubuntu-24.04'
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_installer*.py'
+          python3 -m unittest discover -s tools/tests -p 'test_guest_dev.py'
+          python3 -m unittest discover -s tools/tests -p 'test_factory.py'
+          python3 -m unittest discover -s tools/tests -p 'test_iso_package.py'

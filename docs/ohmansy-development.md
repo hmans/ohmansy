@@ -566,11 +566,17 @@ Each new VM is decompressed separately; a shared APFS factory cache is future wo
 
 ## Pipeline and release work
 
-`.github/workflows/images.yml` checks and builds the factory on ARM Linux and
-the NVIDIA live ISO on x86-64 Linux, then uploads the packaged artifacts.
-Actions are pinned; the workflow does not publish
-releases. Runs are available in the repository's GitHub Actions tab. A successful
-image build still needs a separate boot test.
+`.github/workflows/checks.yml` runs on relevant pull requests and pushes to
+`main`. It evaluates the flake on ARM and x86-64 Linux without building outputs,
+and runs the Python tooling and packaging tests. New commits cancel superseded
+checks for the same PR or branch.
+
+`.github/workflows/images.yml` runs manually through **Run workflow** in GitHub
+Actions, or when a `v*` release tag is pushed. It runs build checks, builds the
+ARM factory disk, x86-64 offline installer and NVIDIA live ISO, and uploads the
+packaged artifacts. Repeated runs for the same ref cancel superseded runs.
+Actions are pinned; the workflow does not publish releases. A successful image
+build still needs a separate boot test.
 
 Verify account setup, login, restart persistence, guest rebuild and rollback,
 input, resizing, and clean shutdown before release. The installer needs a separate
