@@ -144,6 +144,21 @@ retain store paths; removing a default does not immediately erase its files.
 Nautilus and the sound, network, Bluetooth, clipboard, and lock tools remain
 part of the desktop integration in this version.
 
+## NetBird
+
+The default module includes the NetBird service, command-line client, and desktop
+app. Open NetBird from the application menu to sign in to your own network, or
+run `netbird up` in a terminal. Each installation keeps its own identity and login
+state; images contain no enrollment keys or account configuration.
+
+To omit NetBird, set `services.netbird.enable = false;` in your machine's
+preferences. To keep the service and CLI without the desktop app, set
+`services.netbird.ui.enable = false;`. Hosts importing only the desktop or software
+module can enable these standard NixOS options themselves.
+
+New images include NetBird. Existing installations receive it after updating
+their ohmansy input and rebuilding; no logout is required to start the service.
+
 ## Agent skills
 
 ohmansy ships a basic `ohmansy-maintenance` skill in the open

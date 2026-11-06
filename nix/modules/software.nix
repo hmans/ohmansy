@@ -19,6 +19,7 @@ in
       zed-editor
       curl
       wget
+      glib.bin # Includes gio.
       fzf
       ripgrep
       eza

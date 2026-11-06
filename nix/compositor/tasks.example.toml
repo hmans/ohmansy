@@ -1,0 +1,34 @@
+# Save as ~/.config/shine/workspaces.toml with a supporting Shine build.
+# Commands run directly: no shell, environment-variable or ~ expansion.
+# Adjust executable names and app IDs for your installed apps and Chrome profile.
+[[workspaces]]
+id = "dev"
+name = "dev"
+
+[[workspaces.apps]]
+command = ["foot", "--app-id=ohmansy-dev-terminal"]
+match = { app_id = "ohmansy-dev-terminal" }
+
+[[workspaces.apps]]
+command = ["google-chrome", "--new-window"]
+match = { app_id = "google-chrome" }
+
+[[workspaces.apps]]
+command = ["paseo"]
+match = { app_id = "Paseo" }
+
+[[workspaces]]
+id = "chat"
+name = "chat"
+
+[[workspaces.apps]]
+command = ["google-chrome", "--app=https://chat.chatto.run/"]
+match = { app_id = "chrome-chat.chatto.run__-Default" }
+
+[[workspaces.apps]]
+command = ["google-chrome", "--app=https://bsky.app/"]
+match = { app_id = "chrome-bsky.app__-Default" }
+
+[[workspaces.apps]]
+command = ["google-chrome", "--app=https://web.whatsapp.com/"]
+match = { app_id = "chrome-web.whatsapp.com__-Default" }

@@ -13,7 +13,8 @@ for login-manager updates rather than restarting greetd from a running desktop.
 Use `mise run os-boot` to build this checkout for the next boot, then reboot
 when ready to try the updated login screen.
 
-The experimental session opens your configured terminal and normal login shell.
+The experimental session opens your configured terminal and normal login shell,
+or the apps in your [task workspaces](#task-workspaces) when configured.
 **Super+Space** opens the application picker. **Super+Shift+E** opens a sign-out
 confirmation; Cancel keeps the desktop running, while Sign out returns to the
 login screen. Applications use their normal profiles in this session.
@@ -22,7 +23,8 @@ Shine handles DRM/KMS displays, seat access, input devices, and VT switching
 directly through Smithay, libseat, and libinput. Cage is no longer part of the
 session. Without saved settings, connected monitors on the primary GPU are placed
 side by side in connector order, with preferred modes and a scale of 125%.
-Each monitor has four independent scrolling workspaces. Disconnecting a monitor
+Each monitor has four independent scrolling workspaces by default, or your
+configured task workspaces. Disconnecting a monitor
 moves its windows to a remaining monitor. Shine's Quickshell shell draws the
 shared animated ribbon wallpaper on each monitor, behind application windows.
 The ribbon render target uses 75% of its capped resolution (up to 1800 pixels
@@ -204,7 +206,7 @@ mise run compositor-desktop
 ```
 
 It opens a nested desktop with a new terminal, Firefox, GNOME Text Editor, and
-a Quickshell bar on each monitor. The bar has four workspace buttons, a Terminal
+a Quickshell bar on each monitor. The bar has workspace buttons, a Terminal
 button, and a clock. Buttons act on their own monitor. Windows leave room for
 the bar; fullscreen covers it. The same bar starts in the packaged Shine session.
 Its QML lives in `nix/modules/shine-shell/shell.qml` and reloads on save in the
@@ -421,8 +423,10 @@ decodes the PNG from the clipboard after the editor has exited.
 
 ## Configuration
 
-Shine uses one TOML file at `~/.config/shine/config.toml`, honoring
-`XDG_CONFIG_HOME`; `--config PATH` selects a separate file for development.
+Shine keeps compositor settings in `~/.config/shine/config.toml`, honoring
+`XDG_CONFIG_HOME`; `--config PATH` selects another file for development.
+Task workspaces and startup apps live separately in
+`~/.config/shine/workspaces.toml`; see [task workspaces](#task-workspaces).
 Every section is optional. See the complete
 [example configuration](../nix/compositor/config.example.toml) for outputs,
 input, layout, window decorations, bindings, application rules and animations.
@@ -576,8 +580,8 @@ for VT switching. Key releases stay paired with intercepted presses across reloa
 
 Actions include terminal, launcher, logout, close, maximize, fullscreen, focus-prev/next,
 move-prev/next, focus-output-prev/next, move-output-prev/next, resize, cycle-width, workspace,
-workspace-prev/next, move-workspace, move-workspace-prev/next, output, scale, scale-adjust, launch, reload-config and save-config. Resize
-uses `value` in logical pixels; workspace/move-workspace use 1–4, output is
+workspace-prev/next, move-workspace, move-workspace-prev/next, task, output, scale, scale-adjust, launch, reload-config and save-config. Resize
+uses `value` in logical pixels; workspace/move-workspace use 1-based indexes, output is
 1-based, scale uses a percentage, and scale-adjust uses a signed percentage point
 delta (for example, `{ action = "scale-adjust", value = 5 }`). Launch executes the program and argument
 array directly. The configured terminal action still honors the OS launcher.
@@ -588,6 +592,99 @@ Window rules match an exact, case-sensitive `app_id` from status. The last
 matching rule supplies the default width when a new window identifies itself.
 Existing windows retain their widths when rules or defaults reload, including
 manual resizes; client minimum/maximum constraints still apply.
+
+## Task workspaces
+
+Define task workspaces in `~/.config/shine/workspaces.toml`. The bar shows their
+names in configuration order. Each monitor has the same task list and its own
+windows. Startup apps open once, on the primary monitor, after the desktop
+environment is ready. A nonempty task list replaces the default startup terminal.
+With no tasks configured, the existing four-workspace desktop stays available.
+This feature is specific to Shine; it does not configure Niri.
+
+The workspace file loads and reloads independently of `config.toml`. Invalid
+workspace definitions keep the last working task list without blocking display,
+keyboard or other compositor changes. IPC exposes `task_config_path`,
+`task_config_error` and `task_config_revision` separately from compositor errors.
+Saving display settings never writes the workspace file. A missing or empty
+workspace file returns to the default four workspaces while preserving windows.
+
+By default, Shine reads `workspaces.toml` beside the selected compositor config,
+including when `--config PATH` is used for development. `--workspaces PATH`
+selects a different workspace file explicitly.
+
+```toml
+[[workspaces]]
+id = "dev"
+name = "dev"
+
+[[workspaces.apps]]
+command = ["foot", "--app-id=dev-terminal"]
+match = { app_id = "dev-terminal" }
+
+[[workspaces]]
+id = "chat"
+name = "chat"
+```
+
+See [the dev/chat example](../nix/compositor/tasks.example.toml) for terminal,
+Chrome, Paseo, Chatto HQ, Bluesky, and WhatsApp. Install the apps separately and
+adjust commands to your system. For an existing desktop launcher, a command can
+use `gio launch /absolute/path/to/app.desktop`, with each argument as a separate
+array entry. Commands run without a shell: `~`, `$HOME`, pipes and redirection
+are not expanded. Use absolute paths for personal scripts and files.
+
+Every app needs an exact Wayland `app_id` match. Add `title_contains` when an
+app ID alone is ambiguous. Inspect IDs and titles with
+`ohmansy-compositor msg --socket "$OHMANSY_COMPOSITOR_CONTROL" status`.
+Chrome app windows normally have IDs derived from their URL and profile;
+the example uses the Default profile. Custom terminal app IDs are useful for
+distinguishing terminals belonging to different tasks.
+
+Placement happens once, at the first window buffer commit, using the metadata
+available then. The first matching task wins. Later title changes and manual
+window moves do not trigger placement again. Apps that expose their final title
+only later need an app ID match instead. When tasks are configured, new windows
+preserve existing focus. Startup app failures do not block other apps; immediate
+launch errors appear in the session log and IPC `task_startup_errors`.
+This is startup launching, not process supervision or session restoration.
+
+Config edits reload without launching apps again. Stable IDs preserve task
+contents and the active task through renaming and reordering. Removing a task
+moves its windows to the remaining active task. Empty tasks are allowed.
+Invalid workspace configuration keeps the working task list and reports
+`task_config_error`.
+Restarting only the shell also does not relaunch apps.
+
+Optional shortcuts target stable IDs, independent of names and order. Keep
+shortcuts in the existing `[bindings]` table in `~/.config/shine/config.toml`:
+
+```toml
+[bindings]
+"Mod+D" = { action = "task", id = "dev" }
+"Mod+G" = { action = "task", id = "chat" }
+```
+
+Bindings override existing shortcuts when the same chord is already assigned.
+Task IDs are resolved when invoked, so a missing task does not invalidate the
+compositor configuration.
+IPC also accepts `msg --socket PATH task dev`. Previous/next workspace controls
+cycle through the configured task count; numeric IPC indexes remain 1-based.
+
+Validate without launching anything:
+
+```sh
+ohmansy-compositor validate-workspaces ~/.config/shine/workspaces.toml
+```
+
+Use a Shine build with task support to load the workspace file. Keep workspace
+tables out of `config.toml`. A nested session launches real apps using your regular profiles;
+use the private headless test for automated verification:
+
+```sh
+mise run compositor -- --help
+python3 tools/tests/compositor_tasks.py
+```
 
 ## Monitor configuration
 
