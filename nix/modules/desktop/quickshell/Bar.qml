@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import Quickshell.Networking
+import Ohmansy.Launcher as Commands
 import "Niri.js" as Niri
 
 PanelWindow {
@@ -19,9 +20,19 @@ PanelWindow {
     signal launcherRequested()
     signal launcherDismissed()
     signal displayRequested()
+    Commands.CommandLauncher {
+        screen: bar.screen
+        opened: bar.launcherActive && bar.launcherMode === "apps"
+        onDismissed: bar.launcherDismissed()
+        onCommandRequested: command => {
+            if (command === "displays") bar.displayRequested();
+            else if (command === "terminal") Quickshell.execDetached([Quickshell.env("OHMANSY_TERMINAL")]);
+            else if (command === "prefer-dark" || command === "prefer-light") bar.appearance.select(command);
+        }
+    }
     Launcher {
         barWindow: bar
-        opened: bar.launcherActive && bar.launcherMode !== "shortcuts" && bar.launcherMode !== "displays"
+        opened: bar.launcherActive && !["apps", "shortcuts", "displays"].includes(bar.launcherMode)
         requestedMode: bar.launcherMode
         niriState: bar.niriState
         onDismissed: bar.launcherDismissed()

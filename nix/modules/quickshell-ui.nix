@@ -13,4 +13,10 @@ pkgs.runCommand "ohmansy-quickshell-ui" {} ''
   DisplayView 1.0 DisplayView.qml
   DisplayState 1.0 DisplayState.qml
   EOF
+  mkdir -p "$out/lib/qt-6/qml/Ohmansy/Launcher"
+  cp -r ${./launcher}/. "$out/lib/qt-6/qml/Ohmansy/Launcher/"
+  cat > "$out/lib/qt-6/qml/Ohmansy/Launcher/qmldir" <<'EOF'
+  module Ohmansy.Launcher
+  CommandLauncher 1.0 CommandLauncher.qml
+  EOF
 ''
