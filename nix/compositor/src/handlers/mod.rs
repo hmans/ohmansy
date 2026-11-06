@@ -1,3 +1,4 @@
+pub(crate) mod activation;
 mod compositor;
 mod layer_shell;
 mod protocols;

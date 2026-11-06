@@ -79,6 +79,22 @@ Nested previews support scale changes; their resolution follows the host window.
 The module honors `ohmansy.terminal`; the standalone flake preview uses Foot.
 Close the preview's outer window or use its sign-out confirmation to end it.
 
+## Notification clicks
+
+Clicking a Mako notification can focus its originating window, switching to
+that window's monitor and workspace. The application must provide a notification
+action and use the supplied Wayland activation token to select its window.
+Notifications without an action, or applications that ignore activation tokens,
+cannot identify a destination for Shine.
+The pinned GLib 2.88 GNotification backend drops Mako's activation token, so
+applications using that path also need toolkit support before clicks can focus
+their windows. Clients that handle the token directly can use it now.
+
+Shine accepts activation only after recent input to the requesting client.
+Tokens expire after ten seconds and can be used once. Background presentation
+requests without that input do not gain permission to change focus.
+Compositor changes require rebuilding and starting a new Shine session.
+
 ## Wallpaper fidelity
 
 The wallpaper's render scale, particle layers and particle motion detail can
@@ -185,7 +201,6 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+F | Toggle 100% working width, restoring the previous width |
 | Mod+Shift+F | Toggle fullscreen |
 | Mod+W | Close the focused window |
-| Mod+S | Cycle the focused monitor's scale from 100% to 200% |
 | Print / Ctrl+Print | Save the focused monitor and copy its PNG to the clipboard |
 | Mod+Shift+4 | Capture the focused monitor (Mac keyboard screenshot key) |
 | Shift+Print | Capture the focused monitor and open Satty for annotation |
@@ -560,6 +575,7 @@ mise run compositor-check
 mise run compositor-integration
 python3 tools/tests/compositor_nesting.py
 python3 tools/tests/compositor_monitors.py
+python3 tools/tests/compositor_notifications.py
 python3 tools/tests/compositor_preferences.py
 python3 tools/tests/compositor_clipboard.py
 python3 tools/tests/compositor_clipboard.py super

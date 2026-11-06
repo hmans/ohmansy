@@ -135,6 +135,7 @@
       nixosModules.nvidia = import ./nix/modules/nvidia.nix;
       nixosModules.firstBoot = import ./nix/modules/first-boot.nix;
       nixosModules.updates = import ./nix/modules/updates.nix;
+      nixosModules.agentSkills = import ./nix/modules/agent-skills.nix;
       nixosModules.development = import ./nix/modules/development.nix;
       nixosConfigurations.live = live;
       nixosConfigurations.appliance = appliance;
@@ -282,8 +283,8 @@
         let tools = import nixpkgs { system = target; overlays = [ self.overlays.default ]; };
         in { spatial = tools.mkShell {
           OHMANSY_COMPOSITOR_SHELL = "${import ./nix/modules/shine-shell.nix { pkgs = tools; }}/bin/ohmansy-shine-shell";
-          packages = with tools; [ rustup pkg-config gcc tools.mise (python3.withPackages (p: [ p.pillow ])) niri weston dbus quickshell wl-clipboard xdg-user-dirs satty foot firefox gnome-text-editor ];
-          buildInputs = with tools; [ wayland libxkbcommon libGL libgbm libdrm libinput seatd udev ];
+          packages = with tools; [ rustup pkg-config gcc tools.mise (python3.withPackages (p: [ p.pillow ])) niri weston dbus quickshell wl-clipboard xdg-user-dirs satty foot firefox gnome-text-editor mako ];
+          buildInputs = with tools; [ wayland libxkbcommon libGL libgbm libdrm libinput seatd udev gtk4 ];
           LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath (with tools; [ wayland libxkbcommon libGL ]);
           OHMANSY_SPATIAL_FONT = "${tools.inter}/share/fonts/truetype/Inter.ttc";
           shellHook = ''. ${(import ./nix/modules/cursor-theme.nix { pkgs = tools; }).environment}'';
