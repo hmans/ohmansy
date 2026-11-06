@@ -7,8 +7,8 @@ use smithay::{
     wayland::{
         compositor::with_states,
         shell::wlr_layer::{
-            Layer, LayerSurface as ProtocolSurface, LayerSurfaceData, WlrLayerShellHandler,
-            WlrLayerShellState,
+            KeyboardInteractivity, Layer, LayerSurface as ProtocolSurface, LayerSurfaceData,
+            WlrLayerShellHandler, WlrLayerShellState,
         },
     },
 };
@@ -39,6 +39,8 @@ impl WlrLayerShellHandler for Smallvil {
     }
 
     fn layer_destroyed(&mut self, surface: ProtocolSurface) {
+        let had_focus = self.seat.get_keyboard().unwrap().current_focus().as_ref()
+            == Some(surface.wl_surface());
         for output in self.space.outputs() {
             let mut map = layer_map_for_output(output);
             let layer = map
@@ -51,6 +53,9 @@ impl WlrLayerShellHandler for Smallvil {
         }
         self.arrange_layers();
         self.apply_positions();
+        if had_focus {
+            self.sync_keyboard_focus();
+        }
     }
 }
 smithay::delegate_layer_shell!(Smallvil);
@@ -83,6 +88,40 @@ impl Smallvil {
             }
         }
         self.apply_positions();
+        // Wallpaper/bar commits must not interrupt an application's popup grab.
+        let layer_focused = self
+            .seat
+            .get_keyboard()
+            .unwrap()
+            .current_focus()
+            .is_some_and(|focus| {
+                self.layer_shell_state
+                    .layer_surfaces()
+                    .any(|layer| layer.wl_surface() == &focus)
+            });
+        if layer_focused || self.exclusive_layer_focus().is_some() {
+            self.sync_keyboard_focus();
+        }
+    }
+
+    // Exclusive top/overlay surfaces receive keys only while mapped and asking
+    // for them. The layout keeps its selected app, ready for dismissal.
+    pub fn exclusive_layer_focus(&self) -> Option<WlSurface> {
+        for kind in [Layer::Overlay, Layer::Top] {
+            for output in self.space.outputs() {
+                let map = layer_map_for_output(output);
+                for layer in map.layers_on(kind).rev() {
+                    if layer.cached_state().keyboard_interactivity
+                        == KeyboardInteractivity::Exclusive
+                        && layer.bbox().size.w > 0
+                        && layer.bbox().size.h > 0
+                    {
+                        return Some(layer.wl_surface().clone());
+                    }
+                }
+            }
+        }
+        None
     }
 
     pub fn arrange_layers(&mut self) {

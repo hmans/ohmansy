@@ -521,15 +521,21 @@ impl Smallvil {
                 window.toplevel().unwrap().send_pending_configure();
             }
         }
-        let surface = focused
-            .and_then(|id| self.windows.get(&id))
-            .map(|window| window.toplevel().unwrap().wl_surface().clone());
-        self.seat.get_keyboard().unwrap().set_focus(
-            self,
-            surface,
-            smithay::utils::SERIAL_COUNTER.next_serial(),
-        );
+        self.sync_keyboard_focus();
         self.apply_positions();
+    }
+
+    pub fn sync_keyboard_focus(&mut self) {
+        let surface = self.exclusive_layer_focus().or_else(|| {
+            self.layout
+                .focused()
+                .and_then(|id| self.windows.get(&id))
+                .map(|window| window.toplevel().unwrap().wl_surface().clone())
+        });
+        let keyboard = self.seat.get_keyboard().unwrap();
+        if keyboard.current_focus() != surface {
+            keyboard.set_focus(self, surface, smithay::utils::SERIAL_COUNTER.next_serial());
+        }
     }
 
     pub fn action(&mut self, action: &str, value: Option<i64>) -> Result<(), String> {

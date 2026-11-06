@@ -138,8 +138,19 @@ fresh profile, and the editor uses separate application state under ignored
 Closing the outer window ends the nested session and disconnects its clients.
 
 The bar uses Shine's layer-shell support and private control socket, independent
-of Niri's panel and services. This first version has no application menu, tray,
-audio controls, or keyboard-focused layer popups. The plain `compositor` demo
+of Niri's panel and services. Mod+Space or the ohmansy button opens the shared
+Quickshell launcher, with fuzzy search across apps and desktop commands. Its
+source is in `nix/modules/launcher/`, packaged as `Ohmansy.Launcher`. Providers
+contribute stable IDs, titles, subtitles, icons, keywords and activation data;
+the launcher owns search and selection, while each shell handles desktop commands.
+External providers and nested views remain future work.
+
+Shine honors exclusive keyboard focus for mapped top and overlay layer surfaces.
+The launcher requests it only while open; closing restores the selected app's
+keyboard focus. Background and panel commits preserve application popup grabs.
+`python3 tools/tests/compositor_launcher.py` tests search, app and command
+activation, errors, empty results, dismissal and focus on the private display.
+This shell still has no tray or audio controls. The plain `compositor` demo
 stays minimal; use `compositor-desktop` to preview the bar.
 
 Windows form a horizontal strip with persistent widths. Focusing a window

@@ -2,6 +2,8 @@
 let
   ui = import ./quickshell-ui.nix { inherit pkgs; };
   ribbons = import ./greeter-ribbons.nix { inherit pkgs; };
+  launchApp = import ./app-launcher.nix { inherit pkgs; };
+  appearance = import ./appearance.nix { inherit pkgs; };
   displays = pkgs.writeShellScript "ohmansy-shine-displays" ''
     exec ${pkgs.python3}/bin/python3 ${./desktop/shine-displays.py} "$@"
   '';
@@ -17,6 +19,8 @@ in pkgs.writeShellScriptBin "ohmansy-shine-shell" ''
     *) export OHMANSY_COMPOSITOR_CONTROL="$PWD/$OHMANSY_COMPOSITOR_CONTROL" ;;
   esac
   export OHMANSY_DISPLAYS=${displays}
+  export OHMANSY_APP_LAUNCHER=${launchApp}
+  export OHMANSY_APPEARANCE=${appearance}
   export OHMANSY_DISPLAY_PREVIEW=${previewDisplay}
   wallpaper_state="''${XDG_STATE_HOME:-$HOME/.local/state}/ohmansy/wallpaper"
   if [ -f "$wallpaper_state" ]; then

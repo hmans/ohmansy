@@ -11,7 +11,8 @@ let
   compositor = import ./compositor-package.nix { inherit pkgs; };
   shell = import ./shine-shell.nix { inherit pkgs; };
   launcher = pkgs.writeShellScript "ohmansy-compositor-applications" ''
-    exec ${pkgs.wofi}/bin/wofi --normal-window --show drun --prompt Applications
+    exec ${pkgs.quickshell}/bin/quickshell \
+      --path "''${OHMANSY_SHINE_QML:-${./shine-shell}/shell.qml}" ipc call launcher toggle
   '';
   logout = pkgs.writeShellScript "ohmansy-compositor-sign-out" ''
     # A previous confirmation must never make Sign out the next default.

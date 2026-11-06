@@ -9,6 +9,35 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shared Quickshell launcher PoC (2026-11-06)
+
+`nix/modules/launcher/` supplies `Ohmansy.Launcher.CommandLauncher` to Shine
+and Niri through `quickshell-ui.nix`. It uses shared Ui glass/input/palette
+components, fuzzy ranks desktop applications and a desktop-command provider,
+and keeps keyboard selection by stable item ID. The shell handles Displays,
+Terminal and appearance commands. External providers and nested views are future
+work. Shine's ohmansy bar button and packaged Mod+Space open its launcher IPC.
+Niri retains its other launcher modes alongside the shared default search.
+
+Shine now honors mapped top/overlay layers requesting exclusive keyboard focus.
+Closing the launcher restores the layout's selected app; wallpaper/bar commits
+must not interrupt app popup grabs. The installed compositor needs this Rust
+change before the overlay can receive keyboard input. Test it in a new nested
+session rather than replacing a running login compositor.
+
+`app-launcher.nix` retains GIO activation and persistent journal streams. Login
+sessions use an independent systemd scope; nested sessions keep their private
+activation bus and use journal streams without the unavailable private-bus user
+manager. Do not route nested launches through the host's activation environment.
+
+The compositor, packaged session and Niri shell built. All 36 compositor unit
+tests passed. Private headless launcher, packaged-session and full shell trials
+passed: fuzzy search/ranking, arrows, GIO activation using the real nested helper,
+Displays, appearance preferences, launch errors, empty results, outside click,
+repeated dismissal/focus restoration, two outputs and shell lifecycle. An
+interactive nested preview was started for user testing. No installed-system
+activation, login compositor replacement, image build or boot was performed.
+
 ## Ribbon shader cost and runtime fidelity (2026-11-06)
 
 The background skips its 27 particle candidates when proximity is below

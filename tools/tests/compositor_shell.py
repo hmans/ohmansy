@@ -27,7 +27,9 @@ def run():
     def layers_ready():
         return all(o['work_area'][1] == 44 and
                    {layer['namespace'] for layer in o['layers']} ==
-                   {'ohmansy-shine-bar', 'ohmansy-wallpaper', 'ohmansy-screenshot-result'}
+                   {'ohmansy-shine-bar', 'ohmansy-wallpaper', 'ohmansy-screenshot-result', 'ohmansy-launcher'} and
+                   all(layer['geometry'] and layer['geometry'][2] > 0 and layer['geometry'][3] > 0
+                       for layer in o['layers'])
                    for o in control()['outputs'])
 
     def capture(label):

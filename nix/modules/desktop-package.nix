@@ -12,16 +12,7 @@ let
       --setenv=XDG_CONFIG_HOME="''${XDG_CONFIG_HOME:-$HOME/.config}" \
       ${displays}/bin/ohmansy-displays preview "$@"
   '';
-  appearance = pkgs.writeShellScript "ohmansy-appearance" ''
-    export GSETTINGS_SCHEMA_DIR=${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}/glib-2.0/schemas
-    case "$1" in
-      read) exec ${pkgs.glib}/bin/gsettings get org.gnome.desktop.interface color-scheme ;;
-      monitor) exec ${pkgs.glib}/bin/gsettings monitor org.gnome.desktop.interface color-scheme ;;
-      default|prefer-light|prefer-dark)
-        exec ${pkgs.glib}/bin/gsettings set org.gnome.desktop.interface color-scheme "$1" ;;
-      *) exit 2 ;;
-    esac
-  '';
+  appearance = import ./appearance.nix { inherit pkgs; };
   syncTerminalTheme = pkgs.writeShellScript "ohmansy-terminal-theme" ''
     ${pkgs.lib.optionalString (!syncFootTheme) "exit 0"}
     case "$1" in
@@ -53,14 +44,7 @@ let
     ${pkgs.coreutils}/bin/cp "$palette" "$temporary"
     ${pkgs.coreutils}/bin/mv -f "$temporary" "$target"
   '';
-  launchApp = pkgs.writeShellScript "ohmansy-launch-app" ''
-    # Applications must not inherit QProcess pipes which close when gtk-launch
-    # exits. Journal streams survive the launcher and retain application errors.
-    # Keep launched apps outside the shell service's lifetime as well.
-    exec ${pkgs.systemd}/bin/systemd-run --user --scope --collect --quiet \
-      ${pkgs.systemd}/bin/systemd-cat --identifier=ohmansy-app-launch \
-      ${pkgs.gtk3}/bin/gtk-launch "$@"
-  '';
+  launchApp = import ./app-launcher.nix { inherit pkgs; };
 in pkgs.writeShellScriptBin "ohmansy-quickshell" ''
   export QML_IMPORT_PATH="${ui}/lib/qt-6/qml''${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
   export OHMANSY_APP_LAUNCHER="${launchApp}"

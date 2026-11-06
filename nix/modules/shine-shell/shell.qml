@@ -1,5 +1,6 @@
 //@ pragma Env QS_NO_RELOAD_POPUP=1
 //@ pragma UseQApplication
+//@ pragma IconTheme Adwaita
 //@ pragma DefaultEnv QT_QPA_PLATFORMTHEME=xdgdesktopportal
 import Quickshell
 import Quickshell.Io
@@ -8,6 +9,7 @@ import QtQuick
 import QtQuick.Layouts
 import Ohmansy.Ui
 import Ohmansy.Displays as Displays
+import Ohmansy.Launcher as Launcher
 
 ShellRoot {
     id: root
@@ -18,6 +20,36 @@ ShellRoot {
     property double screenshotResult: 0
     property string screenshotOutput: ""
     property bool displaysOpen: false
+    property string launcherScreen: ""
+    function toggleLauncher() {
+        const output = state.outputs.find(output => output.focused) || state.outputs[0];
+        launcherScreen = launcherScreen ? "" : (output ? output.name : Quickshell.screens[0].name);
+    }
+    IpcHandler {
+        target: "launcher"
+        function toggle(): void { root.toggleLauncher(); }
+        function close(): void { root.launcherScreen = ""; }
+        function status(): string {
+            const item = launchers.instances.find(item => item.opened);
+            return item ? item.status() : JSON.stringify({ opened: false });
+        }
+    }
+    Variants {
+        id: launchers
+        model: Quickshell.screens
+        Launcher.CommandLauncher {
+            required property var modelData
+            screen: modelData
+            opened: root.launcherScreen === modelData.name
+            onDismissed: root.launcherScreen = ""
+            onCommandRequested: command => {
+                if (command === "displays") { root.displaysOpen = true; displayState.refresh(); }
+                else if (command === "terminal") root.request("terminal", modelData.name, null);
+                else if (command === "prefer-dark" || command === "prefer-light")
+                    Quickshell.execDetached([Quickshell.env("OHMANSY_APPEARANCE"), command]);
+            }
+        }
+    }
     Displays.DisplayState { id: displayState }
     FloatingWindow {
         visible: root.displaysOpen
@@ -105,7 +137,7 @@ ShellRoot {
             RowLayout {
                 anchors { left: parent.left; verticalCenter: parent.verticalCenter; leftMargin: 10 }
                 spacing: 6
-                Text { text: "ohmansy"; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.rightMargin: 12 }
+                BarButton { text: "ohmansy"; onClicked: root.launcherScreen = root.launcherScreen ? "" : bar.modelData.name }
                 Repeater {
                     model: 4
                     BarButton {
