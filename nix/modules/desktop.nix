@@ -80,16 +80,13 @@ in {
 
   # No account, credentials, machine identifiers, or personal services here.
   environment.systemPackages = with pkgs; [
-    desktop displays quickshell mako swaybg swaylock nautilus
+    desktop displays quickshell swaybg swaylock nautilus
     playerctl wireplumber
     xwayland-satellite cursor.package wl-clipboard
   ];
   environment.sessionVariables.NIRI_CONFIG = lib.mkDefault "/etc/ohmansy/niri.kdl";
   environment.sessionVariables.XCURSOR_THEME = lib.mkDefault cursor.name;
   environment.sessionVariables.XCURSOR_SIZE = lib.mkDefault (toString cursor.size);
-  environment.etc."xdg/mako/config".text = ''
-    max-history=100
-  '';
   systemd.user.services.ohmansy-lock = {
     description = "Ohmansy screen lock";
     after = [ "niri.service" ];

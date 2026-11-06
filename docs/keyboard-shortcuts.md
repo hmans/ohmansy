@@ -27,8 +27,10 @@ and Escape to close. Opening the same menu again closes it. Power actions that
 end or suspend the session require confirmation, with Cancel selected first.
 
 Clipboard history starts collecting when the desktop service runs. It uses
-Cliphist's per-user database; notification history uses Mako's last 100 retained
-notifications. Neither history is written to the system configuration or Git.
+Cliphist's per-user database. Quickshell retains the last 100 non-transient
+notifications in a private per-user state file. Open **Notifications** to read
+history, clear it, or toggle Do Not Disturb. Neither history is written to the
+system configuration or Git.
 Bluetooth controls need a Bluetooth adapter; the development VM has none.
 
 Choose **Displays** in Desktop controls (**Mod+Comma**) to select a monitor,

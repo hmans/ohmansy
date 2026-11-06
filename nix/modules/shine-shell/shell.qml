@@ -10,6 +10,7 @@ import QtQuick.Layouts
 import Ohmansy.Ui
 import Ohmansy.Displays as Displays
 import Ohmansy.Launcher as Launcher
+import Ohmansy.Notifications as Notifications
 
 ShellRoot {
     id: root
@@ -21,6 +22,10 @@ ShellRoot {
     property string screenshotOutput: ""
     property bool displaysOpen: false
     property string launcherScreen: ""
+    Notifications.NotificationService {
+        id: notifications
+        focusedOutput: (root.state.outputs.find(output => output.focused) || root.state.outputs[0] || {}).name || Quickshell.screens[0]?.name || ""
+    }
     function toggleLauncher() {
         const output = state.outputs.find(output => output.focused) || state.outputs[0];
         launcherScreen = launcherScreen ? "" : (output ? output.name : Quickshell.screens[0].name);
@@ -44,6 +49,7 @@ ShellRoot {
             onDismissed: root.launcherScreen = ""
             onCommandRequested: command => {
                 if (command === "displays") { root.displaysOpen = true; displayState.refresh(); }
+                else if (command === "notifications") notifications.historyOutput = modelData.name;
                 else if (command === "terminal") root.request("terminal", modelData.name, null);
                 else if (command === "prefer-dark" || command === "prefer-light")
                     Quickshell.execDetached([Quickshell.env("OHMANSY_APPEARANCE"), command]);
@@ -151,6 +157,10 @@ ShellRoot {
                 BarButton {
                     text: "Displays"
                     onClicked: { root.displaysOpen = true; displayState.refresh(); }
+                }
+                BarButton {
+                    text: notifications.doNotDisturb ? "Notifications · paused" : "Notifications"
+                    onClicked: notifications.historyOutput = notifications.historyOutput ? "" : bar.modelData.name
                 }
             }
             Text {

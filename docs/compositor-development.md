@@ -147,14 +147,29 @@ Close the preview's outer window or use its sign-out confirmation to end it.
 
 ## Notification clicks
 
-Clicking a Mako notification can focus its originating window, switching to
+Clicking a notification can focus its originating window, switching to
 that window's monitor and workspace. The application must provide a notification
 action and use the supplied Wayland activation token to select its window.
 Notifications without an action, or applications that ignore activation tokens,
 cannot identify a destination for Shine.
-The pinned GLib 2.88 GNotification backend drops Mako's activation token, so
+The pinned GLib 2.88 GNotification backend drops the notification activation token, so
 applications using that path also need toolkit support before clicks can focus
 their windows. Clients that handle the token directly can use it now.
+
+Shine and Niri share the Quickshell notification service in
+`nix/modules/notifications/`. It uses the shared UI components and a small native
+Wayland helper to send an activation token before invoking a clicked action.
+The compositor still validates the input serial; showing a notification grants
+no focus permission.
+
+Choose **Notifications** in the launcher, or Shine's bar, to open history and
+Do Not Disturb. The last 100 non-transient messages and the quiet-mode preference
+are saved privately under `$XDG_STATE_HOME/ohmansy/notifications.json` (default
+`~/.local/state/ohmansy/notifications.json`). History contains text, not executable
+actions. Explicit application timeouts are honored; zero stays until dismissed,
+and an unspecified timeout defaults to eight seconds, or no timeout for urgent
+messages. Hovering pauses expiry. Do Not Disturb suppresses popups while retaining
+history. QML reloads retain active notifications; a process restart retains history.
 
 Shine accepts activation only after recent input to the requesting client.
 Tokens expire after ten seconds and can be used once. Background presentation

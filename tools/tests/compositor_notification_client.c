@@ -20,6 +20,18 @@ static void notification_signal(GDBusConnection *connection, const char *sender,
     (void)connection; (void)sender; (void)path; (void)interface; (void)data;
     guint32 id;
     const char *value;
+    if (g_str_equal(signal, "NotificationClosed")) {
+        guint32 reason;
+        g_variant_get(parameters, "(uu)", &id, &reason);
+        if (id == notification_id) {
+            char *path = g_strconcat(command_path, ".closed", NULL);
+            char *text = g_strdup_printf("%u", reason);
+            g_file_set_contents(path, text, -1, NULL);
+            g_free(text);
+            g_free(path);
+        }
+        return;
+    }
     if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("(us)"))) return;
     g_variant_get(parameters, "(u&s)", &id, &value);
     if (id != notification_id) return;
@@ -47,7 +59,8 @@ static gboolean command(gpointer data) {
             "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify",
             g_variant_new("(susss^asa{sv}i)", "Notification trial", 0u, "",
                 "Notification activation trial", "Return to the originating window",
-                actions, NULL, 0), G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 5000, NULL, NULL);
+                actions, NULL, g_str_has_prefix(text, "notify-expire") ? 150 : 0),
+            G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 5000, NULL, NULL);
         g_assert_nonnull(reply);
         g_variant_get(reply, "(u)", &notification_id);
         g_variant_unref(reply);

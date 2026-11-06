@@ -54,6 +54,13 @@ rebuild to receive these defaults; running browsers may need a restart.
 Glass surfaces retain their translucent treatment where graphics support it,
 while software rendering preserves the same muted color hierarchy.
 
+Desktop notifications use `Ohmansy.Notifications`, shared by Shine and Niri.
+Their cards and history panel use `GlassSurface`, `GlassButton`, and `Theme`
+directly, so their font, corners, surfaces, and action roles stay consistent.
+Critical messages include an Urgent label. Supporting notification actions use
+the secondary button role; dismiss controls use the return role. Notification
+popups never request keyboard focus; opening history does.
+
 ## Preview and verification
 
 Keep the installer's main actions in a bottom bar outside the scrolling content.

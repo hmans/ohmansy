@@ -20,12 +20,14 @@ PanelWindow {
     signal launcherRequested()
     signal launcherDismissed()
     signal displayRequested()
+    signal notificationsRequested()
     Commands.CommandLauncher {
         screen: bar.screen
         opened: bar.launcherActive && bar.launcherMode === "apps"
         onDismissed: bar.launcherDismissed()
         onCommandRequested: command => {
             if (command === "displays") bar.displayRequested();
+            else if (command === "notifications") bar.notificationsRequested();
             else if (command === "terminal") Quickshell.execDetached([Quickshell.env("OHMANSY_TERMINAL")]);
             else if (command === "prefer-dark" || command === "prefer-light") bar.appearance.select(command);
         }

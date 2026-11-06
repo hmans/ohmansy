@@ -1,0 +1,3 @@
+module Ohmansy.Notifications
+NotificationService 1.0 NotificationService.qml
+NotificationCard 1.0 NotificationCard.qml

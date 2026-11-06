@@ -5,6 +5,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import Ohmansy.Notifications as Notifications
 
 ShellRoot {
     id: root
@@ -24,6 +25,11 @@ ShellRoot {
     property string launcherScreen: ""
     property string launcherMode: "apps"
     function toggleLauncher(screenName, mode = "apps") {
+        if (mode === "notifications") {
+            launcherScreen = "";
+            notifications.historyOutput = notifications.historyOutput ? "" : screenName;
+            return;
+        }
         const closing = launcherScreen === screenName && launcherMode === mode;
         launcherMode = mode;
         launcherScreen = closing ? "" : screenName;
@@ -41,6 +47,7 @@ ShellRoot {
         }
     }
     NiriState { id: niri }
+    Notifications.NotificationService { id: notifications; focusedOutput: niri.focusedOutput || Quickshell.screens[0]?.name || "" }
     AudioState { id: audioState }
     AppearanceState { id: appearanceState }
     DisplayState { id: displayState }
@@ -58,6 +65,7 @@ ShellRoot {
             launcherMode: root.launcherMode
             onLauncherRequested: root.toggleLauncher(modelData.name)
             onDisplayRequested: root.toggleLauncher(modelData.name, "displays")
+            onNotificationsRequested: root.toggleLauncher(modelData.name, "notifications")
             onLauncherDismissed: if (root.launcherScreen === modelData.name) root.launcherScreen = ""
         }
     }

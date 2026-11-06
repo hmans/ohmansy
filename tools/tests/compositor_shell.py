@@ -27,7 +27,7 @@ def run():
     def layers_ready():
         return all(o['work_area'][1] == 44 and
                    {layer['namespace'] for layer in o['layers']} ==
-                   {'ohmansy-shine-bar', 'ohmansy-wallpaper', 'ohmansy-screenshot-result', 'ohmansy-launcher'} and
+                   {'ohmansy-shine-bar', 'ohmansy-wallpaper', 'ohmansy-screenshot-result', 'ohmansy-launcher', 'ohmansy-notifications'} and
                    all(layer['geometry'] and layer['geometry'][2] > 0 and layer['geometry'][3] > 0
                        for layer in o['layers'])
                    for o in control()['outputs'])
@@ -128,7 +128,7 @@ def run():
             trial.wait_for(lambda: all(layer['geometry'][2] ==
                            control()['outputs'][0]['logical_size'][0]
                            for layer in control()['outputs'][0]['layers']
-                           if layer['namespace'] != 'ohmansy-screenshot-result'),
+                           if layer['namespace'] not in {'ohmansy-screenshot-result', 'ohmansy-notifications'}),
                            description='panel and wallpaper follow scale')
             control('screenshot', path=str(artifacts / 'panel.png'))
             trial.wait_for((artifacts / 'panel.png').exists, description='panel screenshot')

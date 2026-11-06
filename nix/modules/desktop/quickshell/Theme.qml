@@ -21,8 +21,6 @@ QtObject {
     readonly property color tint: colors.surfaceBase
     readonly property real glassOpacity: colors.surfaceOpacity
     readonly property color background: colors.surface
-    readonly property color notificationBackground: colors.surface
-    readonly property color notificationBorder: colors.border
     readonly property color text: onWallpaper ? Ui.Appearance.mixColor(night.text, day.text) : colors.text
     readonly property color secondary: onWallpaper ? text : colors.secondary
     readonly property color muted: onWallpaper ? Ui.Appearance.mixColor(night.muted, day.muted) : colors.muted
@@ -38,12 +36,5 @@ QtObject {
     readonly property color barBackground: "transparent"
     readonly property color shellGlassTint: colors.surface
     readonly property real traySaturation: -1
-    readonly property int notificationWidth: 420
-    readonly property int notificationGap: 12
-    readonly property int notificationEdgeGap: 24
-    readonly property int notificationShadowPadding: 24
-    readonly property color notificationShadow: "#30000000"
     readonly property int edgeGap: 12
-    readonly property int notificationTitleSize: 16
-    readonly property int notificationBodySize: 15
 }
