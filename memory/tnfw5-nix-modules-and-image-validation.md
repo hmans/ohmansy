@@ -9,6 +9,16 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Crane source evaluation in CI (2026-11-06)
+
+`compositor-package.nix` imports the pinned Crane source using
+`builtins.fetchTree`, retaining its revision and NAR checksum. Importing
+`pkgs.fetchFromGitHub` required realizing a derivation during evaluation; fresh
+CI runners failed with an invalid `source.drv` path while local cached-source
+evaluation passed. Both main run 42242062351 and PR run 42251890424 failed this
+way on ARM and x86. The compositor now evaluates with
+`allow-import-from-derivation = false`. A new remote CI run is still needed.
+
 ## Shine window focus, launcher reuse and floating dialogs (2026-11-06)
 
 The launcher helper first sends a display-scoped `activate-app` IPC request,

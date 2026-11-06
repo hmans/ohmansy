@@ -3,11 +3,14 @@ let
   cursor = import ./cursor-theme.nix { inherit pkgs; };
   # Pin the build helper here so standalone module imports use the same cache
   # layout as flake packages, without needing an additional overlay.
-  crane = import (pkgs.fetchFromGitHub {
+  # Fetch during evaluation: importing a build derivation fails on fresh CI
+  # runners when flake checks evaluate without building outputs.
+  crane = import (builtins.fetchTree {
+    type = "github";
     owner = "ipetkov";
     repo = "crane";
     rev = "79fd63528501446749c09f08cad486a58c7d173e";
-    hash = "sha256-TREenflwEjxOSq292FYwbc3kEm7TDRtXCZRNWEdjBmg=";
+    narHash = "sha256-TREenflwEjxOSq292FYwbc3kEm7TDRtXCZRNWEdjBmg=";
   }) { inherit pkgs; };
   common = {
     pname = "ohmansy-compositor";
