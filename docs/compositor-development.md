@@ -174,7 +174,6 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Mod+F | Toggle 100% working width, restoring the previous width |
 | Mod+Shift+F | Toggle fullscreen |
 | Mod+W | Close the focused window |
-| Mod+S | Cycle the focused monitor's scale from 100% to 200% |
 | Print / Ctrl+Print | Save the focused monitor and copy its PNG to the clipboard |
 | Mod+Shift+4 | Capture the focused monitor (Mac keyboard screenshot key) |
 | Shift+Print | Capture the focused monitor and open Satty for annotation |
