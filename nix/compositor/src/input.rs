@@ -7,7 +7,6 @@ use smithay::{
         keyboard::FilterResult,
         pointer::{AxisFrame, ButtonEvent, MotionEvent},
     },
-    reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::SERIAL_COUNTER,
 };
 
@@ -104,7 +103,8 @@ impl Smallvil {
                     window.set_activated(false);
                     window.toplevel().unwrap().send_pending_configure();
                 });
-                keyboard.set_focus(self, Option::<WlSurface>::None, serial);
+                let focus = self.exclusive_layer_focus();
+                keyboard.set_focus(self, focus, serial);
             }
         };
 

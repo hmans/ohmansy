@@ -57,16 +57,31 @@ def run():
             assert child['DBUS_SESSION_BUS_ADDRESS'] != f'unix:path={os.environ["XDG_RUNTIME_DIR"]}/bus', child
             assert child['WAYLAND_DISPLAY'] == state['wayland_display'], child
             assert child['SSH_AUTH_SOCK'] == os.environ.get('SSH_AUTH_SOCK'), child
+            ipc_environment = dict(environment, WAYLAND_DISPLAY=state['wayland_display'])
+            def launcher_status():
+                instances = json.loads(subprocess.check_output(
+                    ['quickshell', 'list', '--all', '--json'], env=ipc_environment, text=True))
+                for instance in instances:
+                    if 'shine-shell' not in instance['config_path']:
+                        continue
+                    result = subprocess.run(['quickshell', 'ipc', '--pid', str(instance['pid']),
+                        'call', 'launcher', 'status'], env=ipc_environment, text=True, capture_output=True)
+                    if result.returncode == 0:
+                        return json.loads(result.stdout)
+                raise AssertionError('No launcher IPC for the packaged session')
+            trial.wait_for(lambda: not launcher_status()['opened'], description='launcher ready')
             terminal = trial.wait_for(lambda: next((window for window in control()['windows'] if window['app_id'] == 'foot'), None), description='normal session terminal')
             trial.wait_for(lambda: next(window for window in control()['windows'] if window['id'] == terminal['id'])['render_density'] == 2, description='2x session terminal')
             if original_focus is not None:
                 trial.focus_parent_window(original_focus)
             trial.keys(control, pid, terminal['id'], [32], shortcut)
-            assert not trial.window_for(control, 'wofi'), 'Mod+D must not open the launcher'
+            assert not launcher_status()['opened'], 'Mod+D must not open the launcher'
             trial.keys(control, pid, terminal['id'], [57], shortcut)
-            trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='application picker')
+            trial.wait_for(lambda: launcher_status()['opened'], description='application picker')
+            trial.wait_for(lambda: control()['keyboard_focus'] is None, description='overlay receives keyboard focus')
             control.send_keys([1])
-            trial.wait_for(lambda: not trial.window_for(control, 'wofi'), description='picker closing')
+            trial.wait_for(lambda: not launcher_status()['opened'], description='picker closing')
+            trial.wait_for(lambda: control()['keyboard_focus'] == terminal['id'], description='picker restores app focus')
             trial.keys(control, pid, terminal['id'], [18], shortcut + ('shift',))
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='sign-out confirmation')
             control.send_keys([28])
