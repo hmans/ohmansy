@@ -1312,23 +1312,19 @@ on this builder. It then failed eight tests (3335 passed), including process
 tracking and archive tests. The binary package avoids this compilation and
 does not add another Nixpkgs input; the root lock remains unchanged.
 
-Herdr packaging (2026-11-04): the default software bundle includes terminal
-herdr from the upstream `herdrdev/herdr` flake at `v0.9.5`. Keep its upstream
-Nixpkgs and Rust overlay pins; ohmansy's Nixpkgs release pin is unchanged.
-The root flake exports the package on both Linux architectures and a narrow
-overlay exposing `pkgs.herdr`. The public default/software modules and internal
-image configurations apply that overlay. Replacing `ohmansy.software.packages`
-with an empty list still omits herdr; desktop-only imports do not install it.
-The customization check now exercises the public modules.
+Herdr removal (2026-11-06): herdr is no longer bundled or exported by
+ohmansy. Its upstream flake input, package exports and overlay entry were
+removed, along with its Rust overlay and separate Nixpkgs lock nodes. The
+ohmansy Nixpkgs release pin is unchanged. Mise remains bundled; users can
+manage herdr themselves through mise.
 
-Nested inputs introduced a lock-generation requirement: follows paths in
-`installation-package.nix` must be prefixed with `ohmansy` when placing the
-release under the generated host flake. The factory-platform check resolves
-every generated input reference. Native customization/factory-platform checks,
-all-system flake evaluation, offline metadata inspection of the generated host
-flake, and six factory/ISO Python tests passed. The x86 package built and ran
-`--version` and `--help`; ARM was evaluated, not built or run. No image rebuild,
-boot test, or installed-system activation was performed.
+The generated host lock still prefixes nested follows paths with `ohmansy`
+in `installation-package.nix`. Keep that generic handling: the factory-platform
+check resolves every generated input reference even without herdr.
+
+Native customization and factory-platform checks built successfully. All-system
+flake evaluation and all six factory/ISO Python tests passed. No image rebuild,
+boot test or installed-system activation was performed.
 
 Module layering (2026-11-02): default.nix composes desktop.nix and software.nix.
 The public flake exports default, desktop, software, and vm modules. Factory,

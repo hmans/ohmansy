@@ -2,9 +2,8 @@
   description = "ohmansy — a portable Shine desktop, persistent VM, and live images";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-  inputs.herdr.url = "github:herdrdev/herdr/v0.9.5";
 
-  outputs = { self, nixpkgs, herdr }:
+  outputs = { self, nixpkgs }:
     let
       nixosSystem = args: nixpkgs.lib.nixosSystem (args // {
         modules = args.modules ++ [{ nixpkgs.overlays = [ self.overlays.default ]; }];
@@ -60,7 +59,6 @@
       desktopPackages = pkgs: {
         compositor = import ./nix/modules/compositor-package.nix { inherit pkgs; };
         compositor-session = import ./nix/modules/compositor-session-package.nix { inherit pkgs; };
-        herdr = herdr.packages.${pkgs.stdenv.hostPlatform.system}.default;
         mise = pkgs.callPackage ./nix/modules/mise-package.nix { };
         desktop-shell = import ./nix/modules/desktop-package.nix { inherit pkgs; };
         display-preview = pkgs.writeShellScriptBin "ohmansy-display-preview" ''
@@ -119,7 +117,6 @@
         '';
     in {
       overlays.default = final: _prev: {
-        herdr = herdr.packages.${final.stdenv.hostPlatform.system}.default;
         mise = final.callPackage ./nix/modules/mise-package.nix { };
       };
       nixosModules.default = {
@@ -190,7 +187,6 @@
         customization = import ./nix/tests/customization.nix {
           inherit nixpkgs;
           ohmansyModules = self.nixosModules;
-          herdrPackage = herdr.packages.${pcSystem}.default;
           misePackage = self.packages.${pcSystem}.mise;
           pkgs = pcPkgs;
           system = pcSystem;
@@ -216,7 +212,6 @@
         customization = import ./nix/tests/customization.nix {
           inherit nixpkgs pkgs system;
           ohmansyModules = self.nixosModules;
-          herdrPackage = herdr.packages.${system}.default;
           misePackage = self.packages.${system}.mise;
         };
         greeter-auth = pkgs.runCommand "ohmansy-greeter-auth" {
