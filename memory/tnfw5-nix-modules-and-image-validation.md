@@ -9,6 +9,29 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine packaged dependency cache (2026-11-06)
+
+`nix/modules/compositor-package.nix` uses a revision/hash-pinned Crane helper,
+with separate `buildDepsOnly` and `buildPackage` derivations. Standalone module
+imports and flake packages share this implementation. Source-dependent asset
+paths and wrapping belong only to the application build. The Nixpkgs release
+pin and root lock file are unchanged. The first build populates the Nix-store
+cache; source-only edits reuse compiled dependencies. Cargo dependency/features,
+toolchain or native input changes can invalidate it. This cache is separate from
+the development Cargo target directory.
+
+Previously `buildRustPackage` rebuilt all Rust dependencies whenever Shine's
+source changed; `os-switch` itself never forced a clean build. Saved package
+logs showed `wayland-protocols-misc` recompiling inside the compositor derivation.
+
+Verified native package and isolated source-comment variant builds, with 48
+release tests passing in each. Both application build logs compiled only Shine
+and imported the same dependency artifacts. The source edit preserved the exact
+dependency derivation; a Cargo feature edit changed it. Packaged `--help` matched
+between builds. ARM package evaluation passed; ARM execution was not tested.
+All-system `nix flake check --no-build --all-systems` evaluation also passed.
+No OS activation or running compositor replacement was performed.
+
 ## Shine unfocused window effects (2026-11-06)
 
 Shine defaults to 0.99 visual scale, 0.85 saturation and 0.08 neutral fog for

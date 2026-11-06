@@ -786,6 +786,10 @@ OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run
 Source is in `nix/compositor/`, with upstream attribution beside it. Keeping it
 under `nix/` includes it in shipped release sources and offline rebuild inputs.
 Nix packages and the session module live in `nix/modules/compositor*.nix`.
+Packaged builds use Crane to cache compiled Rust dependencies separately from
+Shine's source. The first build fills this cache; later source edits reuse it,
+including through `mise run os-switch`. Dependency, compiler, or native library
+changes can rebuild the cache. This uses the Nix store, not `.build/spatial/`.
 Both Rust experiments share the incremental cache in `.build/spatial/`.
 Restart the nested process to try code changes; no OS rebuild is needed.
 
