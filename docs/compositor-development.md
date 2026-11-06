@@ -449,6 +449,8 @@ input, layout, window decorations, bindings, application rules and animations.
 Edits reload live. Unknown fields/actions, invalid widths or shortcuts, and
 keyboard layouts that fail to compile keep the working configuration. Inspect
 `config_error` and `preferences` in status for errors and effective preferences.
+Automatic reload failures and successful reload revisions are also written to
+the session log (`journalctl -b -t ohmansy-session` in a login session).
 Check a file without starting a compositor:
 
 ```sh
@@ -557,9 +559,12 @@ easing = "ease-out"
 
 Edit this section in `~/.config/shine/config.toml`; these settings reload live.
 Set `enabled = false` to disable the effect, or
-`scale = 1.0` for color muting alone. Scale accepts 0.8–1, saturation and fog
-accept 0–1, and duration accepts 0–5000 ms. Fog color is RGB from 0 to 1;
-choose a lighter or darker neutral to suit your wallpaper and appearance.
+`scale = 1.0` for color muting alone. Numeric values are clamped when loaded:
+scale to 0.8–1, saturation and fog to 0–1, and duration to 0–5000 ms.
+Fog color is RGB, with each channel clamped to 0–1. A `nan` value uses that
+setting's default. Clamping leaves your file unchanged; IPC `preferences` shows
+the effective values. These adjustments allow the rest of an edit to apply.
+Choose a lighter or darker neutral fog color to suit your wallpaper and appearance.
 Disabling animations also makes focus transitions immediate.
 `easing` accepts `linear`, `ease-in`, `ease-out` (default), or `ease-in-out`.
 The eased curves are cubic and apply when both focusing and unfocusing a window.

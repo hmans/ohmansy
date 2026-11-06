@@ -146,6 +146,22 @@ def run():
             assert {w['id'] for w in control()['windows']} == identities
             config.write_text(saved)
             trial.wait_for(lambda: control()['config_error'] is None)
+            reload_log = (artifacts / 'session.log').read_text()
+            assert 'Shine configuration reload rejected:' in reload_log
+            assert 'Shine configuration reloaded (revision ' in reload_log
+            config.write_text(saved.replace('gap = 32', 'gap = 33') +
+                              '\n[decorations.inactive]\nscale = 0.1\nfog = 2.0\n')
+            trial.wait_for(lambda: control()['config_error'] is None and
+                           control()['preferences']['decorations']['inactive']['scale'] == 0.8,
+                           description='clamped appearance reload')
+            assert control()['preferences']['decorations']['inactive']['fog'] == 1.0
+            assert control()['preferences']['layout']['gap'] == 33
+            config.write_text(saved + '\n[decorations.inactive]\nscale = 0.98\nfog = 0.15\n')
+            trial.wait_for(lambda: control()['config_error'] is None and
+                           control()['preferences']['decorations']['inactive']['scale'] == 0.98,
+                           description='appearance recovery')
+            config.write_text(saved)
+            trial.wait_for(lambda: control()['preferences']['decorations']['inactive']['scale'] == 0.99)
             control('focus', new['id'])
             available = control()['outputs'][0]['work_area'][2] - 2 * control()['preferences']['layout']['gap']
             widths = [max(200, int(available * ratio + .5)) for ratio in [1/3, .5, 2/3]]

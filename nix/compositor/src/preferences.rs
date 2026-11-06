@@ -163,6 +163,7 @@ pub struct Inactive {
     pub saturation: f32,
     pub fog: f32,
     pub fog_color: [f32; 3],
+    #[serde(deserialize_with = "inactive_duration")]
     pub duration_ms: u32,
     pub easing: FocusEasing,
 }
@@ -205,6 +206,25 @@ impl Default for Inactive {
     }
 }
 impl Inactive {
+    pub fn clamp(&mut self) {
+        let defaults = Self::default();
+        self.scale = if self.scale.is_nan() {
+            defaults.scale
+        } else {
+            self.scale.clamp(0.8, 1.0)
+        };
+        for (value, fallback) in std::iter::once((&mut self.saturation, defaults.saturation))
+            .chain(std::iter::once((&mut self.fog, defaults.fog)))
+            .chain(self.fog_color.iter_mut().zip(defaults.fog_color))
+        {
+            *value = if value.is_nan() {
+                fallback
+            } else {
+                value.clamp(0.0, 1.0)
+            };
+        }
+        self.duration_ms = self.duration_ms.min(5000);
+    }
     fn validate(&self) -> Result<(), String> {
         if !self.scale.is_finite()
             || !(0.8..=1.0).contains(&self.scale)
@@ -220,6 +240,11 @@ impl Inactive {
         }
         Ok(())
     }
+}
+
+fn inactive_duration<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+    let duration = i64::deserialize(deserializer)?;
+    Ok(duration.clamp(0, 5000) as u32)
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

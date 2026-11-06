@@ -129,8 +129,9 @@ pub struct Placement {
 
 impl Settings {
     pub fn parse(text: &str) -> Result<Self, String> {
-        let settings: Self =
+        let mut settings: Self =
             toml::from_str(text).map_err(|e| format!("Invalid Shine configuration: {e}"))?;
+        settings.decorations.inactive.clamp();
         settings.validate()?;
         settings.validate_preferences()?;
         Ok(settings)
@@ -552,16 +553,43 @@ mod tests {
             "[decorations.shadow]\ncolor=[0.0,0.0,0.0,1.1]",
             "[decorations.shadow]\ncolor=[0.0,nan,0.0,0.5]",
             "[decorations.shadow]\nunknown=true",
-            "[decorations.inactive]\nscale=0.79",
-            "[decorations.inactive]\nscale=nan",
-            "[decorations.inactive]\nsaturation=1.1",
-            "[decorations.inactive]\nfog=-0.1",
-            "[decorations.inactive]\nfog_color=[0.0,nan,0.0]",
-            "[decorations.inactive]\nduration_ms=5001",
             "[decorations.inactive]\neasing='unknown'",
+            "[decorations.inactive]\nscale='small'",
         ] {
             assert!(Settings::parse(invalid).is_err(), "{invalid}");
         }
+    }
+    #[test]
+    fn inactive_numbers_clamp_without_rejecting_other_preferences() {
+        let settings = Settings::parse(
+            "[layout]\ngap=24\n[decorations.inactive]\nscale=0.1\nsaturation=2.0\nfog=-0.1\nfog_color=[-1.0,0.4,2.0]\nduration_ms=9000",
+        ).unwrap();
+        let inactive = settings.decorations.inactive;
+        assert_eq!(settings.layout.gap, 24);
+        assert_eq!(inactive.scale, 0.8);
+        assert_eq!(inactive.saturation, 1.0);
+        assert_eq!(inactive.fog, 0.0);
+        assert_eq!(inactive.fog_color, [0.0, 0.4, 1.0]);
+        assert_eq!(inactive.duration_ms, 5000);
+        let settings = Settings::parse(
+            "[decorations.inactive]\nscale=2.0\nsaturation=-1.0\nfog=2.0\nduration_ms=-20",
+        )
+        .unwrap();
+        let inactive = settings.decorations.inactive;
+        assert_eq!(inactive.scale, 1.0);
+        assert_eq!(inactive.saturation, 0.0);
+        assert_eq!(inactive.fog, 1.0);
+        assert_eq!(inactive.duration_ms, 0);
+        let settings = Settings::parse(
+            "[decorations.inactive]\nscale=nan\nsaturation=nan\nfog=nan\nfog_color=[nan,inf,-inf]",
+        )
+        .unwrap();
+        let inactive = settings.decorations.inactive;
+        let defaults = crate::preferences::Inactive::default();
+        assert_eq!(inactive.scale, defaults.scale);
+        assert_eq!(inactive.saturation, defaults.saturation);
+        assert_eq!(inactive.fog, defaults.fog);
+        assert_eq!(inactive.fog_color, [defaults.fog_color[0], 1.0, 0.0]);
     }
     #[test]
     fn output_saves_preserve_handwritten_preferences_and_comments() {

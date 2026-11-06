@@ -9,6 +9,44 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine reload diagnostics (2026-11-06)
+
+Automatic compositor configuration reloads now log rejected edits and successful
+revision changes in the session journal; inspect `journalctl -b -t ohmansy-session`
+and IPC `config_error`/`preferences`. Previously polling failures were visible
+only through IPC. Repeated identical failures are suppressed while the error is
+current. Invalid option names and types still reject the edit; inactive-window
+numeric ranges now clamp as described below.
+
+Added after a reported hard freeze preceded by appearance edits no longer taking
+effect while apps remained usable. The investigation did not establish the cause
+of either symptom; do not describe the logging change as a freeze fix. Existing
+private headless effect/preferences trials and an additional 60-save appearance
+trial with six invalid/recovery cycles passed without reproducing the freeze.
+The diagnostic change passed 49 Rust tests, formatting, strict Clippy, a debug
+build and the private preferences trial with log assertions. That initial
+inactive-range rejection test is superseded by the clamping behavior below. Physical DRM reproduction remains unverified; the running
+login compositor was preserved and has not received the diagnostic change.
+
+## Shine inactive-window numeric clamping (2026-11-06)
+
+`Settings::parse` normalizes inactive-window numeric preferences before validation:
+scale clamps to 0.8–1, saturation/fog/RGB channels to 0–1, duration to 0–5000 ms.
+Signed integer duration input is accepted so negative durations clamp to zero.
+Infinities clamp to endpoints; NaN uses the field default. The source file is
+preserved and IPC `preferences` reports effective values. Unknown fields, invalid
+easing names and wrong types still fail validation. Other preference sections
+retain their existing validation policy.
+
+The native Rust checks pass 50 tests plus formatting and strict Clippy; a debug
+binary was built. The private preferences trial passed, including an out-of-range
+scale/fog edit together with a layout-gap change: all three effective values
+updated with no config error. The private inactive-effect pixel/input/transition/
+reload/idle trial also passed with its old rejection assertion updated to clamping.
+This prevents numeric experiments from blocking an
+entire edit; it does not establish or fix the reported later hard freeze.
+No installed OS activation or physical compositor restart was performed.
+
 ## Shine packaged dependency cache (2026-11-06)
 
 `nix/modules/compositor-package.nix` uses a revision/hash-pinned Crane helper,

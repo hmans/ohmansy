@@ -200,10 +200,12 @@ while True:
             image = capture('disabled')
             near(pixel(image, ids[1], 1, 150), (208, 32, 64))
             assert all(w['visual_scale'] == 1 for w in control()['windows'])
-            # Invalid reload keeps the last working preferences.
+            # Out-of-range numbers clamp while other changes still apply.
             configure(scale=.2)
-            trial.wait_for(lambda: control()['config_error'])
-            assert not control()['preferences']['decorations']['inactive']['enabled']
+            trial.wait_for(lambda: control()['config_error'] is None and
+                           control()['preferences']['decorations']['inactive']['scale'] == 0.8,
+                           description='inactive scale clamped')
+            assert control()['preferences']['decorations']['inactive']['enabled']
             assert {w['id']: w['surface_size'] for w in control()['windows']} == sizes
             assert {w['id']: w['geometry'] for w in control()['windows']} == geometry
             print('Focus pixels, scaling, pointer coordinates, transitions, reload, idle and unchanged client sizes passed.', flush=True)

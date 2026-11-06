@@ -43,6 +43,7 @@ offset = [0, 6] # Horizontal and vertical logical pixels (−128–128)
 color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
 
 [decorations.inactive]
+# Numeric values outside the ranges below are clamped when loaded.
 enabled = true
 scale = 0.99 # Visual scale only; app sizes and layout stay unchanged (0.8–1)
 saturation = 0.85 # 0 is grayscale, 1 preserves colors

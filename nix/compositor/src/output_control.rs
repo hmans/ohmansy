@@ -87,8 +87,19 @@ impl Smallvil {
             return;
         }
         self.config_poll = std::time::Instant::now();
+        let revision = self.config_revision;
         if let Err(error) = self.read_output_config(false) {
+            if self.config_error.as_ref() != Some(&error) {
+                eprintln!(
+                    "Shine configuration reload rejected: {error}; keeping the working configuration"
+                );
+            }
             self.config_error = Some(error);
+        } else if self.config_revision != revision {
+            eprintln!(
+                "Shine configuration reloaded (revision {})",
+                self.config_revision
+            );
         }
         if let Err(error) = self.read_task_config(false) {
             self.task_config_error = Some(error);
