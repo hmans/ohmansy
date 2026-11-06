@@ -4,7 +4,9 @@ use smithay::{
     desktop::{PopupManager, Space, Window, WindowSurfaceType},
     input::{Seat, SeatState},
     reexports::{
-        calloop::{generic::Generic, EventLoop, Interest, LoopSignal, Mode, PostAction},
+        calloop::{
+            generic::Generic, EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction,
+        },
         wayland_server::{
             backend::{ClientData, ClientId, DisconnectReason},
             protocol::wl_surface::WlSurface,
@@ -96,6 +98,7 @@ pub struct Smallvil {
 
     pub space: Space<Window>,
     pub loop_signal: LoopSignal,
+    pub loop_handle: LoopHandle<'static, CalloopData>,
 
     // Smithay State
     pub compositor_state: CompositorState,
@@ -114,7 +117,7 @@ pub struct Smallvil {
 }
 
 impl Smallvil {
-    pub fn new(event_loop: &mut EventLoop<CalloopData>, display: Display<Self>) -> Self {
+    pub fn new(event_loop: &mut EventLoop<'static, CalloopData>, display: Display<Self>) -> Self {
         let start_time = std::time::Instant::now();
 
         let dh = display.handle();
@@ -162,6 +165,7 @@ impl Smallvil {
 
             space,
             loop_signal,
+            loop_handle: event_loop.handle(),
             socket_name,
             ui_scale: 1.25,
             client_surfaces: Vec::new(),
