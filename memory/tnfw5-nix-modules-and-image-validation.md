@@ -9,6 +9,30 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine menu bar controls (2026-11-06)
+
+Shine's bar uses plain clickable ohmansy text to open the launcher. Terminal
+and Displays remain launcher commands rather than left-side shortcuts. Sun and
+moon icons select appearance; a speaker icon and slider control the default
+PipeWire sink. The shell imports the existing AudioState and AppearanceState
+components through Ohmansy.Desktop, packaged by quickshell-ui.nix. The bar uses
+an appearance-aware ColorPalette for text, workspace surfaces, icons and the
+volume slider; the fixed Ui.Theme foreground stays light for other glass UIs.
+The private shell trial checks actual brand text pixels in both light and dark
+mode after changing the appearance preference.
+
+The compositor-session package built and the private headless compositor_shell.py
+trial passed with terminal/display access through the launcher, wallpaper,
+focus, scaling and clean shutdown checks. The running physical session loaded
+the checkout bar on both monitors without replacing the compositor or apps.
+This was a live runtime preview, not an OS activation or new boot.
+
+For runtime shell replacement from a sandboxed agent, a transient systemd user
+service can preserve native graphics and session assets. Direct launch from the
+agent environment selected llvmpipe and missed the installed wallpaper; the
+same wrapper launched with systemd-run --user used NVIDIA and the wallpaper.
+Verify the actual environment and rendering after replacement.
+
 ## Named task workspaces (2026-11-06)
 
 Shine accepts opt-in `[[workspaces]]` tables in a separate

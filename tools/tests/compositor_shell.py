@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import time
@@ -85,6 +86,24 @@ def run():
             wallpaper('pause', 'false')
             time.sleep(.5)
             assert ImageChops.difference(paused, capture('resumed').crop((80, 80, 600, 500))).getbbox(), 'Resume stayed frozen'
+            wrapper = Path(os.environ['OHMANSY_COMPOSITOR_SHELL']).read_text()
+            appearance = re.search(r'export OHMANSY_APPEARANCE=(\S+)', wrapper).group(1)
+            original_appearance = subprocess.check_output([appearance, 'read'], env=environment, text=True).strip().strip("'")
+            try:
+                for preference, foreground in [('prefer-light', (32, 32, 36)),
+                                                ('prefer-dark', (245, 245, 245))]:
+                    subprocess.run([appearance, preference], env=environment, check=True)
+
+                    def brand_has_foreground():
+                        scale = control()['outputs'][0]['scale']
+                        brand = capture(preference).crop(tuple(round(value * scale)
+                            for value in (15, 8, 80, 36)))
+                        return sum(all(abs(a - b) <= 3 for a, b in zip(pixel, foreground))
+                                   for pixel in brand.getdata()) > 10
+
+                    trial.wait_for(brand_has_foreground, description=f'{preference} bar text')
+            finally:
+                subprocess.run([appearance, original_appearance], env=environment, check=True)
             control('launch', program='foot', args=['--app-id=shine-shell-test', 'sleep', '100'])
             window = trial.wait_for(lambda: trial.window_for(control, 'shine-shell-test'))
             trial.wait_for(lambda: trial.window_for(control, 'shine-shell-test')['geometry'][1] == 56,
@@ -97,21 +116,35 @@ def run():
                 control('button', pressed=False)
 
             first, second = control()['outputs']
-            # Brand, four workspace buttons, then Terminal in the left row.
+            # Plain brand text followed by four workspace buttons.
             click(first, 95)
             assert control()['keyboard_focus'] == focused, 'Panel stole keyboard focus'
             click(second, 135)
             trial.wait_for(lambda: control()['outputs'][1]['workspace'] == 2,
                            description='workspace button targets its monitor')
             assert control()['outputs'][0]['workspace'] == 1
-            click(second, 260)
-            trial.wait_for(lambda: len(control()['windows']) == 2, description='panel terminal')
+            def launcher_status():
+                return json.loads(subprocess.check_output(['quickshell', 'ipc', '--pid', str(shell.pid),
+                    'call', 'launcher', 'status'], env=environment, text=True))
+
+            click(second, 40)
+            trial.wait_for(lambda: launcher_status()['opened'], description='brand opens launcher')
+            time.sleep(.5)  # Wait for the mapped launcher's keyboard focus.
+            control.send_keys([24, 25, 18, 49, 57, 20, 18, 19, 50, 23, 49, 30, 38])  # open terminal
+            trial.wait_for(lambda: launcher_status()['selected'] == 'desktop:terminal')
+            control.send_keys([28])
+            trial.wait_for(lambda: len(control()['windows']) == 2, description='launcher terminal')
             assert next(w for w in control()['windows'] if w['id'] != window['id'])['output'] == second['name']
             # The real monitor panel must open from Shine and read its outputs.
-            click(first, 340)
+            click(first, 40)
+            trial.wait_for(lambda: launcher_status()['opened'])
+            time.sleep(.5)
+            control.send_keys([32, 23, 31, 25, 38, 30, 21, 31])  # displays
+            trial.wait_for(lambda: launcher_status()['selected'] == 'desktop:displays')
+            control.send_keys([28])
             display_window = trial.wait_for(lambda: next((w for w in control()['windows']
                 if w['title'] == 'ohmansy displays' and w['surface_size']), None),
-                description='Displays button opens monitor settings')
+                description='launcher opens monitor settings')
             time.sleep(1)  # Let the controller read the real monitor list.
             capture('display-settings')
             control('focus', display_window['id'])
@@ -150,8 +183,7 @@ def run():
             # An empty part of the bar must show the wallpaper without a tint.
             scale = control()['outputs'][0]['scale']
             blank_x = control()['outputs'][0]['logical_size'][0] * .65
-            # Sample the top padding: at fractional scales the old mid-height
-            # point can land on the Displays button instead of empty bar space.
+            # Sample the top padding to avoid controls at fractional scales.
             bar_pixel = (round(blank_x * scale), round(2 * scale))
             trial.wait_for(lambda: all(abs(a - b) <= 2 for a, b in zip(
                 capture('transparent-bar').getpixel(bar_pixel), background)),
@@ -204,7 +236,7 @@ def run():
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
     print('PASS: animated wallpapers, image override, software fallback, foot transparency, two panels, reserved space, '
-          'runtime fidelity, validation, pause/resume, workspace/terminal clicks, keyboard focus, fullscreen, scale, clean shell exit '
+          'runtime fidelity, validation, pause/resume, light/dark bar text, workspace/launcher clicks, keyboard focus, fullscreen, scale, clean shell exit '
           'and parent windows preserved')
 
 
