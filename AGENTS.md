@@ -3,8 +3,7 @@
 Independent NixOS desktop, plus its native macOS host.
 Write the product name as **ohmansy** in all user-facing copy. Follow
 [the design system](docs/design-system.md) for copy and shared button roles.
-Use `apply_patch`, simple English, and Conventional Commits. Do not spawn agents
-or push unless asked. Preserve unrelated changes.
+Use `apply_patch`, simple English, and Conventional Commits. Preserve unrelated changes.
 
 ## Goals
 
