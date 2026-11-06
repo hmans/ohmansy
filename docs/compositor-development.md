@@ -25,6 +25,8 @@ side by side in connector order, with preferred modes and a scale of 125%.
 Each monitor has four independent scrolling workspaces. Disconnecting a monitor
 moves its windows to a remaining monitor. Shine's Quickshell shell draws the
 shared animated ribbon wallpaper on each monitor, behind application windows.
+The ribbon render target uses 75% of its capped resolution (up to 1800 pixels
+wide), while the desktop animation remains about 15 frames per second.
 The background stays stationary while columns and workspaces change; Niri's
 parallax is not yet connected to Shine. Saved wallpaper images are honored,
 with a static fallback when ribbon rendering is unavailable. Foot's shared

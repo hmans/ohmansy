@@ -9,6 +9,22 @@ title: Host tooling and publication workflow
 ---
 # Host development, build, and release tools
 
+## Wallpaper GPU profiling (2026-11-06)
+
+For an animation A/B comparison, freeze `RibbonScene.moving` in a temporary
+copy of the active UI module. Preserve its last image, shell controls, app
+windows and compositor; replacing the backdrop with another picture changes
+the composition workload. Compare repeated settled intervals with both scenes
+moving, both frozen and each output separately, then restore the original shell.
+Record overall GPU utilization, board power, core/memory clocks, per-process
+NVIDIA pmon activity and CPU deltas. A single app-activity snapshot is not a
+sustained attribution. GPU clocks can change sharply when animation stops;
+utilization percentages across modes are not additive, and pmon SM activity is
+not the same counter as overall GPU busy time. The frozen residual still
+includes application and compositor work, not application rendering alone.
+A physical NVIDIA run found a large repeatable wallpaper cost; machine-specific
+measurements and raw samples belong in ignored local handoff/artifacts.
+
 ## Shine rendering and monitor controls (2026-11-06)
 
 Native DRM rendering now runs after event-loop dispatch, allowing input, client

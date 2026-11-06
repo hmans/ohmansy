@@ -9,6 +9,32 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Desktop ribbon render resolution (2026-11-06)
+
+`WallpaperWindow.qml` now sets RibbonScene.renderScale to 0.75, independently
+of the 66 ms desktop animation cadence. The scale multiplies both dimensions
+after the renderer's existing 2400-pixel width cap, giving a desktop maximum
+near 1800 pixels wide and about 44% fewer shader pixels. The greeter retains
+renderScale 1; 4x MSAA, shaders, mesh, animation speed and output geometry stay
+unchanged. Smooth texture sampling is explicitly enabled.
+
+The native property accepts finite values clamped to 0.25–1.0. synchronize()
+invalidates the FBO when it changes; renderSize reports actual target pixels
+through a queued update. The expanded ribbons check verifies target sizes at
+100/75/50%, unchanged window size, exact restoration of the full-resolution
+image, dark/light palettes, motion, resize and GL errors under desktop GL and ES.
+Both passed. Full-size 3440x1440 dark/light captures at a fixed pose were
+visually compared; 75% was chosen over 50% to retain finer contour detail.
+
+Repeated physical NVIDIA samples at the same 15 FPS and stable app window IDs
+showed materially lower GPU board power at 75%. GPU clocks dropped too, so
+GPU busy percentages alone hid much of the saving. Machine-specific numbers
+and raw data remain in ignored local artifacts. The private headless shell
+trial passed animation, transparency, image override, software fallback,
+two-output controls, scale and clean shutdown. The updated session built and
+only Quickshell was gracefully replaced live, preserving the login compositor
+and app windows. No installed-system activation or image build.
+
 ## Source Sans browser font defaults (2026-11-06)
 
 Source Sans 3 is the accepted browser/application system-ui default, replacing

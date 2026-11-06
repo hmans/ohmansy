@@ -56,10 +56,24 @@ int main(int argc, char **argv) {
             // Resizing recreates the multisample target and Qt's resolve target.
             window.resize(480, 300);
             scene->setSize(QSizeF(480, 300));
-        } else {
+        } else if (step == 3) {
             if (frame.size() != QSize(480, 300)) qFatal("Resize did not produce a frame");
+            if (scene->renderSize() != QSize(480, 300)) qFatal("Unexpected default render size");
+            light = frame;
+            scene->setRenderScale(0.75);
+        } else if (step == 4) {
+            if (scene->renderSize() != QSize(360, 225)) qFatal("Render scale did not resize the target");
+            if (frame.size() != QSize(480, 300)) qFatal("Render scale changed the display size");
+            if (frame == light) qFatal("Render scale did not affect rendered pixels");
+            scene->setRenderScale(0.5);
+        } else if (step == 5) {
+            if (scene->renderSize() != QSize(240, 150)) qFatal("Second render scale did not apply");
+            scene->setRenderScale(1);
+        } else {
+            if (scene->renderSize() != QSize(480, 300)) qFatal("Render scale did not restore the target");
+            if (frame != light) qFatal("Render scale round trip changed the scene");
             qInfo() << (es ? "ES" : "Desktop GL")
-                    << "ribbons: dark, light, motion, resize, and GL error checks passed";
+                    << "ribbons: dark, light, motion, resize, live render scale, and GL error checks passed";
             app.quit();
         }
         ++step;

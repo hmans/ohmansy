@@ -20,9 +20,13 @@ public:
         owner = static_cast<RibbonScene *>(item);
         elapsed = owner->elapsed();
         lightMix = owner->lightMix();
+        if (renderScale != owner->renderScale()) {
+            renderScale = owner->renderScale();
+            invalidateFramebufferObject();
+        }
     }
     QOpenGLFramebufferObject *createFramebufferObject(const QSize &requested) override {
-        const double scale = std::min(1.0, 2400.0 / std::max(1, requested.width()));
+        const double scale = std::min(1.0, 2400.0 / std::max(1, requested.width())) * renderScale;
         QSize size(std::max(64, int(requested.width() * scale)),
                    std::max(64, int(requested.height() * scale)));
         QOpenGLFramebufferObjectFormat format;
@@ -32,6 +36,9 @@ public:
         // shaders. Qt resolves this FBO before handing its texture to Qt Quick
         // and clamps the sample count to what the driver supports.
         format.setSamples(4);
+        QMetaObject::invokeMethod(owner, [item = owner, size] {
+            if (item) item->reportRenderSize(size);
+        }, Qt::QueuedConnection);
         return new QOpenGLFramebufferObject(size, format);
     }
     void render() override {
@@ -158,6 +165,7 @@ private:
     GLuint vao = 0;
     float elapsed = 12;
     float lightMix = 0;
+    float renderScale = 1;
     int frames = 0;
     bool attempted = false, ready = false, openGLES = false;
 };

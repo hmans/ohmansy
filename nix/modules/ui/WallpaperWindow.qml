@@ -40,6 +40,8 @@ PanelWindow {
         source: active ? "Ribbons.qml" : ""
         onLoaded: {
             item.motionSpeed = 0.15;
+            // Reduce shader pixels while preserving window size and cadence.
+            item.renderScale = 0.75;
             // About 15 fps at rest; keep the short appearance fade smooth.
             item.frameInterval = Qt.binding(() => Appearance.transitioning ? 16 : 66);
             item.targetLightMix = Qt.binding(() => Appearance.lightMix);
