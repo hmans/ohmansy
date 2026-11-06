@@ -144,6 +144,25 @@ retain store paths; removing a default does not immediately erase its files.
 Nautilus and the sound, network, Bluetooth, clipboard, and lock tools remain
 part of the desktop integration in this version.
 
+## Agent skills
+
+ohmansy ships a basic `ohmansy-maintenance` skill in the open
+[Agent Skills format](https://agentskills.io/specification). The default module
+installs it for all accounts, including accounts created later. It covers local
+configuration, software, diagnostics, updates, and rollback.
+
+The shared content is available under `/etc/ohmansy/skills/`. Codex discovers it
+through `/etc/codex/skills/`; Claude Code uses
+`/etc/claude-code/.claude/skills/`. These paths reference the same read-only
+content and update with the OS. No files are added to home directories and no
+agent is installed or started by this module. Other clients can use the shared
+location if they support configuring skill search paths.
+
+Set `ohmansy.agentSkills.enable = false;` to omit the skills. Hosts that do not
+use the default module can import `ohmansy.nixosModules.agentSkills` separately.
+Agent discovery depends on the installed client version; restart the agent if
+the skill does not appear after activating the updated system.
+
 ## Cursor theme
 
 ohmansy uses Bibata Modern Classic at size 24 for the desktop and login screen.

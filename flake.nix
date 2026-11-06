@@ -135,6 +135,7 @@
       nixosModules.nvidia = import ./nix/modules/nvidia.nix;
       nixosModules.firstBoot = import ./nix/modules/first-boot.nix;
       nixosModules.updates = import ./nix/modules/updates.nix;
+      nixosModules.agentSkills = import ./nix/modules/agent-skills.nix;
       nixosModules.development = import ./nix/modules/development.nix;
       nixosConfigurations.live = live;
       nixosConfigurations.appliance = appliance;
