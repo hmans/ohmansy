@@ -318,6 +318,7 @@ impl Smallvil {
         }
         self.maintain_capture_sources();
         let effect_changed = self.update_inactive();
+        self.update_frame_focus();
         if matches!(&self.cursor_image,smithay::input::pointer::CursorImageStatus::Surface(s) if !s.alive())
         {
             self.cursor_image = smithay::input::pointer::CursorImageStatus::default_named();

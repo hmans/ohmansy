@@ -4,6 +4,7 @@ mod client_scale;
 mod clipboard;
 mod decoration;
 mod desktop;
+mod frame_lighting;
 mod frame_title;
 mod frost;
 mod grabs;

@@ -8,9 +8,11 @@ use std::{
 pub struct Sources {
     pub rounded: String,
     pub coverage: String,
+    pub lighting: String,
     pub frame: String,
     pub frost: String,
     pub shadow: String,
+    pub inset: String,
 }
 impl Sources {
     pub fn load(directory: Option<&std::path::Path>) -> anyhow::Result<Self> {
@@ -27,8 +29,10 @@ impl Sources {
                 include_str!("rounded-coverage.glsl"),
             )?,
             frame: read("frame.frag", include_str!("frame.frag"))?,
+            lighting: read("frame-lighting.glsl", include_str!("frame-lighting.glsl"))?,
             frost: read("frost.frag", include_str!("frost.frag"))?,
             shadow: read("shadow.frag", include_str!("shadow.frag"))?,
+            inset: read("content-inset.frag", include_str!("content-inset.frag"))?,
         })
     }
     pub fn configured() -> anyhow::Result<Self> {
@@ -93,8 +97,10 @@ mod tests {
             "rounded.frag",
             "rounded-coverage.glsl",
             "frame.frag",
+            "frame-lighting.glsl",
             "frost.frag",
             "shadow.frag",
+            "content-inset.frag",
         ] {
             std::fs::write(directory.join(file), file).unwrap();
         }

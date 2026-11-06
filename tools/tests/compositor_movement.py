@@ -28,6 +28,10 @@ enabled={str(enabled).lower()}
 duration_ms={duration}
 [decorations.frame]
 active_color=[0.67,0.57,0.78,1.0]
+[decorations.frame.glass]
+enabled=false
+[decorations.frame.bevel]
+enabled=false
 ''')
         temporary.replace(config)
 

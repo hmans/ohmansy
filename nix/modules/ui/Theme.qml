@@ -7,6 +7,9 @@ QtObject {
     readonly property color secondary: "#c8c4d6"
     readonly property color glass: "#483e4354"
     readonly property color primaryGlass: "#725f467f"
+    // Shared with Shine's default frame material; live frame settings may override.
+    readonly property color frameActive: Qt.rgba(81 / 255, 64 / 255, 95 / 255, 0.55)
+    readonly property color frameInactive: Qt.rgba(37 / 255, 40 / 255, 53 / 255, 0.40)
     readonly property color solidSurface: "#ed30333f"
     readonly property color buttonPrimary: primaryGlass
     readonly property color buttonPrimarySolid: "#51405f"

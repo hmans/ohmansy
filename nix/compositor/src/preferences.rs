@@ -324,6 +324,10 @@ pub struct Frame {
     pub outer_corner_radius: u32,
     pub inner_corner_radius: u32,
     pub glass: Glass,
+    pub bevel: Bevel,
+    pub inset_shadow: InsetShadow,
+    pub focus_duration_ms: u32,
+    pub focus_easing: FocusEasing,
     pub active_color: [f32; 4],
     pub inactive_color: [f32; 4],
 }
@@ -341,6 +345,10 @@ impl Default for Frame {
             outer_corner_radius: 10,
             inner_corner_radius: 8,
             glass: Glass::default(),
+            bevel: Bevel::default(),
+            inset_shadow: InsetShadow::default(),
+            focus_duration_ms: 150,
+            focus_easing: FocusEasing::EaseInOut,
             active_color: [81.0 / 255.0, 64.0 / 255.0, 95.0 / 255.0, 0.55],
             inactive_color: [37.0 / 255.0, 40.0 / 255.0, 53.0 / 255.0, 0.40],
         }
@@ -349,6 +357,11 @@ impl Default for Frame {
 impl Frame {
     pub fn validate(&self) -> Result<(), String> {
         self.glass.validate()?;
+        self.bevel.validate()?;
+        self.inset_shadow.validate()?;
+        if self.focus_duration_ms > 5000 {
+            return Err("Frame focus duration must be 0–5000 ms".into());
+        }
         if !(1..=16).contains(&self.width) || !(20..=64).contains(&self.titlebar_height) {
             return Err("Frame width must be 1–16 and titlebar height 20–64 logical pixels".into());
         }
@@ -424,6 +437,94 @@ impl Glass {
             return Err(
                 "Glass blur radius must be 0–64 logical pixels; opacity and noise 0–1".into(),
             );
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Bevel {
+    pub enabled: bool,
+    pub width: f32,
+    pub inner_width: f32,
+    pub highlight: f32,
+    pub shadow: f32,
+    pub light_direction: [f32; 2],
+}
+impl Default for Bevel {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            width: 1.5,
+            inner_width: 1.0,
+            highlight: 0.20,
+            shadow: 0.18,
+            light_direction: [-1.0, -1.0],
+        }
+    }
+}
+impl Bevel {
+    fn validate(&self) -> Result<(), String> {
+        if [self.width, self.inner_width]
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=16.0).contains(v))
+            || [self.highlight, self.shadow]
+                .iter()
+                .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err(
+                "Bevel widths must be 0–16 logical pixels; highlight and shadow 0–1".into(),
+            );
+        }
+        if self
+            .light_direction
+            .iter()
+            .any(|v| !v.is_finite() || !(-1.0..=1.0).contains(v))
+            || self.light_direction.iter().map(|v| v * v).sum::<f32>() < 0.000001
+        {
+            return Err(
+                "Bevel light direction needs a nonzero [x,y] vector with components from -1 to 1"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct InsetShadow {
+    pub enabled: bool,
+    pub width: f32,
+    pub softness: f32,
+    pub offset: [f32; 2],
+    pub color: [f32; 4],
+}
+impl Default for InsetShadow {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            width: 8.0,
+            softness: 8.0,
+            offset: [2.0, 2.0],
+            color: [0.0, 0.0, 0.0, 0.22],
+        }
+    }
+}
+impl InsetShadow {
+    fn validate(&self) -> Result<(), String> {
+        if [self.width, self.softness]
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=64.0).contains(v))
+            || self
+                .offset
+                .iter()
+                .any(|v| !v.is_finite() || !(-64.0..=64.0).contains(v))
+            || self
+                .color
+                .iter()
+                .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err("Inset shadow width/softness must be 0–64, offsets -64–64 logical pixels, and RGBA color 0–1".into());
         }
         Ok(())
     }
@@ -994,6 +1095,8 @@ mod tests {
             (10, 8)
         );
         assert_eq!(defaults.title_font_size, 13.0);
+        assert_eq!(defaults.focus_duration_ms, 150);
+        assert_eq!(defaults.focus_easing, FocusEasing::EaseInOut);
         assert!(
             Settings::parse("[decorations.frame]\nwidth=3\ntitlebar_height=26\nenabled=false")
                 .is_ok()
@@ -1014,6 +1117,9 @@ mod tests {
             "icon_title_gap=129",
             "outer_corner_radius=129",
             "inner_corner_radius=129",
+            "focus_duration_ms=5001",
+            "focus_duration_ms=-1",
+            "focus_easing='unknown'",
         ] {
             assert!(
                 Settings::parse(&format!("[decorations.frame]\n{input}")).is_err(),
@@ -1049,6 +1155,47 @@ mod tests {
             ),
             (0, 32)
         );
+        assert_eq!(
+            Settings::parse(&toml::to_string(&settings).unwrap())
+                .unwrap()
+                .decorations
+                .frame,
+            settings.decorations.frame
+        );
+    }
+    #[test]
+    fn frame_lighting_settings_validate_and_roundtrip() {
+        let defaults = Frame::default();
+        assert!(defaults.bevel.enabled);
+        assert!(!defaults.inset_shadow.enabled);
+        for input in [
+            "width=-0.1",
+            "width=16.1",
+            "inner_width=nan",
+            "highlight=1.1",
+            "shadow=inf",
+            "light_direction=[0.0,0.0]",
+            "light_direction=[-1.1,0.0]",
+            "light_direction=[nan,1.0]",
+        ] {
+            assert!(
+                Settings::parse(&format!("[decorations.frame.bevel]\n{input}")).is_err(),
+                "accepted {input}"
+            );
+        }
+        for input in [
+            "width=-0.1",
+            "width=65.0",
+            "softness=nan",
+            "offset=[65.0,0.0]",
+            "color=[0.0,0.0,0.0,1.1]",
+        ] {
+            assert!(
+                Settings::parse(&format!("[decorations.frame.inset_shadow]\n{input}")).is_err(),
+                "accepted {input}"
+            );
+        }
+        let settings = Settings::parse("[decorations.frame.bevel]\nwidth=0.0\ninner_width=2.5\nlight_direction=[1.0,0.0]\n[decorations.frame.inset_shadow]\nenabled=true\nwidth=6.5\nsoftness=0.0\noffset=[-2.0,3.0]").unwrap();
         assert_eq!(
             Settings::parse(&toml::to_string(&settings).unwrap())
                 .unwrap()

@@ -1,11 +1,11 @@
-//! One reversible focus transition shared by rendering and pointer input.
+//! Reversible transitions for inactive appearance and frame focus tint.
 use crate::preferences::FocusEasing;
 use crate::{layout::WindowId, Smallvil};
 use smithay::{
     desktop::Window,
     utils::{Logical, Point},
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Default)]
 pub struct Effects(pub BTreeMap<WindowId, Transition>);
@@ -26,7 +26,100 @@ impl Transition {
         self.from + (self.target - self.from) * self.easing.sample(t)
     }
 }
+impl Effects {
+    fn update(
+        &mut self,
+        targets: impl IntoIterator<Item = (WindowId, f64)>,
+        now: f64,
+        duration: f64,
+        easing: FocusEasing,
+    ) -> bool {
+        let mut live = BTreeSet::new();
+        let mut changed = false;
+        for (id, target) in targets {
+            live.insert(id);
+            let t = self.0.entry(id).or_insert(Transition {
+                from: target,
+                target,
+                started: now,
+                duration,
+                easing,
+            });
+            if t.target != target || t.duration != duration || t.easing != easing {
+                *t = Transition {
+                    from: t.value(now),
+                    target,
+                    started: now,
+                    duration,
+                    easing,
+                };
+                changed = true;
+            }
+            if t.from != t.target {
+                changed = true;
+                if now >= t.started + t.duration {
+                    t.from = t.target;
+                }
+            }
+        }
+        self.0.retain(|id, _| live.contains(id));
+        changed
+    }
+}
 impl Smallvil {
+    fn frame_focus_target(&self, id: WindowId) -> f64 {
+        if self.layout.focused() == Some(id)
+            && self.seat.get_keyboard().unwrap().current_focus().is_some()
+        {
+            1.0
+        } else {
+            0.0
+        }
+    }
+    pub fn frame_focus_amount(&self, id: WindowId) -> f64 {
+        if !self.output_settings.decorations.frame.enabled || self.layout.fullscreen_for(id) {
+            return 0.0;
+        }
+        if !self.output_settings.animations.enabled
+            || self.output_settings.decorations.frame.focus_duration_ms == 0
+        {
+            return self.frame_focus_target(id);
+        }
+        self.frame_focus.0.get(&id).map_or_else(
+            || self.frame_focus_target(id),
+            |t| t.value(self.start_time.elapsed().as_secs_f64()),
+        )
+    }
+    pub fn frame_focus_color(&self, id: WindowId) -> [f32; 4] {
+        let frame = &self.output_settings.decorations.frame;
+        let amount = self.frame_focus_amount(id) as f32;
+        std::array::from_fn(|i| {
+            frame.inactive_color[i] + (frame.active_color[i] - frame.inactive_color[i]) * amount
+        })
+    }
+    pub fn update_frame_focus(&mut self) -> bool {
+        let frame = &self.output_settings.decorations.frame;
+        let targets: Vec<_> = self
+            .windows
+            .keys()
+            .copied()
+            .filter(|id| frame.enabled && !self.layout.fullscreen_for(*id))
+            .map(|id| (id, self.frame_focus_target(id)))
+            .collect();
+        let duration = if self.output_settings.animations.enabled {
+            frame.focus_duration_ms as f64 / 1000.0
+        } else {
+            0.0
+        };
+        let changed = self.frame_focus.update(
+            targets,
+            self.start_time.elapsed().as_secs_f64(),
+            duration,
+            frame.focus_easing,
+        );
+        self.needs_redraw |= changed;
+        changed
+    }
     fn inactive_target(&self, id: WindowId) -> f64 {
         if self.output_settings.decorations.inactive.enabled
             && self.layout.focused() != Some(id)
@@ -117,6 +210,23 @@ impl Smallvil {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn effects_reverse_from_the_visible_value_and_stop_at_the_endpoint() {
+        let mut effects = Effects::default();
+        assert!(!effects.update([(1, 0.0)], 0.0, 1.0, FocusEasing::Linear));
+        assert!(effects.update([(1, 1.0)], 0.0, 1.0, FocusEasing::Linear));
+        assert_eq!(effects.0[&1].value(0.4), 0.4);
+        assert!(effects.update([(1, 0.0)], 0.4, 1.0, FocusEasing::Linear));
+        assert_eq!(effects.0[&1].value(0.4), 0.4);
+        assert!(effects.0[&1].value(0.5) < 0.4);
+        assert!(effects.update([(1, 0.0)], 1.4, 1.0, FocusEasing::Linear));
+        assert_eq!(effects.0[&1].value(1.4), 0.0);
+        assert!(!effects.update([(1, 0.0)], 1.5, 1.0, FocusEasing::Linear));
+        assert!(effects.update([(1, 1.0)], 1.5, 0.0, FocusEasing::Linear));
+        assert_eq!(effects.0[&1].value(1.5), 1.0);
+        assert!(!effects.update([], 2.0, 0.0, FocusEasing::Linear));
+        assert!(effects.0.is_empty());
+    }
     #[test]
     fn configurable_curves_have_distinct_timing_and_fixed_endpoints() {
         for (easing, quarter) in [

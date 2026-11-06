@@ -70,9 +70,11 @@ Existing personal frame measurements pick up glass defaults without file edits.
 `frost.rs` renders each lower scene into a GPU texture, excluding the current
 window's client, caption and shadow. `frost.frag` samples a weighted Gaussian
 kernel and composites only the rounded frame. No CPU pixel readback or sampling
-of a previous display framebuffer occurs, preventing self-feedback. Snapshots
-cache by output/window, lower element IDs/commits/geometry/UV/alpha, frame style,
-visual scale, canvas offset and output dimensions. Captions and clients stay
+of a previous display framebuffer occurs, preventing self-feedback. Backdrop snapshots
+cache by output/window, lower element IDs/commits/geometry/UV/alpha, canvas offset,
+output scale and dimensions. Frame appearance (geometry, visual scale and style)
+has a separate cache key; tint-only changes update uniforms without recapturing
+an unchanged backdrop. Captions and clients stay
 unblurred. Sampling follows the window's actual visual position during inactive
 scaling. Fully offscreen frames skip snapshot work. Shader reload also watches
 frost.frag; snapshot work requests nested EGL draw-buffer restoration before
@@ -90,6 +92,94 @@ slots. At large scale a work-area-filling frame can have wallpaper behind its
 top edge, so the backdrop trial checks a side edge over the background app.
 Physical-GPU performance, native DRM behavior and installed activation remain
 unverified. No compositor restart, OS activation or reboot was performed.
+
+## Frame bevels and inset shadows (2026-11-06)
+
+`decorations.frame.bevel` defaults to enabled, width1.5 and inner_width1.0 logical
+pixels, highlight0.20, shadow0.18 and light_direction=[-1,-1] (northwest).
+`frame-lighting.glsl` is shared by solid and frosted frames and watched by shader
+reload. Analytic rounded-rectangle normals give continuous corner lighting.
+Outer northwest edges brighten and southeast edges darken; the inner bevel
+reverses the normal so the frame looks raised around the cutout. Widths accept
+fractional 0–16 logical pixels; strengths accept 0–1. Width zero disables that
+bevel. Direction components accept -1–1, must form a nonzero vector, and normalize
+in the shader. `frame_lighting.rs` supplies matching uniforms to both shaders.
+
+The optional `decorations.frame.inset_shadow` is disabled by default. The initial
+frame-only shading was a misunderstanding and is superseded by the client-content
+overlay below. Defaults are now width8, softness8, offset[2,2] and black alpha0.22.
+Width/softness accept 0–64 and offsets -64–64 logical pixels; color is 0–1 RGBA.
+Bevels remain in the shared material shader; inset shadows render separately
+above application surfaces. Existing config files get bevel defaults without
+changing personal settings.
+
+Verification: full shine-check --no-graphics passed 58 Rust tests, formatting,
+strict Clippy, 2 preview lifecycle tests and Git-backed Nix package build. The
+packaged example config validated. Private CPU pixel trials passed both frame
+types, northwest/southeast and reversed lighting, curved/inner bevels, zero-width
+and disable controls, optional inset shadow/offsets, unchanged client pixels,
+live config, 100/125/200% scales and idle. Existing configurable-frame, two-output
+glass and animated movement trials passed. Physical-GPU behavior and installed
+activation were not tested; the native compositor/session was preserved.
+
+## Reversible frame focus tint (2026-11-06)
+
+`decorations.frame.focus_duration_ms` defaults to 150 (0–5000 accepted), and
+`focus_easing` defaults to ease-in-out (also linear, ease-in, ease-out).
+Inactive and active RGBA colors interpolate independently of inactive-window
+scaling/grading. `inactive.rs` uses a separate Effects map and the existing
+Transition timing curves. Retargeting starts at the visible value, so rapid
+focus changes reverse continuously. New windows initialize at their target,
+fullscreen/disabled frames drop their transitions, and settled windows repaint
+the exact endpoint once before stopping. Global animations disabled or duration
+zero snaps immediately. IPC exposes per-window frame_focus_amount (0–1).
+
+Both native and nested backends update the tint from maintain_scene. Tint-only
+updates do not replay pointer motion. Glass backdrop keys now depend only on
+lower scene content, scale/canvas and output dimensions. A separate appearance
+key updates the material element ID when tint/geometry/style changes; it reuses
+the existing backdrop texture. Lower windows changing their tint correctly
+invalidate any upper window's backdrop that includes them.
+
+Verification: 59 Rust tests, formatting, strict Clippy, 2 preview lifecycle tests
+and the Git-backed Nix compositor build passed; the packaged example validated.
+Private CPU focus-pixel trials passed glass/solid fading in both directions,
+continuous reversal, exact colors/endpoints, independent inactive controls,
+zero duration, global disable and no idle repaints. Existing two-output glass
+and inactive-effect trials passed after the cache/update-loop change. Tests use
+an 800 ms linear fixture to reliably sample intermediate software-rendered
+frames; defaults are separately checked at 150 ms ease-in-out. No installed
+activation, native compositor restart or physical-GPU trial was performed.
+
+## Corrected inset shadow over application contents (2026-11-06)
+
+The owner clarified that the frame should cast a subtle shadow inward over app
+contents, not shade its own inner rim. `content-inset.frag` and decoration.rs
+now draw a separate premultiplied-alpha overlay in non-overlapping client-edge
+bands. It sits above the full client surface tree (including subsurfaces), below
+popups and captions, and clips to both rounded client and outer-frame masks.
+The app buffer and input regions do not change. Fullscreen and frameless windows
+omit the effect; individual-window sharing still excludes desktop decorations.
+
+`width`/`softness` control signed-distance falloff inside the client. Positive
+offsets move the apparent opening southeast, casting farther onto top/left app
+edges. Shadow alpha reaches zero toward the center. Cached PixelShaderElements
+need no additional texture capture or CPU readback. Small-window bands never
+overlap, avoiding doubled opacity. Removed the old inset mix from native frame
+lighting and the QML frame material; workspace buttons retain their bevels.
+The new fragment participates in checkout shader reload and Git-backed builds.
+
+Verification: shine-check --no-graphics passed 59 Rust tests, formatting, strict
+Clippy, 2 preview lifecycle tests and the Nix compositor package. Packaged example
+validation passed. Private compositor_bevel.py now verifies that near-edge app
+pixels darken, center and frame pixels stay unchanged, rounded corners clip,
+offsets shift the falloff, and 100/125/200% scales work for both frame types.
+The corrected effect also ran in an NVIDIA hardware-rendered nested preview
+with isolated browser/editor/terminal clients and a light demonstration window.
+The login compositor was preserved. Its older frame-only effect was disabled
+in personal config; moving the new overlay into the login session requires a
+new build/session and enabling the inset shadow there. No native restart or
+installed activation was performed.
 
 ## Pointer-lock deadlock during client drags (2026-11-06)
 
@@ -1984,6 +2074,38 @@ standalone module's `/etc` output built successfully. These checks do not prove
 live client discovery; no OS activation or desktop restart was performed.
 
 ## Shine menu bar controls (2026-11-06)
+
+Workspace buttons now use shared `Ui.FrameSurface`, an opt-in compact frame
+material; other shared buttons keep GlassSurface. The surface reads current
+`preferences.decorations.frame` colors, radius, glass opacity/noise, bevel
+settings, focus duration/easing and global animation enablement. Active tabs use
+the purple tint, inactive tabs slate, with a small non-color selection marker.
+Labels retain appearance-aware ColorPalette text; click routing and keyboard
+focus behavior are unchanged. The shader gives translucent tint, stationary
+grain and frame-matching bevels; cross-window backdrop blur is a compositor
+effect and is not claimed for these QML buttons.
+
+`quickshell-ui.nix` builds the Qt ShaderEffect QSB for GLSL, HLSL and Metal.
+It reuses the native rounded-coverage and frame-lighting GLSL functions, stripping
+standalone uniform declarations into the Qt shader's UBO. Build the QSB in a
+writable temporary directory, assert nonempty output, then copy it into the UI
+package after making that copied subdirectory writable. Store-source directories
+copied with cp -r can remain read-only, and qsb returned success after an output
+write failure. A successful Nix derivation alone did not prove a shader asset
+was installed. The shell trial now checks shader-load logs and actual tint/bevel
+pixels on a uniform wallpaper, preventing a labels-only false pass.
+
+Verification: Git-backed compositor-session package built, including the shared
+GPU shader. Private two-output compositor_shell.py passed active/inactive tint
+and northwest/southeast bevel pixels, light/dark labels, workspace/launcher
+clicks, app keyboard-focus preservation, wallpaper, scale and software fallback.
+A graceful Quickshell-only replacement applied checkout bar QML in the running
+native desktop. Both monitor bars/wallpapers returned, the compositor and all
+nine original app windows remained, and Qt RHI logs reported NVIDIA OpenGL ES
+rather than software rendering with no shader/QML load errors. A native
+screenshot verified the live bar; use screenshot-screen for native capture,
+since the test-only screenshot IPC action is nested-only. This was a runtime
+preview, not an OS activation; installed defaults require the next system build.
 
 Shine's bar uses plain clickable ohmansy text to open the launcher. Terminal
 and Displays remain launcher commands rather than left-side shortcuts. Sun and

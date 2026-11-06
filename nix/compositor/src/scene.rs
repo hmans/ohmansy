@@ -317,11 +317,7 @@ impl Smallvil {
             let style = &self.output_settings.decorations;
             if !fullscreen && style.frame.enabled {
                 let mut ring_style = style.clone();
-                if self.layout.focused() != Some(id)
-                    || self.seat.get_keyboard().unwrap().current_focus().is_none()
-                {
-                    ring_style.frame.active_color = style.frame.inactive_color;
-                }
+                ring_style.frame.active_color = self.frame_focus_color(id);
                 {
                     if let Some(title) = decorations.titles.element(
                         renderer,
@@ -338,6 +334,18 @@ impl Smallvil {
                             visual.push(WindowVisual::Decoration(ring));
                         }
                     }
+                }
+            }
+            if !fullscreen
+                && style.frame.enabled
+                && style.frame.inset_shadow.enabled
+                && style.frame.inset_shadow.width > 0.0
+                && style.frame.inset_shadow.color[3] > 0.0
+            {
+                for shadow in decorations.inset(id, bounds, style, scale) {
+                    // After popups/caption in the front-to-back list, but above
+                    // every client subsurface. This never modifies app buffers.
+                    visual.push(WindowVisual::Decoration(shadow));
                 }
             }
             for element in render_elements_from_surface_tree::<
@@ -384,11 +392,7 @@ impl Smallvil {
                 && frame_bounds.overlaps(Rectangle::from_size(crop.size.to_logical(1)))
             {
                 let mut glass = style.frame.clone();
-                if self.layout.focused() != Some(id)
-                    || self.seat.get_keyboard().unwrap().current_focus().is_none()
-                {
-                    glass.active_color = glass.inactive_color;
-                }
+                glass.active_color = self.frame_focus_color(id);
                 match decorations.frost.element(
                     renderer,
                     &output.name(),

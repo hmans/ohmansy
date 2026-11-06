@@ -29,6 +29,7 @@ varying vec2 v_coords;
 uniform float tint;
 #endif
 //_COVERAGE_
+//_LIGHTING_
 void main() {
     vec2 p = (v_coords - source_rect.xy) / source_rect.zw * frame_size;
     float outer = rounded_coverage(p - frame_size * 0.5, frame_size * 0.5, radius, 1.0 / density);
@@ -53,6 +54,8 @@ void main() {
     // Grain is anchored to the frame, so it does not shimmer while idle.
     float grain = fract(sin(dot(floor(p * density), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
     color = clamp(color + grain * noise_strength, 0.0, 1.0);
+    color = frame_lighting(color, p - frame_size * 0.5, frame_size * 0.5, radius,
+        p - inner_center, inner_size * 0.5, inner_radius, 1.0 / density);
     float a = opacity * alpha * coverage;
     gl_FragColor = vec4(color * a, a);
 }

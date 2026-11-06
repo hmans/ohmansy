@@ -34,6 +34,7 @@ use crate::CalloopData;
 
 pub struct Smallvil {
     pub inactive: crate::inactive::Effects,
+    pub frame_focus: crate::inactive::Effects,
     pub image_capture: crate::image_capture::CaptureState,
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
@@ -159,6 +160,7 @@ impl Smallvil {
 
         Self {
             inactive: Default::default(),
+            frame_focus: Default::default(),
             image_capture: crate::image_capture::CaptureState::new(&dh),
             start_time,
             display_handle: dh.clone(),
@@ -841,6 +843,7 @@ impl Smallvil {
         }).collect();
         for window in &mut windows {
             let id = window["id"].as_u64().unwrap();
+            window["frame_focus_amount"] = serde_json::json!(self.frame_focus_amount(id));
             let (side, top) = self
                 .output_settings
                 .decorations

@@ -41,9 +41,11 @@ pub struct Renderer {
     rounded: GlesTexProgram,
     border: GlesPixelProgram,
     shadow: GlesPixelProgram,
+    inset: GlesPixelProgram,
     masks: HashMap<Id, MaskId>,
     frames: HashMap<WindowId, CachedBands>,
     shadows: HashMap<WindowId, CachedBands>,
+    insets: HashMap<WindowId, CachedBands>,
     used: HashSet<Id>,
 }
 impl Renderer {
@@ -52,7 +54,12 @@ impl Renderer {
         Ok(Self {
             restore_draw_buffer: false,
             titles: crate::frame_title::Renderer::default(),
-            frost: crate::frost::Renderer::new(renderer, &sources.frost, &sources.coverage)?,
+            frost: crate::frost::Renderer::new(
+                renderer,
+                &sources.frost,
+                &sources.coverage,
+                &sources.lighting,
+            )?,
             rounded: renderer.compile_custom_texture_shader(
                 sources.rounded.replace("//_COVERAGE_", &sources.coverage),
                 &[
@@ -67,7 +74,10 @@ impl Renderer {
                 ],
             )?,
             border: renderer.compile_custom_pixel_shader(
-                sources.frame.replace("//_COVERAGE_", &sources.coverage),
+                sources
+                    .frame
+                    .replace("//_COVERAGE_", &sources.coverage)
+                    .replace("//_LIGHTING_", &sources.lighting),
                 &[
                     UniformName::new("radius", UniformType::_1f),
                     UniformName::new("inner_radius", UniformType::_1f),
@@ -77,7 +87,10 @@ impl Renderer {
                     UniformName::new("frame_color", UniformType::_4f),
                     UniformName::new("full_size", UniformType::_2f),
                     UniformName::new("piece_offset", UniformType::_2f),
-                ],
+                ]
+                .into_iter()
+                .chain(crate::frame_lighting::names())
+                .collect::<Vec<_>>(),
             )?,
             shadow: renderer.compile_custom_pixel_shader(
                 sources.shadow,
@@ -92,9 +105,24 @@ impl Renderer {
                     UniformName::new("feather", UniformType::_1f),
                 ],
             )?,
+            inset: renderer.compile_custom_pixel_shader(
+                sources.inset.replace("//_COVERAGE_", &sources.coverage),
+                &[
+                    UniformName::new("client_size", UniformType::_2f),
+                    UniformName::new("piece_offset", UniformType::_2f),
+                    UniformName::new("radius", UniformType::_1f),
+                    UniformName::new("outer_rect", UniformType::_4f),
+                    UniformName::new("outer_radius", UniformType::_1f),
+                    UniformName::new("feather", UniformType::_1f),
+                    UniformName::new("shadow_params", UniformType::_2f),
+                    UniformName::new("shadow_offset", UniformType::_2f),
+                    UniformName::new("shadow_color", UniformType::_4f),
+                ],
+            )?,
             masks: HashMap::new(),
             frames: HashMap::new(),
             shadows: HashMap::new(),
+            insets: HashMap::new(),
             used: HashSet::new(),
         })
     }
@@ -109,6 +137,7 @@ impl Renderer {
         });
         self.frames.retain(|id, _| live.contains(id));
         self.shadows.retain(|id, _| live.contains(id));
+        self.insets.retain(|id, _| live.contains(id));
     }
     #[allow(clippy::too_many_arguments)]
     pub fn rounded(
@@ -232,6 +261,59 @@ impl Renderer {
         cache.style = key;
         cache.elements.clone()
     }
+    pub fn inset(
+        &mut self,
+        id: WindowId,
+        bounds: Rectangle<i32, Logical>,
+        style: &Decorations,
+        scale: f64,
+    ) -> Vec<PixelShaderElement> {
+        let shadow = &style.frame.inset_shadow;
+        let reach = (shadow.width
+            + shadow.softness
+            + shadow.offset[0].abs().max(shadow.offset[1].abs())
+            + style.inner_radius() as f32
+            + 1.0)
+            .ceil() as i32;
+        let (w, h) = (bounds.size.w, bounds.size.h);
+        let top = reach.min(h);
+        let bottom = reach.min(h - top);
+        let left = reach.min(w);
+        let right = reach.min(w - left);
+        // Non-overlapping bands shade only the edge pixels, even when the
+        // client is smaller than the configured shadow reach.
+        let pieces = [
+            Rectangle::new((0, 0).into(), (w, top).into()),
+            Rectangle::new((0, h - bottom).into(), (w, bottom).into()),
+            Rectangle::new((0, top).into(), (left, h - top - bottom).into()),
+            Rectangle::new((w - right, top).into(), (right, h - top - bottom).into()),
+        ];
+        let key = (style.clone(), scale.to_bits(), w, h);
+        let cache = self.insets.entry(id).or_insert_with(|| CachedBands {
+            style: key.clone(),
+            elements: pieces
+                .iter()
+                .map(|piece| {
+                    PixelShaderElement::new(
+                        self.inset.clone(),
+                        Rectangle::new(bounds.loc + piece.loc, piece.size),
+                        None,
+                        1.0,
+                        inset_uniforms(style, scale, bounds.size, piece.loc),
+                        Kind::Unspecified,
+                    )
+                })
+                .collect(),
+        });
+        for (element, piece) in cache.elements.iter_mut().zip(pieces) {
+            element.resize(Rectangle::new(bounds.loc + piece.loc, piece.size), None);
+            if cache.style != key {
+                element.update_uniforms(inset_uniforms(style, scale, bounds.size, piece.loc));
+            }
+        }
+        cache.style = key;
+        cache.elements.clone()
+    }
     pub fn frame(
         &mut self,
         id: WindowId,
@@ -285,6 +367,34 @@ impl Renderer {
         cache.elements.clone()
     }
 }
+fn inset_uniforms(
+    style: &Decorations,
+    scale: f64,
+    size: smithay::utils::Size<i32, Logical>,
+    offset: Point<i32, Logical>,
+) -> Vec<Uniform<'static>> {
+    let shadow = &style.frame.inset_shadow;
+    let outer = style.frame.bounds(Rectangle::from_size(size), false);
+    vec![
+        Uniform::new("client_size", (size.w as f32, size.h as f32)),
+        Uniform::new("piece_offset", (offset.x as f32, offset.y as f32)),
+        Uniform::new("radius", style.inner_radius() as f32),
+        Uniform::new(
+            "outer_rect",
+            (
+                outer.loc.x as f32,
+                outer.loc.y as f32,
+                outer.size.w as f32,
+                outer.size.h as f32,
+            ),
+        ),
+        Uniform::new("outer_radius", style.outer_radius() as f32),
+        Uniform::new("feather", 0.5 / scale as f32),
+        Uniform::new("shadow_params", (shadow.width, shadow.softness)),
+        Uniform::new("shadow_offset", shadow.offset),
+        Uniform::new("shadow_color", shadow.color),
+    ]
+}
 fn shadow_uniforms(
     style: &Decorations,
     scale: f64,
@@ -311,7 +421,7 @@ fn frame_uniforms(
     size: smithay::utils::Size<i32, Logical>,
     offset: Point<i32, Logical>,
 ) -> Vec<Uniform<'static>> {
-    vec![
+    let mut uniforms = vec![
         Uniform::new("radius", style.outer_radius() as f32),
         Uniform::new("inner_radius", style.frame.inner_corner_radius as f32),
         Uniform::new("thickness", style.frame.width as f32),
@@ -320,7 +430,9 @@ fn frame_uniforms(
         Uniform::new("frame_color", style.frame.active_color),
         Uniform::new("full_size", (size.w as f32, size.h as f32)),
         Uniform::new("piece_offset", (offset.x as f32, offset.y as f32)),
-    ]
+    ];
+    uniforms.extend(crate::frame_lighting::uniforms(&style.frame));
+    uniforms
 }
 
 #[derive(Debug)]

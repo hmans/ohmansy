@@ -36,7 +36,7 @@ enabled=false
             title_padding=8, icon_title_gap=7, outer_corner_radius=14, inner_corner_radius=11,
             active_color=[81/255,64/255,95/255,1.0], inactive_color=[37/255,40/255,53/255,1.0])
         values.update(tomllib.loads(extra).get('decorations', {}).get('frame', {}))
-        return base_config + '\n[decorations.frame]\n' + '\n'.join(f'{key}={json.dumps(value)}' for key,value in values.items()) + '\n[decorations.frame.glass]\nenabled=false\n'
+        return base_config + '\n[decorations.frame]\n' + '\n'.join(f'{key}={json.dumps(value)}' for key,value in values.items()) + '\n[decorations.frame.glass]\nenabled=false\n[decorations.frame.bevel]\nenabled=false\n'
     config.write_text(fixture())
     data = artifacts / 'data'
     (data / 'applications').mkdir(parents=True)

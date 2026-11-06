@@ -14,6 +14,7 @@ varying vec2 v_coords;
 uniform float tint;
 #endif
 //_COVERAGE_
+//_LIGHTING_
 void main() {
     vec2 p = v_coords * size + piece_offset - full_size * 0.5;
     float outer = rounded_coverage(p, full_size * 0.5, radius, 2.0 * feather);
@@ -21,5 +22,7 @@ void main() {
     vec2 inner_center = vec2(0.0, (titlebar_height - thickness) * 0.5);
     float inner = rounded_coverage(p - inner_center, inner_size * 0.5, inner_radius, 2.0 * feather);
     float coverage = max(outer - inner, 0.0);
-    gl_FragColor = vec4(frame_color.rgb * frame_color.a, frame_color.a) * alpha * coverage;
+    vec3 color = frame_lighting(frame_color.rgb, p, full_size * 0.5, radius,
+        p - inner_center, inner_size * 0.5, inner_radius, 2.0 * feather);
+    gl_FragColor = vec4(color * frame_color.a, frame_color.a) * alpha * coverage;
 }

@@ -36,6 +36,12 @@ with a static fallback when ribbon rendering is unavailable. Foot's shared
 defaults provide a translucent background; Shine does not yet blur it.
 Niri's panel, wallpaper service, and other services remain tied to Niri.
 
+Workspace buttons echo Shine's window frames: purple/slate translucent surfaces,
+fine grain, a northwest bevel, and the same focus-tint fade. They read the current
+frame colors, radii, lighting and animation settings from Shine. A small marker
+also identifies the selected workspace. Labels follow light/dark appearance,
+and clicking a workspace continues to preserve the app's keyboard focus.
+
 This session is experimental: it has no screen locking, IME,
 X11 support, or complete desktop portal integration. Keep Niri available as the
 alternative desktop. Normal logins use the regular user D-Bus, so applications can
@@ -616,6 +622,8 @@ title_padding = 11
 icon_title_gap = 7
 outer_corner_radius = 10
 inner_corner_radius = 8
+focus_duration_ms = 150
+focus_easing = "ease-in-out"
 active_color = [0.317647, 0.250980, 0.372549, 0.55]
 inactive_color = [0.145098, 0.156863, 0.207843, 0.40]
 
@@ -648,6 +656,14 @@ Desktop-entry icons support PNG and SVG, with a window glyph as fallback.
 Title text uses Inter with font fallback for other scripts. Titles and icons
 are cached until the title, app, caption measurements or render density changes.
 
+Focus tint fades between the active and inactive RGBA colors over 150 ms,
+independently of inactive-window scaling and grading. Rapid focus changes reverse
+from the currently visible tint. `focus_duration_ms` accepts 0–5000; zero makes
+the change immediate. `focus_easing` accepts `linear`, `ease-in`, `ease-out` or
+`ease-in-out`. Disabling global animations also makes tint changes immediate.
+The fade stops scheduling repaints at its exact endpoint. Tint-only changes
+reuse the existing backdrop texture; lower scene changes still refresh it.
+
 Glass samples the actual scene behind each window, excluding that window's
 own contents, caption and shadow. Blur runs on the GPU; there is no CPU pixel
 readback. `blur_radius` accepts 0–64 logical pixels, `opacity` and `noise` accept
@@ -657,6 +673,53 @@ cached until lower surfaces, their geometry or frame settings change. A changing
 wallpaper updates the blur too. Individual-window sharing excludes frames.
 `python3 tools/tests/compositor_glass.py` checks real blur, transparency, grain,
 background updates and scaling on the private test display.
+
+### Frame bevels and inset shadows
+
+A thin bevel makes frames look raised: the outer top and left edges catch a
+northwest light, while the bottom and right edges are shaded. The inner bevel
+reverses that lighting around the client cutout. Rounded corners use continuous
+surface normals. Both plain and glass frames use the same lighting.
+
+```toml
+[decorations.frame.bevel]
+enabled = true
+width = 1.5
+inner_width = 1.0
+highlight = 0.20
+shadow = 0.18
+light_direction = [-1.0, -1.0]
+
+[decorations.frame.inset_shadow]
+enabled = false
+width = 8.0
+softness = 8.0
+offset = [2.0, 2.0]
+color = [0.0, 0.0, 0.0, 0.22]
+```
+
+Widths use logical pixels and accept fractions. Bevel widths accept 0–16;
+highlight and shadow strengths accept 0–1. Zero width disables that bevel.
+`light_direction` points toward the light in screen coordinates: negative X is
+left, negative Y is up. Components accept −1 to 1; the vector must be nonzero
+and is normalized automatically. `[1.0, 1.0]` moves the light to the southeast.
+
+The optional inset shadow is cast inward **over app content**, making the app
+look recessed beneath its frame. Shine draws a separate translucent overlay
+above the client surface tree and below menus, tooltips and the frame caption.
+The app's own buffer and input regions stay unchanged. The rounded client and
+outer frame masks clip the shadow; fullscreen and frameless windows omit it.
+Individual-window sharing continues to capture client surfaces without desktop
+decorations, while display sharing includes the shadow.
+
+Width and softness accept 0–64 logical pixels, offsets accept −64–64, and color
+is RGBA from 0–1. Positive offsets cast farther down/right, emphasizing top/left
+app edges. Width zero disables the shadow. Settings reload live on a compositor
+built with this overlay; older builds drew it on the frame itself. This code
+change needs a new preview or login session. It adds no idle animation or
+offscreen capture pass and does not darken workspace-button contents.
+`python3 tools/tests/compositor_bevel.py` checks actual pixels for both frame
+types, light reversal, curved corners, clipping, live settings and scale.
 
 Drop shadows follow each window's rounded outer frame. Their interiors are cut
 out so translucent windows keep their original background opacity. `enabled =

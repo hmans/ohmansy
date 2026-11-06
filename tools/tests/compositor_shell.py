@@ -63,6 +63,8 @@ def run():
                                   if layer['namespace'] == 'ohmansy-wallpaper')
                 assert background['geometry'] == [0, 0, *output['logical_size']], background
             first_frame = capture('ribbons-first').crop((80, 80, 600, 500))
+            shell_log = (artifacts / 'session.log').read_text()
+            assert 'Failed to deserialize QShader' not in shell_log and 'shader preparation failed' not in shell_log, 'Workspace material shader failed to load'
             assert max(channel[1] - channel[0] for channel in first_frame.getextrema()) > 20
             time.sleep(0.8)
             next_frame = capture('ribbons-next').crop((80, 80, 600, 500))
@@ -188,6 +190,19 @@ def run():
             trial.wait_for(lambda: all(abs(a - b) <= 2 for a, b in zip(
                 capture('transparent-bar').getpixel(bar_pixel), background)),
                 description='transparent panel background')
+            # Check actual control pixels, so a missing shader cannot pass just
+            # because labels, click handlers and the transparent bar still work.
+            material = capture('workspace-material')
+            frame = control()['preferences']['decorations']['frame']
+            for x, field in [(104, 'active_color'), (136, 'inactive_color')]:
+                tint = frame[field]
+                alpha = tint[3] * frame['glass']['opacity']
+                expected = tuple(round(tint[i] * 255 * alpha + background[i] * (1-alpha)) for i in range(3))
+                actual = material.getpixel((round(x*scale),round(12*scale)))
+                assert all(abs(a-b)<=5 for a,b in zip(actual,expected)), (field,actual,expected)
+            northwest = material.getpixel((round(104*scale),round(6*scale)))
+            southeast = material.getpixel((round(104*scale),round(37*scale)))
+            assert sum(northwest)>sum(southeast)+8, ('Workspace bevel lighting missing',northwest,southeast)
             control('launch', program='foot', args=['--app-id=shine-alpha-test',
                     '--override=main.initial-color-theme=dark',
                     '--override=colors-dark.alpha=0.85',

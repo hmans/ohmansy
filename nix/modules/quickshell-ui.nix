@@ -1,6 +1,6 @@
 { pkgs }:
 let support = import ./notifications-support.nix { inherit pkgs; };
-in pkgs.runCommand "ohmansy-quickshell-ui" {} ''
+in pkgs.runCommand "ohmansy-quickshell-ui" { nativeBuildInputs = [ pkgs.qt6.qtshadertools ]; } ''
   mkdir -p "$out/lib/qt-6/qml"
   cp -r ${support}/lib/qt-6/qml/. "$out/lib/qt-6/qml/"
   chmod -R u+w "$out/lib/qt-6/qml"
@@ -8,6 +8,17 @@ in pkgs.runCommand "ohmansy-quickshell-ui" {} ''
   cp ${./notifications}/*.qml ${./notifications}/qmldir "$out/lib/qt-6/qml/Ohmansy/Notifications/"
   mkdir -p "$out/lib/qt-6/qml/Ohmansy/Ui"
   cp -r ${./ui}/. "$out/lib/qt-6/qml/Ohmansy/Ui/"
+  mkdir -p frame-shader
+  cp ${./ui/shaders/frame-surface.frag} frame-shader/frame-surface.frag
+  cp ${../compositor/src/rounded-coverage.glsl} frame-shader/rounded-coverage.glsl
+  sed '/^uniform /d' ${../compositor/src/frame-lighting.glsl} > frame-shader/frame-lighting.glsl
+  qsb --glsl '100 es,120,150' --hlsl 50 --msl 12 \
+    -o frame-shader/frame-surface.frag.qsb frame-shader/frame-surface.frag
+  # qsb may return success after an output write failure. Check the asset before
+  # installing it; copied source subdirectories retain the store's read-only mode.
+  test -s frame-shader/frame-surface.frag.qsb
+  chmod u+w "$out/lib/qt-6/qml/Ohmansy/Ui/shaders"
+  cp frame-shader/frame-surface.frag.qsb "$out/lib/qt-6/qml/Ohmansy/Ui/shaders/"
   cp ${./greeter/scene/Ribbons.qml} "$out/lib/qt-6/qml/Ohmansy/Ui/Ribbons.qml"
   cp ${./desktop/wallpapers/twilight-cat.png} "$out/lib/qt-6/qml/Ohmansy/Ui/wallpaper.png"
   mkdir -p "$out/lib/qt-6/qml/Ohmansy/Displays"

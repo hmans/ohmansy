@@ -33,17 +33,20 @@ type Signature = (
 #[derive(PartialEq)]
 struct Key {
     scene: Vec<Signature>,
-    bounds: Rectangle<i32, Logical>,
     canvas: Point<i32, Physical>,
     size: Size<i32, Physical>,
     scale: f64,
+}
+#[derive(PartialEq)]
+struct Appearance {
+    bounds: Rectangle<i32, Logical>,
     visual_scale: f64,
     style: Frame,
 }
 struct Snapshot {
     key: Key,
     texture: GlesTexture,
-    id: Id,
+    appearance: Option<(Appearance, Id)>,
 }
 pub struct Renderer {
     program: GlesTexProgram,
@@ -55,9 +58,12 @@ impl Renderer {
         renderer: &mut GlesRenderer,
         source: &str,
         coverage: &str,
+        lighting: &str,
     ) -> Result<Self, GlesError> {
         let program = renderer.compile_custom_texture_shader(
-            source.replace("//_COVERAGE_", coverage),
+            source
+                .replace("//_COVERAGE_", coverage)
+                .replace("//_LIGHTING_", lighting),
             &[
                 UniformName::new("source_rect", UniformType::_4f),
                 UniformName::new("sample_bounds", UniformType::_4f),
@@ -72,7 +78,10 @@ impl Renderer {
                 UniformName::new("noise_strength", UniformType::_1f),
                 UniformName::new("frame_color", UniformType::_4f),
                 UniformName::new("density", UniformType::_1f),
-            ],
+            ]
+            .into_iter()
+            .chain(crate::frame_lighting::names())
+            .collect::<Vec<_>>(),
         )?;
         Ok(Self {
             program,
@@ -112,12 +121,9 @@ impl Renderer {
                     )
                 })
                 .collect(),
-            bounds,
             canvas,
             size,
             scale,
-            visual_scale,
-            style: style.clone(),
         };
         let cache_key = (output.to_owned(), id);
         if self
@@ -155,11 +161,24 @@ impl Renderer {
                 Snapshot {
                     key,
                     texture,
-                    id: Id::new(),
+                    appearance: None,
                 },
             );
         }
-        let snapshot = &self.snapshots[&cache_key];
+        let snapshot = self.snapshots.get_mut(&cache_key).unwrap();
+        let appearance = Appearance {
+            bounds,
+            visual_scale,
+            style: style.clone(),
+        };
+        if snapshot
+            .appearance
+            .as_ref()
+            .is_none_or(|(old, _)| *old != appearance)
+        {
+            snapshot.appearance = Some((appearance, Id::new()));
+        }
+        let id = &snapshot.appearance.as_ref().unwrap().1;
         let (tw, th) = ((size.w + canvas.x) as f32, (size.h + canvas.y) as f32);
         let center = bounds.loc.to_f64()
             + Point::from((bounds.size.w as f64 / 2.0, bounds.size.h as f64 / 2.0));
@@ -168,7 +187,7 @@ impl Renderer {
                 + canvas.to_f64().to_logical(1.0),
             bounds.size.to_f64() * (scale * visual_scale),
         );
-        let uniforms = vec![
+        let mut uniforms = vec![
             Uniform::new(
                 "source_rect",
                 (
@@ -199,8 +218,9 @@ impl Renderer {
             Uniform::new("frame_color", style.active_color),
             Uniform::new("density", scale as f32),
         ];
+        uniforms.extend(crate::frame_lighting::uniforms(style));
         let texture = TextureRenderElement::from_static_texture(
-            snapshot.id.clone(),
+            id.clone(),
             renderer.context_id(),
             bounds.loc.to_f64().to_physical(1.0),
             snapshot.texture.clone(),
@@ -214,7 +234,7 @@ impl Renderer {
         );
         Ok(ElementType {
             inner: TextureShaderElement::new(texture, self.program.clone(), uniforms),
-            id: snapshot.id.clone(),
+            id: id.clone(),
         })
     }
 }

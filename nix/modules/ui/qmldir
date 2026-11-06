@@ -4,6 +4,7 @@ singleton Appearance 1.0 Appearance.qml
 singleton WallpaperQuality 1.0 WallpaperQuality.qml
 ColorPalette 1.0 ColorPalette.qml
 GlassSurface 1.0 GlassSurface.qml
+FrameSurface 1.0 FrameSurface.qml
 GlassButton 1.0 GlassButton.qml
 GlassField 1.0 GlassField.qml
 IconButton 1.0 IconButton.qml

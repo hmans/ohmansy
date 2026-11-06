@@ -54,6 +54,15 @@ rebuild to receive these defaults; running browsers may need a restart.
 Glass surfaces retain their translucent treatment where graphics support it,
 while software rendering preserves the same muted color hierarchy.
 
+Shine's workspace buttons use `FrameSurface` to match its window frames: purple
+for the current workspace, slate for the others, fine stationary grain, and a
+northwest highlight with southeast shading. The material reads the current
+frame settings and shares the native frame's bevel functions. Workspace changes
+use the frame's focus-fade duration and easing. Keep appearance-aware label
+colors and the small active marker for legibility and selection beyond color.
+The compact surface is translucent; cross-window backdrop blur remains a
+compositor effect. Other shared buttons retain their existing `GlassSurface`.
+
 Desktop notifications use `Ohmansy.Notifications`, shared by Shine and Niri.
 Their cards and history panel use `GlassSurface`, `GlassButton`, and `Theme`
 directly, so their font, corners, surfaces, and action roles stay consistent.

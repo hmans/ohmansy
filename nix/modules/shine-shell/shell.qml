@@ -153,13 +153,21 @@ ShellRoot {
                     verticalAlignment: Text.AlignVCenter
                     opacity: workspaceButton.dimmed ? 0.45 : 1
                 }
-                background: GlassSurface {
-                    colors: barColors
-                    primary: workspaceButton.actionRole === "primary"
-                    tint: primary ? barColors.selection : barColors.control
+                Accessible.name: "Workspace " + text
+                Accessible.description: actionRole === "primary" ? "Current workspace" : "Switch to workspace"
+                background: FrameSurface {
+                    frameSettings: root.state.preferences?.decorations?.frame || ({})
+                    animationsEnabled: root.state.preferences?.animations?.enabled !== false
+                    active: workspaceButton.actionRole === "primary"
                     highlighted: workspaceButton.hovered
                     pressed: workspaceButton.down
                     focused: workspaceButton.visualFocus
+                    Rectangle {
+                        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 3 }
+                        width: 7; height: 2; radius: 1
+                        color: barColors.text
+                        opacity: parent.activeAmount * 0.65
+                    }
                 }
             }
             component BarIcon: Button {
