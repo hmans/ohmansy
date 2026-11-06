@@ -36,6 +36,8 @@ or push unless asked. Preserve unrelated changes.
   default: reload Shine settings or checkout QML, or gracefully replace only
   Quickshell. Preserve the compositor and application windows. Do not require
   logout for these changes. See [runtime iteration](docs/linux-development.md#iterate-in-the-running-desktop).
+- Run automated graphical tests on the private headless display. Visible test
+  windows require an explicit user request; interactive previews are separate.
 - `flakey/` is ignored reference material, never an official flake input or staged
   content. Its old VM was deleted. Do not recreate it as a fallback.
 - Keep credentials, VM state, generated bundles, and personal configuration out

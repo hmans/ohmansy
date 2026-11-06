@@ -8,17 +8,23 @@ import subprocess
 import sys
 import tempfile
 
-import compositor_integration as trial
+import compositor_support as trial
 
 
 def manager_display_environment():
-    output = subprocess.check_output(['systemctl', '--user', 'show-environment'], text=True)
+    env = dict(os.environ)
+    if address := env.get('OHMANSY_TEST_HOST_DBUS'):
+        env['DBUS_SESSION_BUS_ADDRESS'] = address
+    if runtime := env.get('OHMANSY_TEST_HOST_RUNTIME'):
+        env['XDG_RUNTIME_DIR'] = runtime
+    output = subprocess.check_output(['systemctl', '--user', 'show-environment'], text=True, env=env)
     names = {'WAYLAND_DISPLAY', 'DISPLAY', 'XDG_CURRENT_DESKTOP', 'XDG_SESSION_DESKTOP', 'XDG_SESSION_TYPE', 'SSH_AUTH_SOCK'}
     return {key: value for line in output.splitlines()
             for key, _, value in [line.partition('=')] if key in names}
 
 
 def run():
+    trial.ensure_test_display()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session', type=Path, default=trial.ROOT / '.local/compositor-session/bin/ohmansy-compositor-session')
     args = parser.parse_args()
@@ -30,7 +36,6 @@ def run():
     original_focus = next((window['id'] for window in trial.parent_windows() if window['is_focused']), None)
     original_environment = manager_display_environment()
     control = trial.Control(artifacts / 'control.sock')
-    trial.TEST_CONTROL = control
     command = [str(args.session), '--nested']
     command += ['--test-input', '--config', str(artifacts / 'config.toml'), '--control-socket', control.path, '--close-after', '60', '--report', str(artifacts / 'state.json')]
     environment = os.environ.copy()
@@ -60,18 +65,18 @@ def run():
             assert not trial.window_for(control, 'wofi'), 'Mod+D must not open the launcher'
             trial.keys(control, pid, terminal['id'], [57], shortcut)
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='application picker')
-            trial.send_keys([1])
+            control.send_keys([1])
             trial.wait_for(lambda: not trial.window_for(control, 'wofi'), description='picker closing')
             trial.keys(control, pid, terminal['id'], [18], shortcut + ('shift',))
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='sign-out confirmation')
-            trial.send_keys([28])
+            control.send_keys([28])
             trial.wait_for(lambda: not trial.window_for(control, 'wofi'), description='cancel sign-out')
             assert process.poll() is None, 'Cancel must keep the session running'
             control('screenshot', path=str(artifacts / 'session.png'))
             trial.wait_for(lambda: (artifacts / 'session.png').exists(), description='session framebuffer')
             trial.keys(control, pid, terminal['id'], [18], shortcut + ('shift',))
             trial.wait_for(lambda: trial.window_for(control, 'wofi'), description='second sign-out confirmation')
-            trial.send_keys([108])
+            control.send_keys([108])
             # Confirming ends the server; there is no key release to deliver.
             control('key', code=28, pressed=True)
             process.wait(timeout=12)

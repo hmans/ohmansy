@@ -2,7 +2,7 @@
 data:
   area: tooling
   kind: workflow
-  reviewed: "2026-11-05"
+  reviewed: "2026-11-06"
   status: current
 id: b4jpz
 title: Host tooling and publication workflow
@@ -11,6 +11,59 @@ title: Host tooling and publication workflow
 
 Read [root instructions](../AGENTS.md). Run commands from the
 repository root unless the tool explicitly supports another working directory.
+
+## Headless compositor automation (2026-11-06)
+
+Automated graphical tests use the private headless display by default. Visible
+test windows require an explicit user request; interactive previews stay
+separate. This is recorded in AGENTS.md after visible automated trials disrupted
+the user's work. Do not bypass this default for routine verification.
+
+`tools/dev/compositor-test-display.py` starts Weston with an explicit headless GL
+backend and kiosk shell, an isolated Shine parent, and a private activation bus.
+It enters the spatial Nix shell for Weston, D-Bus and Qt dependencies. Private
+runtime and XDG directories separate test sockets, clipboard, app settings and
+activation from the real login. The bus starts after the private display exists,
+so activated helpers inherit the private environment as well. Headless setup
+failure stops the test; it never falls back to the visible display. An ExitStack
+owns the subprocess/log lifetimes and unwinds partial startup or interruptions.
+Cleanup waits for the process group even after its leader exits, escalating to
+SIGKILL for stubborn descendants. It removes the private runtime on SIGTERM or
+Ctrl+C. Logs and screenshots remain under `.local/compositor-tests/`.
+
+`tools/tests/compositor_support.py` owns shared IPC, display guards, and input
+helpers; the runner and all trials import it without depending on the browser
+test. `Control.send_keys(...)` targets an explicit connection; there is no mutable
+global input destination. Headless parent lookup uses the known control socket
+and cannot fall through to visible-desktop discovery. Every trial calls
+`ensure_test_display` before starting work, and the parent-window helper also
+guards its entry. Direct Python invocations and
+`mise run compositor-integration` therefore default to headless. Run an individual
+trial with `mise run compositor-test -- tools/tests/compositor_clipboard.py`.
+The runner's explicit `--visible` flag is for requested visual debugging only.
+Build the dev binary first; the integration task already builds it. Headless
+parent-preservation assertions refer to the isolated parent, not the real login.
+The packaged-session trial separately reads the real user's systemd manager
+through the original runtime and bus address to check activation preservation;
+this is read-only and does not attach graphical clients to that display.
+
+Verified native NVIDIA GL acceleration, full Firefox/GTK rendering/input/cursor/
+clipboard integration, Foot/Qt clipboard, live preferences, nested key forwarding,
+monitor layout, and a freshly built packaged session with app picker and canceled/
+confirmed logout. All ran headlessly. A separate read-only host-window observer
+saw no test windows while exit-code propagation, failed-dependency refusal,
+SIGTERM cleanup and private-runtime removal were checked. Python compilation and
+whitespace checks passed. An old local packaged session lacked --config; rebuilding
+a separate candidate resolved that stale-artifact failure. No login compositor
+restart, OS activation, commit or push was performed.
+
+After the support/lifecycle consolidation, the browser, clipboard, nesting,
+preference, monitor and packaged-session trials passed headlessly again. Two
+non-graphical regressions cover exception cleanup and a SIGTERM-ignoring child
+whose leader has exited (`test_compositor_test_display.py`). Separate runtime
+checks verified failed setup, interruptions, removed private runtimes and
+signal-exit normalization to conventional shell exit codes, with no visible
+test windows observed.
 
 ## Boundaries
 

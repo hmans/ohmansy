@@ -9,10 +9,11 @@ import time
 
 from PIL import Image, ImageChops
 
-import compositor_integration as trial
+import compositor_support as trial
 
 
 def run():
+    trial.ensure_test_display()
     root = trial.ROOT / '.local/compositor-tests'
     root.mkdir(parents=True, exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix='shell-', dir=root))

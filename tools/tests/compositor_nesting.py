@@ -5,10 +5,11 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-import compositor_integration as trial
+import compositor_support as trial
 
 
 def run():
+    trial.ensure_test_display()
     base = trial.ROOT / '.local/compositor-tests'
     base.mkdir(parents=True, exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix='nesting-', dir=base))
@@ -16,7 +17,6 @@ def run():
     original = {window['id']: window['pid'] for window in trial.parent_windows()}
     focus = next((window['id'] for window in trial.parent_windows() if window['is_focused']), None)
     parent, child = [trial.Control(artifacts / name) for name in ['parent.sock', 'child.sock']]
-    trial.TEST_CONTROL = parent
     with (artifacts / 'session.log').open('w') as log:
         process = subprocess.Popen([str(trial.BINARY), '--no-clients', '--test-input',
             '--config', str(artifacts / 'parent-config.toml'),
@@ -35,22 +35,22 @@ def run():
             child('terminal')
             trial.wait_for(lambda: len(child()['windows']) == 1, description='child terminal')
             parent('focus', nested['id'])
-            trial.send_keys([28], ('super', 'alt'))
+            parent.send_keys([28], ('super', 'alt'))
             trial.wait_for(lambda: len(child()['windows']) == 2, description='Super+Alt+Enter forwarded to child')
             assert len(parent()['windows']) == 1, 'Host consumed child shortcut'
-            trial.send_keys([31], ('super', 'alt'))
+            parent.send_keys([31], ('super', 'alt'))
             trial.wait_for(lambda: child()['display_scale'] == 1.5, description='child scale shortcut')
             assert parent()['display_scale'] == 1.25
-            trial.send_keys([31], ('super',))
+            parent.send_keys([31], ('super',))
             trial.wait_for(lambda: parent()['display_scale'] == 1.5, description='host scale shortcut')
             assert child()['display_scale'] == 1.5, 'Host shortcut reached child'
-            trial.send_keys([28], ('super',))
+            parent.send_keys([28], ('super',))
             trial.wait_for(lambda: len(parent()['windows']) == 2, description='Super+Enter opens host terminal')
             assert len(child()['windows']) == 2
             for control in [parent, child]:
                 trial.wait_for(lambda: not any(control()['modifiers'].values()), description='released modifiers after focus change')
             parent('focus', nested['id'])
-            trial.send_keys([31], ('super', 'alt'))
+            parent.send_keys([31], ('super', 'alt'))
             trial.wait_for(lambda: child()['display_scale'] == 1.75, description='child shortcut after regaining focus')
             (artifacts / 'verification.json').write_text(json.dumps({'parent': parent(), 'child': child()}, indent=2)+'\n')
         finally:

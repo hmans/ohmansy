@@ -8,10 +8,11 @@ import tempfile
 import time
 
 from compositor_decorations import png_pixels
-import compositor_integration as trial
+import compositor_support as trial
 
 
 def run():
+    trial.ensure_test_display()
     root = trial.ROOT / '.local/compositor-tests'
     root.mkdir(parents=True, exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix='movement-', dir=root))
@@ -30,7 +31,6 @@ duration_ms={duration}
 
     preferences()
     control = trial.Control(artifacts / 'control.sock')
-    trial.TEST_CONTROL = control
     original = {w['id']: w['pid'] for w in trial.parent_windows()}
     (artifacts / 'parent-before.json').write_text(json.dumps(original))
 
@@ -76,7 +76,7 @@ duration_ms={duration}
             start = window(ids[0])['geometry']
             screenshot('baseline')  # Wait through the nested capture startup delay.
             # Use the actual nested shortcut profile: Super+Alt+Shift+Right.
-            trial.send_keys([106], ('super', 'alt', 'shift'))
+            control.send_keys([106], ('super', 'alt', 'shift'))
             mid = control()
             selected = next(w for w in mid['windows'] if w['id'] == ids[0])
             assert selected['moving'] and start[0] < selected['geometry'][0] < selected['target_geometry'][0], mid

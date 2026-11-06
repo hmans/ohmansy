@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import time
 
-import compositor_integration as trial
+import compositor_support as trial
 from PIL import Image
 
 
@@ -20,6 +20,7 @@ def png_pixels(path):
 
 
 def run():
+    trial.ensure_test_display()
     root = trial.ROOT / '.local/compositor-tests'
     root.mkdir(parents=True, exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix='screenshots-', dir=root))
@@ -48,7 +49,6 @@ def run():
     clipboard.chmod(0o755)
     env['PATH'] = str(helpers) + ':' + env['PATH']
     control = trial.Control(artifacts / 'control.sock')
-    trial.TEST_CONTROL = control
     original = {w['id']: w['pid'] for w in trial.parent_windows()}
     frames = 0
 
@@ -160,12 +160,12 @@ def run():
             control('fullscreen')
             # Print uses the same action as the CLI and updates the image selection.
             previous = control()['screenshot']['id']
-            trial.send_keys([99])
+            control.send_keys([99])
             result = trial.wait_for(lambda: completed_after(previous), description='Print screenshot')
             assert result.get('clipboard') and result['output'] == 'SHINE-2', result
             previous = result['id']
             focused = control()['focused']
-            trial.send_keys([5], ('super', 'alt', 'shift'))
+            control.send_keys([5], ('super', 'alt', 'shift'))
             result = trial.wait_for(lambda: completed_after(previous),
                 description='Mac screenshot shortcut')
             assert result['clipboard'] and result['output'] == 'SHINE-2', result

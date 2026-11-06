@@ -105,6 +105,7 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | --- | --- |
 | Mod+H/L or Left/Right | Focus previous/next column |
 | Mod+Tab | Focus the next column, wrapping from the last to the first |
+| Mod+C / Mod+V | Copy / paste; terminal windows receive Ctrl+Shift+C/V |
 | Mod+Shift+H/L or Left/Right | Move column left/right |
 | Mod+comma/period | Focus previous/next monitor |
 | Mod+Shift+comma/period | Move window to previous/next monitor |
@@ -127,6 +128,35 @@ navigation: Niri reserves Super+Alt+L for screen locking.
 | Shift+Print | Capture the focused monitor and open Satty for annotation |
 
 Ctrl+Alt+function keys are reserved for switching Linux virtual terminals.
+
+Copy and paste use Ctrl+C/V in ordinary apps and Ctrl+Shift+C/V in recognized
+terminals. Ctrl+C still interrupts terminal programs. Terminal copy uses the
+terminal's selection, including when a text editor runs inside it.
+
+Customize these shortcuts in `~/.config/shine/config.toml`; changes reload live
+after installing a compositor build that supports them. For example:
+
+```toml
+[bindings]
+"Mod+C" = { action = "none" } # Remove the default copy shortcut.
+"Mod+Insert" = { action = "copy" }
+"Mod+V" = { action = "paste" }
+
+[clipboard]
+copy = "Ctrl+C"
+paste = "Ctrl+V"
+terminal_copy = "Ctrl+Shift+C"
+terminal_paste = "Ctrl+Shift+V"
+```
+
+The optional `clipboard.terminal_app_ids` list replaces the built-in terminal
+IDs with exact, case-sensitive app IDs. Include all terminals you use when
+overriding it; `[]` sends ordinary app shortcuts everywhere. Window app IDs
+are visible in IPC `status`. The complete default list is in
+[`config.example.toml`](../nix/compositor/config.example.toml).
+Target shortcuts use explicit modifiers such as Ctrl and Shift; `Mod` is only
+for the incoming binding. Applications with other clipboard conventions need
+their own settings. These defaults apply to Shine sessions.
 
 Moving a window between workspaces keeps you on the current workspace. These
 moves stay on the current monitor and wrap between workspaces 1 and 4.
@@ -468,6 +498,8 @@ mise run compositor-integration
 python3 tools/tests/compositor_nesting.py
 python3 tools/tests/compositor_monitors.py
 python3 tools/tests/compositor_preferences.py
+python3 tools/tests/compositor_clipboard.py
+python3 tools/tests/compositor_clipboard.py super
 python3 tools/tests/compositor_movement.py
 python3 tools/tests/compositor_shadows.py
 nix build .#checks.x86_64-linux.compositor-drm
@@ -476,7 +508,33 @@ mise run compositor -- --scale 1.5 --close-after 10
 
 The integration task creates disposable Firefox, GTK editor, and terminal clients
 and checks rendering, input, scrolling, menus, clipboard, workspaces, and idle
-frames. It requires a running Niri or ohmansy desktop. Test input goes through a private
+frames. Automated compositor tests run on a private headless Wayland display by
+default, including direct Python invocations above. No test windows appear on
+your desktop. The runner starts Weston with its headless GL backend, an isolated
+Shine parent, and a private D-Bus session with temporary runtime and configuration
+directories. GPU rendering remains enabled. It needs no logged-in desktop and
+never falls back to a visible display if setup fails.
+
+Run an individual test through the runner, or opt into visible windows when
+you specifically want to watch it:
+
+```sh
+mise run compositor-test -- tools/tests/compositor_clipboard.py
+python3 tools/dev/compositor-test-display.py --visible -- python3 tools/tests/compositor_clipboard.py
+```
+
+The development shell supplies Weston and D-Bus; direct tests enter that shell
+automatically. Build the development compositor first with
+`mise run compositor-integration` if no binary exists. Interactive commands such
+as `mise run compositor-desktop` still open a visible preview.
+
+Headless display and activation-bus logs are saved in
+`.local/compositor-tests/headless-*/`; each trial keeps its usual screenshots
+and reports. Shared IPC, display guards, and input helpers live in
+`tools/tests/compositor_support.py`. Use `control.send_keys(...)` to make the
+destination compositor explicit. The runner registers each process group for
+cleanup as it starts, including descendants that outlive the group leader.
+Test input goes through a private
 control socket into the normal compositor handlers; `--test-input` enables this
 path and ignores physical input from the parent window during the trial.
 Artifacts stay in ignored `.local/compositor-tests/`.
@@ -492,6 +550,9 @@ animation disabling and cleanup. Window status exposes visual `geometry`, final
 `target_geometry`, and `moving` so these transitions can be inspected over IPC.
 The nesting trial checks real Wayland key forwarding between a Super host and
 a Super+Alt child, including focus changes and independent scale shortcuts.
+The clipboard trial checks Foot and Qt copy/paste, preserved Ctrl+C, live
+incoming and outgoing shortcut overrides, invalid-config recovery, and releases
+across a binding reload. Both modifier profiles have a trial invocation above.
 
 After building `nix build --out-link .local/compositor-session .#compositor-session`,
 `python3 tools/tests/compositor_session.py` checks the packaged nested session,

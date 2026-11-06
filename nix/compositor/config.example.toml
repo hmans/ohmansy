@@ -13,6 +13,15 @@ primary = true
 [input.keyboard]
 layout = "us"
 
+# Target shortcuts delivered to the focused app. Terminal IDs match exactly;
+# supplying a list replaces the defaults. An empty list treats all apps alike.
+[clipboard]
+copy = "Ctrl+C"
+paste = "Ctrl+V"
+terminal_copy = "Ctrl+Shift+C"
+terminal_paste = "Ctrl+Shift+V"
+terminal_app_ids = ["foot", "footclient", "org.codeberg.dnkl.foot", "Alacritty", "kitty", "com.mitchellh.ghostty", "org.wezfurlong.wezterm", "wezterm", "org.gnome.Terminal", "org.gnome.Console", "ohmansy-nested-client"]
+
 [input.touchpad]
 tap = true
 natural_scroll = true
@@ -36,6 +45,8 @@ color = [0.0, 0.0, 0.0, 0.35] # RGBA, each from 0 to 1
 # Mod is Super in a login and Super+Alt in a nested preview.
 # Omitted bindings keep their defaults. Use action="none" to remove one.
 [bindings]
+"Mod+C" = { action = "copy" }
+"Mod+V" = { action = "paste" }
 "Mod+E" = { action = "launch", program = "nautilus" }
 "Mod+Return" = { action = "terminal" }
 "Mod+Space" = { action = "launcher" }

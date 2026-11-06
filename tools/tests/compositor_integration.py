@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Exercise disposable native clients inside a Niri or ohmansy desktop.
+"""Exercise disposable native clients on an isolated headless Wayland desktop.
 
 All window operations target the test compositor's private socket. Keyboard
 events use a test-only path into the compositor's normal key handler. They do
 not touch the parent desktop's input devices. No terminal command text is typed.
-Original desktop window identities are checked after clean shutdown.
+The isolated parent's window identities are checked after clean shutdown.
 """
 import json
 import os
@@ -15,99 +15,10 @@ import tempfile
 import time
 from urllib.parse import quote
 
-ROOT = Path(__file__).resolve().parents[2]
-BINARY = ROOT / ".build/spatial/debug/ohmansy-compositor"
-TEST_CONTROL = None
-
-
-def send_keys(keycodes, modifiers=()):
-    assert TEST_CONTROL is not None
-    held = [{"ctrl": 29, "alt": 56, "shift": 42, "super": 125}[modifier] for modifier in modifiers]
-    for code in held:
-        TEST_CONTROL("key", code=code, pressed=True)
-    for code in keycodes:
-        TEST_CONTROL("key", code=code, pressed=True)
-        time.sleep(.05)
-        TEST_CONTROL("key", code=code, pressed=False)
-        time.sleep(.15)
-    for code in reversed(held):
-        TEST_CONTROL("key", code=code, pressed=False)
-    time.sleep(.1)
-
-
-def wait_for(function, timeout=15, description="condition"):
-    deadline = time.monotonic() + timeout
-    last_error = None
-    while time.monotonic() < deadline:
-        try:
-            result = function()
-            if result:
-                return result
-        except (OSError, ValueError, KeyError, AssertionError) as error:
-            last_error = error
-        time.sleep(0.1)
-    raise AssertionError(f"Timed out waiting for {description}: {last_error}")
-
-
-def parent_windows():
-    path = os.environ.get('OHMANSY_COMPOSITOR_CONTROL')
-    if path:
-        try:
-            state = Control(path)()
-            if state['wayland_display'] == Path(os.environ['WAYLAND_DISPLAY']).name:
-                return [{**window, 'pid': state['pid'], 'is_focused': window['focused']}
-                        for window in state['windows']]
-        except (OSError, ValueError, AssertionError):
-            pass
-        # A retained agent can outlive the login that supplied this path too.
-        os.environ.pop('OHMANSY_COMPOSITOR_CONTROL', None)
-    try:
-        return json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"], stderr=subprocess.PIPE))
-    except (OSError, subprocess.CalledProcessError):
-        # A long-lived agent may retain a previous desktop's environment after
-        # login. Find only the Shine server hosting the current Wayland socket.
-        runtime = Path(os.environ['XDG_RUNTIME_DIR'])
-        display = Path(os.environ['WAYLAND_DISPLAY']).name
-        matches = []
-        for path in runtime.glob('ohmansy-compositor-*.sock'):
-            try:
-                state = Control(path)()
-                if state['wayland_display'] == display:
-                    matches.append((path, state))
-            except (OSError, ValueError, AssertionError):
-                continue
-        if len(matches) != 1:
-            raise AssertionError('Cannot identify the compositor hosting the current Wayland display')
-        path, state = matches[0]
-        os.environ['OHMANSY_COMPOSITOR_CONTROL'] = str(path)
-        return [{**window, 'pid': state['pid'], 'is_focused': window['focused']}
-                for window in state['windows']]
-
-
-def focus_parent_window(ident):
-    path = os.environ.get('OHMANSY_COMPOSITOR_CONTROL')
-    if path:
-        Control(path)('focus', ident)
-    else:
-        subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(ident)], check=True, stdout=subprocess.DEVNULL)
-
-
-class Control:
-    def __init__(self, path):
-        self.path = str(path)
-
-    def __call__(self, action="status", value=None, **fields):
-        request = {"action": action, **fields}
-        if value is not None:
-            request["value"] = value
-        with socket.socket(socket.AF_UNIX) as connection:
-            connection.settimeout(5)
-            connection.connect(self.path)
-            connection.sendall(json.dumps(request).encode() + b"\n")
-            with connection.makefile("rb") as stream:
-                response = json.loads(stream.readline())
-        assert response["ok"], response
-        return response["state"]
+from compositor_support import (
+    BINARY, ROOT, Control, ensure_test_display, focus_parent_window, keys,
+    parent_windows, wait_for, window_for,
+)
 
 
 class Marionette:
@@ -143,10 +54,6 @@ class Marionette:
         return self.command("WebDriver:ExecuteScript", {"script": script, "args": [], "newSandbox": False, "sandbox": "default"})
 
 
-def window_for(control, app):
-    return next((window for window in control()["windows"] if window["app_id"] == app), None)
-
-
 def set_browser_cursor(browser, style):
     # Keep the cursor target over the entire viewport at every scale, including
     # empty page margins where Firefox would otherwise choose its own arrow.
@@ -161,20 +68,8 @@ def cursor_hidden(control):
                                                   and state['cursor_rendered_elements'] == 0)
 
 
-def keys(control, pid, window_id, keycodes, modifiers=(), gui_only=False):
-    state = control("focus", window_id)
-    assert state["pid"] == pid
-    focused = next(window for window in state["windows"] if window["id"] == state["focused"])
-    if gui_only:
-        assert focused["app_id"] in {"firefox", "org.gnome.TextEditor"}, focused
-    selection_updates = state["selection_updates"]
-    send_keys(keycodes, modifiers)
-    if "ctrl" in modifiers and 46 in keycodes:
-        wait_for(lambda: control()["selection_updates"] > selection_updates, description="clipboard publication")
-
-
 def run():
-    global TEST_CONTROL
+    ensure_test_display()
     os.chdir(ROOT)
     base = ROOT / ".local/compositor-tests"
     base.mkdir(parents=True, exist_ok=True)
@@ -183,7 +78,6 @@ def run():
     (artifacts / "parent-before.json").write_text(json.dumps(original))
     previous_focus = next((window["id"] for window in parent_windows() if window["is_focused"]), None)
     control = Control(artifacts / "control.sock")
-    TEST_CONTROL = control
     checks = []
     print(f"Artifacts: {artifacts}", flush=True)
     browser = None
@@ -299,10 +193,10 @@ def run():
 
             keys(control, process.pid, firefox["id"], [], gui_only=True)
             browser.script("document.querySelector('#choice').focus(); return true")
-            send_keys([57])
+            control.send_keys([57])
             wait_for(lambda: browser.script("return document.querySelector('#choice').matches(':open')"), timeout=5, description="browser dropdown")
             control("screenshot", path=str(artifacts / "popup.png"))
-            send_keys([108, 28])
+            control.send_keys([108, 28])
             wait_for(lambda: browser.script("return document.querySelector('#choice').selectedIndex") == 1, description="popup keyboard selection")
             wait_for(lambda: not browser.script("return document.querySelector('#choice').matches(':open')"), description="dropdown closing")
             time.sleep(.3)
@@ -314,14 +208,14 @@ def run():
             control("button", pressed=True)
             control("button", pressed=False)
             wait_for(lambda: browser.script("return document.querySelector('#choice').matches(':open')"), timeout=5, description="pointer dropdown opening")
-            send_keys([103, 28])
+            control.send_keys([103, 28])
             wait_for(lambda: browser.script("return document.querySelector('#choice').selectedIndex") == 0, description="pointer-opened dropdown selection")
 
             popup_events = control()["popup_events"]
             keys(control, process.pid, editor["id"], [68], gui_only=True)
             wait_for(lambda: control()["popup_events"] > popup_events, timeout=5, description="GTK native menu")
             assert control()["popup_grabs"] > 0
-            send_keys([1])
+            control.send_keys([1])
             wait_for(lambda: abs(control()["viewport"] - control()["viewport_target"]) < 1, description="editor viewport")
             editor_geometry = next(window for window in control()["windows"] if window["id"] == editor["id"])["geometry"]
             control("pointer", x=editor_geometry[0]+editor_geometry[2]/2, y=editor_geometry[1]+editor_geometry[3]/2)
@@ -333,11 +227,14 @@ def run():
             text = "browser clipboard check"
             control("focus", firefox["id"])
             browser.script(f"const field=document.querySelector('#clipboard');field.value={json.dumps(text)};field.focus();field.select();return true")
-            keys(control, process.pid, firefox["id"], [46], ("ctrl",), gui_only=True)
-            keys(control, process.pid, editor["id"], [30, 47, 30, 46], ("ctrl",), gui_only=True)
+            keys(control, process.pid, firefox["id"], [46], ("super", "alt"), gui_only=True)
+            keys(control, process.pid, editor["id"], [30], ("ctrl",), gui_only=True)
+            keys(control, process.pid, editor["id"], [47], ("super", "alt"), gui_only=True)
+            keys(control, process.pid, editor["id"], [30], ("ctrl",), gui_only=True)
+            keys(control, process.pid, editor["id"], [46], ("super", "alt"), gui_only=True)
             control("focus", firefox["id"])
             browser.script("const field=document.querySelector('#clipboard');field.value='';field.focus();return true")
-            keys(control, process.pid, firefox["id"], [47], ("ctrl",), gui_only=True)
+            keys(control, process.pid, firefox["id"], [47], ("super", "alt"), gui_only=True)
             wait_for(lambda: browser.script("return document.querySelector('#clipboard').value") == text, description="browser/editor clipboard round trip")
             keys(control, process.pid, editor["id"], [30], ("ctrl",), gui_only=True)
             keys(control, process.pid, editor["id"], [35, 18, 38, 38, 24], gui_only=True)
@@ -346,7 +243,7 @@ def run():
             browser.script("document.querySelector('#clipboard').focus();document.querySelector('#clipboard').select();return true")
             keys(control, process.pid, firefox["id"], [47], ("ctrl",), gui_only=True)
             wait_for(lambda: browser.script("return document.querySelector('#clipboard').value") == "hello", description="native GTK typing and copy")
-            checks.append("GUI typing and clipboard in both directions between GTK and Firefox")
+            checks.append("GUI typing, Super copy/paste and ordinary Ctrl clipboard shortcuts between GTK and Firefox")
 
             control("screenshot", path=str(artifacts / "desktop.png"))
             wait_for(lambda: (artifacts / "desktop.png").exists(), description="rendered desktop image")

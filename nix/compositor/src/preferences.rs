@@ -226,6 +226,8 @@ pub struct WindowRule {
 #[serde(tag = "action", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Action {
     None,
+    Copy,
+    Paste,
     FocusPrev,
     FocusNext,
     FocusNextWrap,
@@ -312,6 +314,8 @@ impl Action {
         use Action::*;
         let (name, value) = match self {
             None => return Ok(()),
+            Copy => return state.send_clipboard_shortcut(true),
+            Paste => return state.send_clipboard_shortcut(false),
             Screenshot { annotate } => return state.request_screenshot(Option::None, *annotate),
             Launch { program, args } => {
                 return crate::spawn_application(&state.socket_name, program, args)
@@ -369,7 +373,7 @@ fn lowercase(key: u32) -> u32 {
     }
 }
 impl Chord {
-    fn parse(text: &str, profile: ShortcutModifier) -> Result<Self, String> {
+    pub(crate) fn parse(text: &str, profile: ShortcutModifier) -> Result<Self, String> {
         let mut parts: Vec<_> = text.split('+').collect();
         let key = parts
             .pop()
@@ -412,6 +416,38 @@ impl Chord {
                 | (u8::from(mods.shift) * 8))
             && symbols.iter().any(|s| lowercase(*s) == self.key)
     }
+
+    pub(crate) fn resolve(
+        &self,
+        keymap: &xkb::Keymap,
+        layout: u32,
+    ) -> Option<(u32, ModifiersState)> {
+        // Prefer the active layout, then a layout containing the requested symbol.
+        // Only level zero is used: Shift is explicit in the configured chord.
+        for group in std::iter::once(layout).chain(0..keymap.num_layouts()) {
+            for code in keymap.min_keycode().raw()..=keymap.max_keycode().raw() {
+                if keymap
+                    .key_get_syms_by_level(code.into(), group, 0)
+                    .iter()
+                    .any(|symbol| lowercase(symbol.raw()) == self.key)
+                {
+                    let mut mods = ModifiersState {
+                        logo: self.modifiers & 1 != 0,
+                        alt: self.modifiers & 2 != 0,
+                        ctrl: self.modifiers & 4 != 0,
+                        shift: self.modifiers & 8 != 0,
+                        ..Default::default()
+                    };
+                    let mut state = xkb::State::new(keymap);
+                    let mask = mods.serialize_back(&state);
+                    state.update_mask(mask.depressed, 0, 0, 0, 0, group);
+                    mods.update_with(&state);
+                    return Some((code - 8, mods));
+                }
+            }
+        }
+        None
+    }
 }
 
 pub fn bindings(
@@ -420,6 +456,8 @@ pub fn bindings(
 ) -> Result<Vec<(Chord, Action)>, String> {
     use Action::*;
     let mut defaults = vec![
+        ("Mod+C".into(), Copy),
+        ("Mod+V".into(), Paste),
         ("Print".into(), Screenshot { annotate: false }),
         ("Mod+Shift+4".into(), Screenshot { annotate: false }),
         ("Ctrl+Print".into(), Screenshot { annotate: false }),
@@ -583,6 +621,8 @@ mod tests {
                     .map(|(_, a)| a)
             };
             assert!(matches!(action("Mod+Space"), Some(Action::Launcher)));
+            assert!(matches!(action("Mod+C"), Some(Action::Copy)));
+            assert!(matches!(action("Mod+V"), Some(Action::Paste)));
             assert!(matches!(action("Mod+Tab"), Some(Action::FocusNextWrap)));
             assert!(matches!(action("Mod+Right"), Some(Action::FocusNext)));
             assert!(matches!(

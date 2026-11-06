@@ -2,12 +2,44 @@
 data:
   area: nix
   kind: workflow
-  reviewed: "2026-11-05"
+  reviewed: "2026-11-06"
   status: current
 id: tnfw5
 title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
+
+## Shine universal clipboard shortcuts (2026-11-06)
+
+Shine defaults Mod+C/V to typed copy/paste actions. Ordinary apps receive
+Ctrl+C/V; exact terminal app IDs receive Ctrl+Shift+C/V. Incoming chords are
+customizable through `[bindings]`, with `action="none"` removing a default.
+`[clipboard]` configures the four outgoing chords and replaces the terminal
+app-ID list. All use the existing validated live TOML reload; effective settings
+appear in IPC status. See `nix/compositor/config.example.toml` and the compositor
+guide for configuration and the default terminal IDs.
+
+`clipboard.rs` resolves target keys through the seat's current XKB keymap,
+falling back to another configured layout for Latin shortcut symbols. It sends
+explicit modifiers, a paired key down/up, then the original serialized modifiers
+to the actual focused client's wl_keyboard resources. This does not mutate
+physical XKB or pressed-key state, inject a virtual keyboard, or intercept
+ordinary Ctrl+C. A target key already forwarded as held is left alone. Existing
+shortcut release tracking handles focus changes and binding reloads. Terminal
+copy uses the terminal selection, not a TUI editor's internal selection.
+
+The native dev binary and Nix compositor package built; the packaged binary
+validated the full example TOML. All 36 Rust tests, formatting and strict Clippy
+passed.
+The full Firefox/GTK integration passed Super clipboard round trips. The focused
+Foot/Qt trials passed both Super and Super+Alt profiles, custom incoming/outgoing
+mappings, preserved raw Ctrl+C and typing, invalid-config recovery, no synthetic
+repeat, and releases across focus changes/reloads. Existing real Wayland nesting
+and preference trials passed too; final trials preserved parent window IDs.
+Shine currently does not assign keyboard focus to layer-shell panels; panel text
+entry was not verified and is not added by this change. Shift+Insert in Foot
+pastes PRIMARY, not CLIPBOARD, unless the terminal binding is customized.
+No installed OS activation or login compositor restart was performed.
 
 Super+Tab column cycling (2026-11-05): Shine's `focus-next-wrap` action and
 default Mod+Tab binding advance in the active workspace's column order, wrapping

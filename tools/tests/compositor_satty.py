@@ -8,10 +8,11 @@ import subprocess
 import tempfile
 
 from PIL import Image
-import compositor_integration as trial
+import compositor_support as trial
 
 
 def run():
+    trial.ensure_test_display()
     root = trial.ROOT / '.local/compositor-tests'
     root.mkdir(parents=True, exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix='satty-', dir=root))
@@ -24,7 +25,6 @@ def run():
     (config / 'config.toml').write_text('[general]\nearly-exit = true\n')
     env = dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'))
     control = trial.Control(artifacts / 'control.sock')
-    trial.TEST_CONTROL = control
     original = {w['id']: w.get('pid') for w in trial.parent_windows()}
     with (artifacts / 'session.log').open('w') as log:
         process = subprocess.Popen(['dbus-run-session', '--', str(trial.BINARY),
@@ -39,7 +39,7 @@ def run():
             editor = trial.wait_for(lambda: trial.window_for(control, 'com.gabm.satty'),
                                     description='Satty editor')
             trial.wait_for(lambda: control()['keyboard_focus'] == editor['id'], description='Satty focus')
-            trial.send_keys([46], modifiers=['ctrl'])  # Satty's Copy action.
+            control.send_keys([46], modifiers=['ctrl'])  # Satty's Copy action.
             trial.wait_for(lambda: not trial.window_for(control, 'com.gabm.satty'),
                            description='Satty exits after Copy')
             clipboard_env = dict(env, WAYLAND_DISPLAY=control()['wayland_display'])

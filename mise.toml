@@ -25,6 +25,10 @@ run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh run --desktop"
 description = "Test disposable browser/editor clients in Shine"
 run = "OHMANSY_EXPERIMENT=compositor bash tools/dev/spatial.sh integration"
 
+[tasks.compositor-test]
+description = "Run a compositor test on a private headless display"
+run = "python3 tools/dev/compositor-test-display.py --"
+
 [tasks.compositor-session]
 description = "Preview the packaged Shine session"
 run = "nix run --no-update-lock-file .#compositor-session -- --nested"

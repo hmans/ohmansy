@@ -8,10 +8,11 @@ import tempfile
 import time
 
 from PIL import Image
-import compositor_integration as trial
+import compositor_support as trial
 
 
 def run():
+    trial.ensure_test_display()
     base = trial.ROOT / '.local/compositor-tests'
     base.mkdir(parents=True, exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix='shadows-', dir=base))

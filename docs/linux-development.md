@@ -77,6 +77,11 @@ authenticate, reboot, or shut down the machine. `nix run .#first-boot-preview`
 previews onboarding without creating accounts. The `ribbons` flake check tests
 both desktop OpenGL and ES on a software renderer; it does not replace a GPU test.
 
+Automated compositor tests use an isolated headless display by default, so their
+windows do not interrupt the desktop. See [headless test commands and logs](compositor-development.md#development).
+Use visible automation only when explicitly requested; interactive previews
+remain available for visual review.
+
 ### Iterate in the running desktop
 
 Apply requested desktop styling changes to the running session when supported,

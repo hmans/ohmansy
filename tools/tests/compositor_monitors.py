@@ -7,10 +7,11 @@ import subprocess
 import tempfile
 import tomllib
 import time
-from compositor_integration import BINARY, ROOT, Control, parent_windows, wait_for
+from compositor_support import BINARY, ROOT, Control, ensure_test_display, parent_windows, wait_for
 
 
 def main():
+    ensure_test_display()
     base = ROOT / '.local/compositor-monitors'
     base.mkdir(parents=True, exist_ok=True)
     base = Path(tempfile.mkdtemp(prefix='run-', dir=base))
