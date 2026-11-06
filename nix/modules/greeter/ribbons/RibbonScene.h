@@ -2,10 +2,16 @@
 #include <QQuickFramebufferObject>
 #include <QtQml/qqmlregistration.h>
 #include <cmath>
+#include <QVector2D>
+#include <QVector3D>
 
 class RibbonScene : public QQuickFramebufferObject {
     Q_OBJECT
     QML_ELEMENT
+    Q_PROPERTY(QVector2D lightDirection READ lightDirection WRITE setLightDirection NOTIFY lightingChanged)
+    Q_PROPERTY(float lightStrength READ lightStrength WRITE setLightStrength NOTIFY lightingChanged)
+    Q_PROPERTY(QVector3D lightHighlight READ lightHighlight WRITE setLightHighlight NOTIFY lightingChanged)
+    Q_PROPERTY(QVector3D lightShadow READ lightShadow WRITE setLightShadow NOTIFY lightingChanged)
     Q_PROPERTY(float elapsed READ elapsed WRITE setElapsed NOTIFY elapsedChanged)
     Q_PROPERTY(float lightMix READ lightMix WRITE setLightMix NOTIFY lightMixChanged)
     Q_PROPERTY(float renderScale READ renderScale WRITE setRenderScale NOTIFY renderScaleChanged)
@@ -16,6 +22,30 @@ class RibbonScene : public QQuickFramebufferObject {
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY statisticsChanged)
     Q_PROPERTY(double frameTime READ frameTime NOTIFY statisticsChanged)
 public:
+    QVector2D lightDirection() const { return m_lightDirection; }
+    float lightStrength() const { return m_lightStrength; }
+    QVector3D lightHighlight() const { return m_lightHighlight; }
+    QVector3D lightShadow() const { return m_lightShadow; }
+    void setLightDirection(QVector2D value) {
+        if (!std::isfinite(value.x()) || !std::isfinite(value.y())) return;
+        if (value.lengthSquared() > 1) value.normalize();
+        if (value == m_lightDirection) return;
+        m_lightDirection = value; emit lightingChanged(); update();
+    }
+    void setLightStrength(float value) {
+        if (!std::isfinite(value)) return;
+        value = qBound(0.f, value, 3.f);
+        if (value == m_lightStrength) return;
+        m_lightStrength = value; emit lightingChanged(); update();
+    }
+    void setLightHighlight(QVector3D value) {
+        if (value == m_lightHighlight) return;
+        m_lightHighlight = value; emit lightingChanged(); update();
+    }
+    void setLightShadow(QVector3D value) {
+        if (value == m_lightShadow) return;
+        m_lightShadow = value; emit lightingChanged(); update();
+    }
     explicit RibbonScene(QQuickItem *parent = nullptr) : QQuickFramebufferObject(parent) {
         setMirrorVertically(true);
         setSmooth(true);
@@ -76,6 +106,7 @@ public:
         m_fps = fps; m_frameTime = frameTime; emit statisticsChanged();
     }
 signals:
+    void lightingChanged();
     void elapsedChanged();
     void lightMixChanged();
     void renderScaleChanged();
@@ -85,6 +116,10 @@ signals:
     void failedChanged();
     void statisticsChanged();
 private:
+    QVector2D m_lightDirection = QVector2D(-0.70710678f, -0.70710678f);
+    float m_lightStrength = 1;
+    QVector3D m_lightHighlight = QVector3D(1, 1, 1);
+    QVector3D m_lightShadow;
     float m_elapsed = 12;
     float m_lightMix = 0;
     float m_renderScale = 1;

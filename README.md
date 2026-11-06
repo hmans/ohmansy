@@ -23,6 +23,11 @@ controls, network status, and system tray. Its QML files are in
 for both shells with the same shared components. The panel runs as a user
 service tied to the Niri session.
 
+Shine's **Desktop lighting** bar control aims a shared light with a draggable
+globe and adjusts its strength and colors. Frames, workspace buttons and animated
+ribbons respond together. Save the result to `[theme.lighting]` in Shine's
+`config.toml`; see [lighting settings](docs/compositor-development.md#frame-bevels-and-inset-shadows).
+
 Fish is the default interactive shell. Hosts and individual accounts can
 override the shell through the standard NixOS user options.
 

@@ -40,6 +40,10 @@ PanelWindow {
         source: active ? "Ribbons.qml" : ""
         onLoaded: {
             item.motionSpeed = 0.15;
+            item.lightDirection = Qt.binding(() => Qt.vector2d(Lighting.direction[0], Lighting.direction[1]));
+            item.lightStrength = Qt.binding(() => Lighting.strength);
+            item.lightHighlight = Qt.binding(() => Qt.vector3d(...Lighting.highlight));
+            item.lightShadow = Qt.binding(() => Qt.vector3d(...Lighting.shadow));
             // Reduce shader pixels while preserving window size and cadence.
             item.renderScale = Qt.binding(() => WallpaperQuality.renderScale);
             item.particleLayers = Qt.binding(() => WallpaperQuality.particleLayers);

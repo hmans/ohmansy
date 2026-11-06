@@ -7,9 +7,9 @@ void main() {
     vec3 n = normalize(normal);
     vec3 view = normalize(vec3(0, 0, 4.5) - world);
     if (dot(n, view) < 0.0) n = -n;
-    vec3 light = normalize(vec3(-0.4, 0.8, 1.4));
-    float diffuse = max(dot(n, light), 0.0);
-    float specular = pow(max(dot(n, normalize(light + view)), 0.0), 60.0);
+    vec3 light = desktopLight();
+    float diffuse = max(dot(n, light), 0.0) * lightStrength;
+    float specular = pow(max(dot(n, normalize(light + view)), 0.0), 60.0) * lightStrength;
     float fresnel = pow(1.0 - max(dot(n, view), 0.0), 3.0);
     const vec3 palette[3] = vec3[3](vec3(0.20, 0.50, 0.83), vec3(0.47, 0.26, 0.69), vec3(0.12, 0.57, 0.57));
     const vec3 dayPalette[3] = vec3[3](vec3(0.53, 0.73, 0.90), vec3(0.77, 0.64, 0.87), vec3(0.49, 0.76, 0.73));
@@ -25,6 +25,8 @@ void main() {
     vec3 dayColor = dayTint * (0.69 + diffuse * (0.23 + silk * 0.08));
     dayColor += vec3(0.94, 0.96, 1.0) * (specular * 0.16 + fresnel * 0.09 + edge * 0.09);
     color = mix(color, dayColor, lightMix);
+    color *= mix(vec3(1.0), lightHighlight, clamp(diffuse * 0.55, 0.0, 1.0));
+    color = mix(color, lightShadow, clamp(max(-dot(n, light), 0.0) * lightStrength * 0.35, 0.0, 1.0));
     vec2 screenUV = vec2(gl_FragCoord.x, size.y - gl_FragCoord.y) / size;
     color *= 1.0 - mix(0.38, 0.055, lightMix) * smoothstep(0.30, 0.73, length(screenUV - 0.5));
     float alpha = mix(0.63 + edge * 0.20 + fresnel * 0.12, 0.84 + edge * 0.08 + fresnel * 0.06, lightMix);

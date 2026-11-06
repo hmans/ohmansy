@@ -2,12 +2,7 @@
 let
   # Ship exactly the source needed to evaluate this release, including its lock.
   # A store-path pin also supports offline first boot and unpublished test builds.
-  source = pkgs.runCommand "ohmansy-release" {} ''
-    mkdir -p "$out"
-    cp ${../../flake.nix} "$out/flake.nix"
-    cp ${../../flake.lock} "$out/flake.lock"
-    cp -r ${../.} "$out/nix"
-  '';
+  source = import ./release-source.nix { inherit pkgs; };
   template = pkgs.writeText "installed-flake.nix" (builtins.replaceStrings
     [ "@SOURCE@" "@SYSTEM@" ] [ (toString source) pkgs.stdenv.hostPlatform.system ]
     (builtins.readFile ./installation/flake.nix.in));

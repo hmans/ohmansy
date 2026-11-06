@@ -118,6 +118,19 @@ color=[0.0,0.0,0.0,0.5]
                 reversed_light = edges(capture(f'southeast-{glass}'))
                 assert reversed_light['top'] < 98 and reversed_light['bottom'] > 108, reversed_light
                 assert reversed_light['inner_top'] > 108 and reversed_light['inner_bottom'] < 98, reversed_light
+                central = dict(direction=[-.7,-.7], strength=0,
+                    highlight_color=[1,1,1], shadow_color=[0,0,0])
+                control('configure-lighting', lighting=central)
+                assert edges(capture(f'central-zero-{glass}')) == baseline, 'Zero theme strength left a bevel'
+                control('configure-lighting', lighting=dict(central, strength=1.5))
+                central_lit = edges(capture(f'central-northwest-{glass}'))
+                assert central_lit['top'] > central_lit['bottom']+30, central_lit
+                control('configure-lighting', lighting=dict(central, direction=[0,0], strength=2))
+                assert edges(capture(f'central-front-{glass}')) == baseline, 'Frontal light chose an arbitrary bevel direction'
+                control('configure-lighting', lighting=dict(central, strength=2, highlight_color=[1,0,0]))
+                colored = capture(f'central-colored-{glass}')
+                red,green,blue = pixel(colored,100,0)
+                assert red > green+20 and green == blue, (red,green,blue)
                 configure(glass=glass,bevel=True,width=0,inner_width=0)
                 assert edges(capture(f'zero-width-{glass}')) == baseline
                 configure(glass=glass,inset=True)
@@ -162,7 +175,7 @@ color=[0.0,0.0,0.0,0.5]
                 except (OSError,ValueError,AssertionError,subprocess.TimeoutExpired):
                     process.terminate()
                     process.wait(timeout=5)
-    print('PASS: northwest/southeast lighting, curved/inner bevels, app-content inset shadows, live settings, scale and idle')
+    print('PASS: shared direction/strength/colors, northwest/southeast lighting, curved/inner bevels, app-content inset shadows, live settings, scale and idle')
 
 
 if __name__ == '__main__':

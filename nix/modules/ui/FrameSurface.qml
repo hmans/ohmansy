@@ -51,8 +51,10 @@ Item {
             property real interaction: surface.interaction
             property vector2d bevel_widths: surface.bevel.enabled === false ? Qt.vector2d(0, 0)
                 : Qt.vector2d(surface.bevel.width ?? 1.5, surface.bevel.inner_width ?? 1.0)
-            property vector2d bevel_strength: Qt.vector2d(surface.bevel.highlight ?? 0.20, surface.bevel.shadow ?? 0.18)
-            property vector2d light_direction: Qt.vector2d(surface.bevel.light_direction?.[0] ?? -1, surface.bevel.light_direction?.[1] ?? -1)
+            property vector2d bevel_strength: Qt.vector2d((surface.bevel.highlight ?? 0.20) * Lighting.strength, (surface.bevel.shadow ?? 0.18) * Lighting.strength)
+            property vector2d light_direction: Qt.vector2d(Lighting.direction[0], Lighting.direction[1])
+            property vector3d light_highlight: Qt.vector3d(...Lighting.highlight)
+            property vector3d light_shadow: Qt.vector3d(...Lighting.shadow)
             property real inner_radius: surface.frameSettings.inner_corner_radius ?? 8
             fragmentShader: Qt.resolvedUrl("shaders/frame-surface.frag.qsb")
         }

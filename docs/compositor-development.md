@@ -688,7 +688,12 @@ width = 1.5
 inner_width = 1.0
 highlight = 0.20
 shadow = 0.18
-light_direction = [-1.0, -1.0]
+
+[theme.lighting]
+direction = [-0.70710678, -0.70710678]
+strength = 1.0
+highlight_color = [1.0, 1.0, 1.0]
+shadow_color = [0.0, 0.0, 0.0]
 
 [decorations.frame.inset_shadow]
 enabled = false
@@ -700,9 +705,25 @@ color = [0.0, 0.0, 0.0, 0.22]
 
 Widths use logical pixels and accept fractions. Bevel widths accept 0–16;
 highlight and shadow strengths accept 0–1. Zero width disables that bevel.
-`light_direction` points toward the light in screen coordinates: negative X is
-left, negative Y is up. Components accept −1 to 1; the vector must be nonzero
-and is normalized automatically. `[1.0, 1.0]` moves the light to the southeast.
+`theme.lighting` supplies one light to window frames, workspace buttons and the
+animated wallpaper. Direction uses screen coordinates: negative X is left,
+negative Y is up. It must lie inside the unit disk. `[0, 0]` lights from straight
+ahead; points near the rim produce grazing light. Strength accepts 0–3; zero
+removes directional lighting. Highlight and shadow colors are RGB values from
+0–1. Frame highlight/shadow settings remain material-specific multipliers.
+The optional inset shadow retains its own color and offset.
+
+Click **Desktop lighting** in the bar to open the globe. Drag to aim, use the
+strength slider or choose Neutral, Warm or Cool colors. Arrow keys move the
+focused globe, and Home centers the light. Edits apply immediately; **Save**
+writes the theme section to `config.toml` without rewriting other preferences.
+Errors, including concurrent file edits, appear in the control. Unsaved edits
+last until a config reload or session exit. This requires the updated compositor
+and shell; it can be tested together in a disposable preview.
+
+Existing `decorations.frame.bevel.light_direction` values remain supported and
+normalized when the theme section is absent. Once `theme.lighting` is supplied,
+it takes precedence and becomes the source shared by all three renderers.
 
 The optional inset shadow is cast inward **over app content**, making the app
 look recessed beneath its frame. Shine draws a separate translucent overlay

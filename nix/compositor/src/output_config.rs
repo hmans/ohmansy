@@ -100,6 +100,8 @@ pub struct OutputRule {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Settings {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<crate::theme::Theme>,
     #[serde(default, skip_serializing_if = "crate::preferences::is_default")]
     pub browser: crate::preferences::Browser,
     #[serde(default, skip_serializing_if = "crate::preferences::is_default")]
@@ -136,9 +138,25 @@ impl Settings {
         settings.decorations.inactive.clamp();
         settings.validate()?;
         settings.validate_preferences()?;
+        settings.resolve_lighting();
         Ok(settings)
     }
+    pub fn resolve_lighting(&mut self) {
+        self.decorations.frame.lighting = self.theme.as_ref().map(|t| t.lighting.clone());
+    }
+    pub fn effective_theme(&self) -> crate::theme::Theme {
+        self.theme.clone().unwrap_or_else(|| {
+            let mut theme = crate::theme::Theme::default();
+            let [x, y] = self.decorations.frame.bevel.light_direction;
+            let length = x.hypot(y);
+            theme.lighting.direction = [x / length, y / length];
+            theme
+        })
+    }
     fn validate_preferences(&self) -> Result<(), String> {
+        if let Some(theme) = &self.theme {
+            theme.lighting.validate()?;
+        }
         self.browser.validate()?;
         self.clipboard.validate()?;
         self.decorations.validate()?;
@@ -366,6 +384,30 @@ impl ConfigFile {
         self.saved = Some(contents);
         Ok(())
     }
+    pub fn save_theme(&mut self, theme: &crate::theme::Theme) -> Result<(), String> {
+        if self.read()? != self.saved {
+            return Err("Configuration changed on disk; reload it before saving".into());
+        }
+        let mut document = self
+            .saved
+            .as_deref()
+            .unwrap_or("")
+            .parse::<toml_edit::DocumentMut>()
+            .map_err(|e| e.to_string())?;
+        let replacement = toml::to_string(&Settings {
+            theme: Some(theme.clone()),
+            ..Settings::default()
+        })
+        .map_err(|e| e.to_string())?
+        .parse::<toml_edit::DocumentMut>()
+        .map_err(|e| e.to_string())?;
+        document["theme"] = replacement["theme"].clone();
+        let contents = document.to_string();
+        atomic_write(&self.path, &contents)?;
+        self.observed = Some(contents.clone());
+        self.saved = Some(contents);
+        Ok(())
+    }
 }
 /// Live commands currently change outputs only. Keep all handwritten preference
 /// sections intact and update output values without losing their comments.
@@ -528,6 +570,54 @@ pub fn edid_identity(name: &str, bytes: &[u8]) -> (String, String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn central_lighting_validation_and_resolution() {
+        let settings = Settings::parse(
+            "[theme.lighting]\ndirection=[0.0,0.0]\nstrength=2.0\nhighlight_color=[1.0,0.8,0.5]",
+        )
+        .unwrap();
+        let light = settings.decorations.frame.lighting.unwrap();
+        assert_eq!(light.direction, [0.0, 0.0]);
+        assert_eq!(light.strength, 2.0);
+        assert!(Settings::parse("")
+            .unwrap()
+            .decorations
+            .frame
+            .lighting
+            .is_none());
+        for invalid in [
+            "direction=[1.0,1.0]",
+            "strength=-1.0",
+            "strength=nan",
+            "shadow_color=[1.1,0.0,0.0]",
+        ] {
+            assert!(Settings::parse(&format!("[theme.lighting]\n{invalid}")).is_err());
+        }
+    }
+    #[test]
+    fn lighting_save_preserves_preferences_and_rejects_external_edits() {
+        let path =
+            std::env::temp_dir().join(format!("shine-lighting-test-{}.toml", std::process::id()));
+        let original =
+            "# personal desktop\n[layout]\ngap=24 # keep this\n[decorations.frame]\nwidth=9\n";
+        std::fs::write(&path, original).unwrap();
+        let mut file = ConfigFile::new(path.clone());
+        file.saved = Some(original.into());
+        let theme = crate::theme::Theme::default();
+        file.save_theme(&theme).unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("# personal desktop"));
+        assert!(saved.contains("gap=24 # keep this"));
+        assert_eq!(Settings::parse(&saved).unwrap().decorations.frame.width, 9);
+        assert_eq!(Settings::parse(&saved).unwrap().theme.unwrap(), theme);
+        std::fs::write(&path, "# edited elsewhere\n").unwrap();
+        assert!(file.save_theme(&theme).is_err());
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "# edited elsewhere\n"
+        );
+        std::fs::remove_file(path).unwrap();
+    }
     #[test]
     fn full_example_and_preference_validation() {
         let settings = Settings::parse(include_str!("../config.example.toml")).unwrap();

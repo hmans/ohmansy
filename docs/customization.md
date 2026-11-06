@@ -75,6 +75,36 @@ build with `nixos-rebuild boot`, and reboot when ready. Keep the previous
 generation available in the boot menu. After reboot, check `nvidia-smi` and
 press **5** in btop for the GPU panel.
 
+## Install OBS Studio
+
+For the optional NixOS app layer and home-directory selection, see
+[app layers and switch commands](../nix/apps/README.md).
+
+ohmansy provides PipeWire audio, desktop screen-capture portals, graphics
+support, and Flatpak with a per-user Flathub remote. OBS remains optional:
+
+```sh
+flatpak install --user flathub com.obsproject.Studio
+flatpak run com.obsproject.Studio
+```
+
+Alternatively, add `pkgs.obs-studio` to `environment.systemPackages` in your
+local NixOS preferences and rebuild as described below. OBS and its package
+supply the application libraries; no separate system-wide FFmpeg installation
+is needed for ordinary recording.
+
+In OBS, use the PipeWire screen-capture source and the system picker to share a
+display or window. The desktop supplies microphone and desktop audio through
+PipeWire's PulseAudio compatibility service. Verify a short recording with both
+video and audio before streaming. Hardware encoding depends on the GPU, its
+driver and the installed OBS build; graphics support alone does not verify it.
+
+Shine currently uses shared-memory capture and defaults to a 30 FPS limit.
+See [screen-sharing support and verification](compositor-development.md#screen-sharing).
+OBS's optional virtual-camera output requires separate `v4l2loopback` kernel
+configuration; it is not required for recording or streaming and is not enabled
+by default.
+
 ## Add or remove optional software
 
 For example, create a `preferences.nix` module:

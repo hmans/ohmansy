@@ -89,11 +89,30 @@ int main(int argc, char **argv) {
             if (frame == light) qFatal("Particle motion uniform did not update");
             scene->setParticleLayers(3);
             scene->setParticleMotionDetail(1);
-        } else {
+        } else if (step == 11) {
             if (scene->renderSize() != QSize(480, 300)) qFatal("Uniforms changed the framebuffer size");
             if (frame != dark) qFatal("Particle fidelity round trip changed the scene");
+            scene->setLightDirection(QVector2D(0.7, 0.7));
+        } else if (step == 12) {
+            if (frame == dark) qFatal("Light direction did not change the scene");
+            light = frame;
+            scene->setLightStrength(0);
+        } else if (step == 13) {
+            if (frame == light) qFatal("Light strength did not change the scene");
+            scene->setLightStrength(2);
+            light = frame;
+            scene->setLightHighlight(QVector3D(1, 0.4, 0.1));
+            scene->setLightShadow(QVector3D(0.05, 0.1, 0.2));
+        } else if (step == 14) {
+            if (frame == light) qFatal("Colored lighting did not change the scene");
+            scene->setLightDirection(QVector2D(-0.70710678f, -0.70710678f));
+            scene->setLightStrength(1);
+            scene->setLightHighlight(QVector3D(1, 1, 1));
+            scene->setLightShadow(QVector3D(0, 0, 0));
+        } else {
+            if (frame != dark) qFatal("Lighting round trip changed the scene");
             qInfo() << (es ? "ES" : "Desktop GL")
-                    << "ribbons: palettes, motion, resize, live resolution/particle uniforms, and GL checks passed";
+                    << "ribbons: palettes, motion, resize, fidelity, shared lighting and GL checks passed";
             app.quit();
         }
         ++step;

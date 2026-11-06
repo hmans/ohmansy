@@ -25,6 +25,7 @@ mod screenshot;
 mod shader_reload;
 mod state;
 mod tasks;
+mod theme;
 mod window_policy;
 mod winit;
 mod xwayland;

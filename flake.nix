@@ -57,6 +57,7 @@
         modules = [ ./nix/profiles/live-nvidia.nix ];
       };
       desktopPackages = pkgs: {
+        ohmansy-apply = import ./nix/modules/apply-package.nix { inherit pkgs; };
         compositor = import ./nix/modules/compositor-package.nix { inherit pkgs; };
         compositor-session = import ./nix/modules/compositor-session-package.nix { inherit pkgs; };
         mise = pkgs.callPackage ./nix/modules/mise-package.nix { };
@@ -128,6 +129,7 @@
         imports = [ ./nix/modules/software.nix ];
         nixpkgs.overlays = [ self.overlays.default ];
       };
+      nixosModules.apps = import ./nix/apps;
       nixosModules.vm = import ./nix/modules/vm.nix;
       nixosModules.nvidia = import ./nix/modules/nvidia.nix;
       nixosModules.firstBoot = import ./nix/modules/first-boot.nix;

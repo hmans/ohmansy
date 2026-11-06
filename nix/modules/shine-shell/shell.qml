@@ -18,6 +18,64 @@ ShellRoot {
     id: root
     property var state: ({ outputs: [] })
     property var requests: []
+    property string lightingOutput: ""
+    readonly property bool lightingOpen: lightingOutput !== ""
+    function toggleLighting(output) {
+        lightingOutput = lightingOpen ? "" : (output || state.active_output || Quickshell.screens[0]?.name || "");
+    }
+    property string lightingError: ""
+    property bool lightingSaved: false
+    IpcHandler {
+        target: "lighting"
+        function toggle(): void { root.toggleLighting(""); }
+        function status(): string { return JSON.stringify({ opened: root.lightingOpen, settings: Lighting.settings, error: root.lightingError, saved: root.lightingSaved }); }
+    }
+    Binding { target: Lighting; property: "settings"; value: root.state.preferences?.theme?.lighting || ({}) }
+    function configureLighting(settings, save) {
+        // Coalesce drag events while retaining the final save operation.
+        requests = requests.filter(r => r.action !== "configure-lighting" || r.save).concat([
+            { action: "configure-lighting", lighting: settings, save: save }]);
+        lightingError = "";
+        lightingSaved = false;
+        if (!control.connected) control.connected = true;
+    }
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            id: lightingPanel
+            required property var modelData
+            screen: modelData
+            readonly property bool opened: root.lightingOutput === modelData.name
+            anchors { top: true; bottom: true; left: true; right: true }
+            exclusiveZone: 0
+            color: "transparent"
+            mask: Region { item: lightingPanel.opened ? lightingInteraction : null }
+            WlrLayershell.namespace: "ohmansy-lighting"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            Item {
+                id: lightingInteraction
+                anchors.fill: parent
+                visible: lightingPanel.opened
+                MouseArea { anchors.fill: parent; onClicked: root.lightingOutput = "" }
+                GlassSurface {
+                    anchors { right: parent.right; top: parent.top; rightMargin: 14; topMargin: 52 }
+                    width: Math.min(340, parent.width - 28)
+                    height: Math.min(510, parent.height - 66)
+                    tint: Theme.solidSurface
+                    MouseArea { anchors.fill: parent }
+                    LightingControl {
+                        id: lightingForm
+                        anchors { fill: parent; margins: 24 }
+                        error: root.lightingError
+                        saved: root.lightingSaved
+                        onEdited: (settings, save) => root.configureLighting(settings, save)
+                        Keys.onEscapePressed: root.lightingOutput = ""
+                    }
+                }
+            }
+        }
+    }
     property string screenshotMessage: ""
     property string screenshotTitle: ""
     property double screenshotResult: 0
@@ -95,10 +153,12 @@ ShellRoot {
     }
     Socket {
         id: control
+        property bool savingLighting: false
         readonly property string controlPath: Quickshell.env("OHMANSY_COMPOSITOR_CONTROL")
         path: controlPath.startsWith("/") ? controlPath : Quickshell.env("PWD") + "/" + controlPath
         onConnectedChanged: if (connected) {
             const request = root.requests.length ? root.requests[0] : { action: "status" };
+            savingLighting = request.action === "configure-lighting" && request.save;
             if (root.requests.length) root.requests = root.requests.slice(1);
             write(JSON.stringify(request) + "\n");
             flush();
@@ -107,8 +167,8 @@ ShellRoot {
             onRead: data => {
                 try {
                     const reply = JSON.parse(data);
-                    if (reply.ok) root.state = reply.state;
-                    else console.warn("Shine:", reply.error);
+                    if (reply.ok) { root.state = reply.state; if (control.savingLighting) root.lightingSaved = true; }
+                    else { root.lightingError = reply.error; console.warn("Shine:", reply.error); }
                 } catch (error) { console.warn("Shine:", error); }
                 control.connected = false;
                 if (root.requests.length) Qt.callLater(() => control.connected = true);
@@ -238,6 +298,11 @@ ShellRoot {
                     checkable: true
                     checked: notifications.historyOutput === bar.modelData.name
                     onClicked: notifications.historyOutput = notifications.historyOutput ? "" : bar.modelData.name
+                }
+                BarIcon {
+                    text: "Desktop lighting"
+                    icon.name: "display-brightness-symbolic"
+                    onClicked: root.toggleLighting(bar.modelData.name)
                 }
                 BarIcon {
                     text: "Light mode"

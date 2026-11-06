@@ -6,5 +6,5 @@ let
     text = ''exec python3 ${./updates/update.py} "$@"'';
   };
 in {
-  environment.systemPackages = [ update ];
+  environment.systemPackages = [ update (import ./apply-package.nix { inherit pkgs; }) ];
 }

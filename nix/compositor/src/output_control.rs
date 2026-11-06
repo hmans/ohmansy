@@ -107,6 +107,24 @@ impl Smallvil {
     }
     pub fn output_request(&mut self, action: &str, request: &Value) -> Result<(), String> {
         match action {
+            "configure-lighting" => {
+                let lighting: crate::theme::Lighting =
+                    serde_json::from_value(request["lighting"].clone())
+                        .map_err(|e| format!("Invalid lighting: {e}"))?;
+                lighting.validate()?;
+                let theme = crate::theme::Theme { lighting };
+                if request["save"].as_bool().unwrap_or(false) {
+                    self.config_file
+                        .as_mut()
+                        .ok_or("No configuration path")?
+                        .save_theme(&theme)?;
+                }
+                self.output_settings.theme = Some(theme);
+                self.output_settings.resolve_lighting();
+                self.config_revision += 1;
+                self.needs_redraw = true;
+                Ok(())
+            }
             "reload-config" => {
                 let result = self.read_output_config(true);
                 if let Err(e) = &result {

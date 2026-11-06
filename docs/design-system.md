@@ -63,6 +63,15 @@ colors and the small active marker for legibility and selection beyond color.
 The compact surface is translucent; cross-window backdrop blur remains a
 compositor effect. Other shared buttons retain their existing `GlassSurface`.
 
+`theme.lighting` owns the desktop light's direction, strength, highlight RGB and
+shadow RGB. Shine supplies it to the shared `Lighting` singleton; workspace
+materials and the ribbon wallpaper consume those values directly. Bevel widths
+and highlight/shadow multipliers describe the frame material, independently of
+the light source. Keep screen coordinates consistent: x right, y down, with the
+unit disk representing the visible hemisphere. The globe supports dragging,
+arrow keys and Home; its Save action persists lighting without replacing other
+preferences.
+
 Desktop notifications use `Ohmansy.Notifications`, shared by Shine and Niri.
 Their cards and history panel use `GlassSurface`, `GlassButton`, and `Theme`
 directly, so their font, corners, surfaces, and action roles stay consistent.

@@ -119,6 +119,13 @@ panel or wallpaper over the first. No logout or compositor restart is needed.
 Afterward, checkout QML reloads on save. This is a runtime preview: the installed
 session wrapper will use its packaged shell again at the next login until updated.
 
+Shine's launcher shortcut also selects Quickshell by its QML path. Replacing the
+shell with checkout QML does not update the running compositor's launcher helper.
+If clicking **ohmansy** works but Mod+Space fails, compare the helper's QML path
+with the running shell's path. Check `ipc call launcher status` against both
+paths before changing keyboard bindings. Keep their IPC routing aligned during
+live replacement; restarting the compositor is unnecessary.
+
 For an isolated Shine preview, `mise run compositor-desktop` already points the
 shell at checkout QML. See [Shine development](compositor-development.md).
 

@@ -15,6 +15,8 @@ layout(std140, binding = 0) uniform buf {
     vec2 bevel_widths;
     vec2 bevel_strength;
     vec2 light_direction;
+    vec3 light_highlight;
+    vec3 light_shadow;
     float inner_radius;
 };
 // The build copies the native frame's functions here, without its standalone

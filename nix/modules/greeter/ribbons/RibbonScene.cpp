@@ -24,6 +24,10 @@ public:
         owner = static_cast<RibbonScene *>(item);
         elapsed = owner->elapsed();
         lightMix = owner->lightMix();
+        lightDirection = owner->lightDirection();
+        lightStrength = owner->lightStrength();
+        lightHighlight = owner->lightHighlight();
+        lightShadow = owner->lightShadow();
         particleLayers = owner->particleLayers();
         particleMotionDetail = owner->particleMotionDetail();
         if (renderScale != owner->renderScale()) {
@@ -123,6 +127,10 @@ private:
         program.setUniformValue("size", QVector2D(size.width(), size.height()));
         program.setUniformValue("time", elapsed);
         program.setUniformValue("lightMix", lightMix);
+        program.setUniformValue("lightDirection", lightDirection);
+        program.setUniformValue("lightStrength", lightStrength);
+        program.setUniformValue("lightHighlight", lightHighlight);
+        program.setUniformValue("lightShadow", lightShadow);
     }
     void initialize() {
         attempted = true;
@@ -190,6 +198,9 @@ private:
     GLuint indices = 0;
     float elapsed = 12;
     float lightMix = 0;
+    QVector2D lightDirection;
+    float lightStrength = 1;
+    QVector3D lightHighlight, lightShadow;
     float renderScale = 1;
     int particleLayers = 3;
     float particleMotionDetail = 1;

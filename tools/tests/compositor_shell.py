@@ -28,7 +28,7 @@ def run():
     def layers_ready():
         return all(o['work_area'][1] == 44 and
                    {layer['namespace'] for layer in o['layers']} ==
-                   {'ohmansy-shine-bar', 'ohmansy-wallpaper', 'ohmansy-screenshot-result', 'ohmansy-launcher', 'ohmansy-notifications'} and
+                   {'ohmansy-shine-bar', 'ohmansy-wallpaper', 'ohmansy-screenshot-result', 'ohmansy-launcher', 'ohmansy-notifications', 'ohmansy-lighting'} and
                    all(layer['geometry'] and layer['geometry'][2] > 0 and layer['geometry'][3] > 0
                        for layer in o['layers'])
                    for o in control()['outputs'])
@@ -85,6 +85,65 @@ def run():
             paused = capture('paused-first').crop((80, 80, 600, 500))
             time.sleep(.4)
             assert not ImageChops.difference(paused, capture('paused-next').crop((80, 80, 600, 500))).getbbox(), 'Pause kept moving'
+            # Freeze motion so changing pixels prove the shared lighting reached
+            # the wallpaper, rather than merely advancing its animation.
+            def lighting(function):
+                result = subprocess.check_output(['quickshell', 'ipc', '--pid', str(shell.pid),
+                    'call', 'lighting', function], env=environment, text=True)
+                return json.loads(result) if result.strip() else None
+            changed = dict(direction=[0.6, 0.6], strength=2,
+                           highlight_color=[1, .7, .4], shadow_color=[.03, .05, .1])
+            control('configure-lighting', lighting=changed)
+            trial.wait_for(lambda: lighting('status')['settings'].get('strength') == 2 and
+                           abs(lighting('status')['settings']['direction'][0] - .6) < .0001,
+                           description='shared shell lighting')
+            time.sleep(.4)
+            relit = capture('shared-lighting').crop((80,80,600,500))
+            assert ImageChops.difference(paused, relit).getbbox(), 'Wallpaper ignored the shared light'
+            lighting('toggle')
+            trial.wait_for(lambda: lighting('status')['opened'], description='lighting globe panel')
+            time.sleep(.4)
+            target = next(o for o in control()['outputs'] if o['focused'])
+            x, y = target['position']
+            control('pointer', x=x+target['logical_size'][0]-184, y=y+207)
+            control('button', pressed=True)
+            control('button', pressed=False)
+            trial.wait_for(lambda: control()['preferences']['theme']['lighting']['direction'] != changed['direction'],
+                           description='globe drag updates compositor')
+            control.send_keys([102])  # Home: aim straight ahead.
+            trial.wait_for(lambda: control()['preferences']['theme']['lighting']['direction'] == [0,0],
+                           description='keyboard globe controls')
+            control.send_keys([106])  # Right arrow.
+            trial.wait_for(lambda: control()['preferences']['theme']['lighting']['direction'][0] > .06)
+            def panel_click(px, py):
+                control('pointer', x=x+target['logical_size'][0]+px, y=y+py)
+                control('button', pressed=True)
+                control('button', pressed=False)
+            panel_click(-169, 407)  # Warm preset.
+            trial.wait_for(lambda: abs(control()['preferences']['theme']['lighting']['highlight_color'][1] - .84) < .001,
+                           description='lighting color preset')
+            control('pointer', x=x+target['logical_size'][0]-152, y=y+363)
+            control('button', pressed=True)
+            control('pointer', x=x+target['logical_size'][0]-220, y=y+363)
+            control('button', pressed=False)
+            trial.wait_for(lambda: control()['preferences']['theme']['lighting']['strength'] < 1.9,
+                           description='lighting strength slider')
+            capture('lighting-control')
+            panel_click(-64, 521)  # Save the actual UI's edited values.
+            trial.wait_for(lambda: lighting('status')['saved'], description='lighting Save button')
+            assert '[theme.lighting]' in config.read_text()
+            lighting('toggle')
+            control('configure-lighting', lighting=dict(direction=[-.70710678,-.70710678], strength=1,
+                highlight_color=[1,1,1], shadow_color=[0,0,0]), save=True)
+            assert '[theme.lighting]' in config.read_text()
+            assert '[animations]' in config.read_text(), 'Saving lighting removed unrelated settings'
+            control('reload-config')
+            try:
+                control('configure-lighting', lighting=dict(changed, direction=[1,1]))
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError('Invalid light direction was accepted')
             wallpaper('pause', 'false')
             time.sleep(.5)
             assert ImageChops.difference(paused, capture('resumed').crop((80, 80, 600, 500))).getbbox(), 'Resume stayed frozen'
@@ -133,7 +192,12 @@ def run():
             trial.wait_for(lambda: launcher_status()['opened'], description='brand opens launcher')
             time.sleep(.5)  # Wait for the mapped launcher's keyboard focus.
             control.send_keys([24, 25, 18, 49, 57, 20, 18, 19, 50, 23, 49, 30, 38])  # open terminal
-            trial.wait_for(lambda: launcher_status()['selected'] == 'desktop:terminal')
+            try:
+                trial.wait_for(lambda: launcher_status()['selected'] == 'desktop:terminal')
+            except AssertionError:
+                capture('launcher-input-failure')
+                print('Launcher input:', launcher_status(), 'Lighting:', lighting('status'), flush=True)
+                raise
             control.send_keys([28])
             trial.wait_for(lambda: len(control()['windows']) == 2, description='launcher terminal')
             assert next(w for w in control()['windows'] if w['id'] != window['id'])['output'] == second['name']
@@ -251,7 +315,7 @@ def run():
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
     print('PASS: animated wallpapers, image override, software fallback, foot transparency, two panels, reserved space, '
-          'runtime fidelity, validation, pause/resume, light/dark bar text, workspace/launcher clicks, keyboard focus, fullscreen, scale, clean shell exit '
+          'runtime fidelity, shared lighting globe/keyboard/presets/slider/save, validation, pause/resume, light/dark bar text, workspace/launcher clicks, keyboard focus, fullscreen, scale, clean shell exit '
           'and parent windows preserved')
 
 

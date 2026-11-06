@@ -2,6 +2,16 @@
 uniform vec2 size;
 uniform float time;
 uniform float lightMix;
+uniform vec2 lightDirection;
+uniform float lightStrength;
+uniform vec3 lightHighlight;
+uniform vec3 lightShadow;
+
+vec3 desktopLight() {
+    // Wallpaper world y points up; theme coordinates point down.
+    return normalize(vec3(lightDirection.x, -lightDirection.y,
+        sqrt(max(0.0, 1.0 - dot(lightDirection, lightDirection))) + 0.001));
+}
 uniform int ribbonId;
 uniform int particleLayers;
 uniform float particleMotionDetail;

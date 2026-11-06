@@ -125,7 +125,7 @@ pub fn start(event_loop: &EventLoop<CalloopData>, path: PathBuf) -> Result<Serve
                     }
                 } else if matches!(
                     action,
-                    "configure-outputs" | "reload-config" | "save-config"
+                    "configure-outputs" | "configure-lighting" | "reload-config" | "save-config"
                 ) {
                     data.state.output_request(action, &request)
                 } else if action == "status" {

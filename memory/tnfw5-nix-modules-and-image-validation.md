@@ -7,6 +7,44 @@ data:
 id: tnfw5
 title: Nix modules and image validation
 ---
+## Shared desktop lighting (2026-11-06)
+
+`theme.lighting` centralizes a screen-space light for Shine frames, workspace
+buttons and animated ribbons: direction is a point in the unit disk (x right,
+y down, center facing the viewer), strength is 0–3, and highlight/shadow colors
+are RGB 0–1. Frame bevel widths and highlight/shadow multipliers remain material
+properties; inset-shadow color/offset stay independent. Absent a theme section,
+the legacy normalized frame bevel direction supplies the effective theme.
+
+`theme.rs` validates the model; Settings resolves it into the frame material
+without serializing the internal resolved copy. IPC `configure-lighting` accepts
+`lighting` and optional `save`. Saving atomically merges only the theme section,
+preserving other preferences/comments and rejecting external edits. It does
+not activate an OS generation. Config reload restores saved values.
+
+Quickshell's `Lighting` singleton receives effective preferences from Shine.
+`FrameSurface` shares native bevel functions and colors; RibbonScene receives
+live uniforms through its render-thread synchronization, including updates
+while motion is paused. Ribbon world Y is inverted from screen coordinates.
+The light adds no backdrop capture pass; normal rendering remains GPU shaders.
+
+The bar's Desktop lighting action opens a compact overlay panel on that output,
+with a draggable hemisphere, keyboard Home/arrows, strength slider, color
+presets, explicit Save, and visible save/error feedback. Its always-mapped,
+transparent layer has an empty input mask and no keyboard focus while closed.
+Use an explicit Slider implicitHeight when replacing its background/handle:
+otherwise it can paint visibly with a zero-height pointer area. Tests exercise
+real controls, not just compositor IPC.
+
+Verified: 61 Rust tests, fmt/strict Clippy, Git-backed compositor-session build,
+packaged example validation, private frame pixel tests (solid/glass, shared
+strength/direction/colors, legacy behavior, scales/inset/idle), and full private
+Quickshell interaction/shell tests. The ribbons Nix check passed both desktop
+GL and OpenGL ES, including lighting round trips. Automated rendering used
+llvmpipe; these results do not establish hardware rendering or native-session
+activation. This Rust feature requires a new preview compositor or planned
+login, while the running compositor and app windows remain untouched.
+
 ## Shine window frames replace halos and focus rings (2026-11-06)
 
 `decorations.frame` defaults to 7 logical px sides/bottom and a 30 px top edge.

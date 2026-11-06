@@ -313,6 +313,8 @@ fn inactive_duration<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Resul
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Frame {
+    #[serde(skip)]
+    pub lighting: Option<crate::theme::Lighting>,
     pub enabled: bool,
     pub width: u32,
     pub titlebar_height: u32,
@@ -334,6 +336,7 @@ pub struct Frame {
 impl Default for Frame {
     fn default() -> Self {
         Self {
+            lighting: None,
             enabled: true,
             width: 7,
             titlebar_height: 30,
