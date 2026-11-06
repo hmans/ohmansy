@@ -31,7 +31,7 @@ in {
       color-scheme = "prefer-dark";
       cursor-theme = cursor.name;
       cursor-size = lib.gvariant.mkInt32 cursor.size;
-      font-name = lib.mkDefault "Inter 11";
+      font-name = lib.mkDefault "Source Sans 3 11";
     };
   }];
   # NixOS enables speech synthesis for graphical desktops by default, pulling
@@ -60,22 +60,22 @@ in {
       SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="3434", TAG+="uaccess"
     '';
   }) ];
-  fonts.packages = with pkgs; [ inter jetbrains-mono ibm-plex ];
-  fonts.fontconfig.defaultFonts.sansSerif = lib.mkDefault [ "Inter" ];
+  fonts.packages = with pkgs; [ inter source-sans jetbrains-mono ibm-plex ];
+  fonts.fontconfig.defaultFonts.sansSerif = lib.mkDefault [ "Source Sans 3" ];
   fonts.fontconfig.localConf = ''
     <alias binding="same">
       <family>system-ui</family>
-      <prefer><family>Inter</family></prefer>
+      <prefer><family>Source Sans 3</family></prefer>
     </alias>
   '';
   # Chromium and Electron obtain their system-ui family from GTK settings.
   environment.etc."xdg/gtk-3.0/settings.ini".text = ''
     [Settings]
-    gtk-font-name=Inter 11
+    gtk-font-name=Source Sans 3 11
   '';
   environment.etc."xdg/gtk-4.0/settings.ini".text = ''
     [Settings]
-    gtk-font-name=Inter 11
+    gtk-font-name=Source Sans 3 11
   '';
 
   # No account, credentials, machine identifiers, or personal services here.

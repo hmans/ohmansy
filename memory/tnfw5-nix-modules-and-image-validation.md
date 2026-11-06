@@ -9,9 +9,21 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
-## Browser interface font defaults (2026-11-06)
+## Source Sans browser font defaults (2026-11-06)
 
-`desktop.nix` defaults Fontconfig sans-serif to Inter, aliases system-ui to
+Source Sans 3 is the accepted browser/application system-ui default, replacing
+the Inter defaults from `6dd3bf1`: desktop.nix adds source-sans
+3.052 and changes Fontconfig/GTK/dconf defaults to Source Sans 3 (GTK size 11).
+The QML shell retains Inter. The user approved the Source Sans 3 trial.
+Native customization check passed. Real Chromium on the private Wayland test
+display reported SourceSans3-Regular for system-ui via CDP platform fonts;
+its separate sans-serif preference still reported Liberation Sans. The user
+trial has the same defaults, with Inter settings backed up first. No browser
+restart or system activation was performed during verification.
+
+## Earlier Inter browser interface defaults (2026-11-06)
+
+Before Source Sans 3, `desktop.nix` defaulted Fontconfig sans-serif to Inter, aliased system-ui to
 Inter, and supplies Inter 11 through GTK 3/4 settings and the dconf interface
 font default. Chromium/Electron system-ui follows GTK; `fc-match system-ui`
 alone does not prove a browser rendered that family. Browser-specific generic
