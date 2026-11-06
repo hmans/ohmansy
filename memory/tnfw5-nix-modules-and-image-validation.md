@@ -9,6 +9,42 @@ title: Nix modules and image validation
 ---
 # Official Ohmansy configuration
 
+## Shine unfocused window effects (2026-11-06)
+
+Shine defaults to 0.985 visual scale, 0.85 saturation and 0.05 neutral fog for
+unfocused windows, with a reversible 160 ms transition. Live TOML controls are
+under `decorations.inactive`; see `docs/compositor-development.md`. The effect
+uses the layout-selected app, so desktop overlays do not mute the selected app.
+Fullscreen windows are exempt. Client sizes and layout slots do not change.
+
+`inactive.rs` shares the transition and inverse transform with pointer input.
+`scene.rs` transforms window surfaces, popups and decorations before output
+clipping. The rounded texture shader applies premultiplied-alpha color muting;
+its mask follows the visual transform. Uniform changes invalidate cached mask
+identities so static clients repaint. Settled transitions repaint their exact
+endpoint once and then stop scheduling frames. `grabs/scaled_click.rs` updates
+the implicit click grab's coordinates during focus animation and beyond window
+bounds; existing popup and drag grabs retain their ownership.
+
+Individual-window capture remains unscaled and unmuted; embedded cursor
+coordinates use the inverse transform. Whole-output capture includes the effect.
+
+Verification: 41 Rust tests, formatting, strict Clippy and the packaged session
+build passed. Private headless inactive-window pixel/input/drag/reversal/reload/
+idle trials passed at 100–200% display scaling, as did existing corner, shadow
+and movement trials. The real private PipeWire portal trial passed isolated
+window colors, popups, resize, hidden-workspace animation and display capture.
+The packaged session headless login/launcher/logout trial passed using an
+ignored wrapper that selects the packaged D-Bus session config explicitly:
+this machine's system session.conf is an empty stub. No OS activation or login
+compositor replacement was performed. A separate interactive preview was
+closed after the user clarified that remaining verification must stay headless.
+
+Long checkout paths exceed Linux's Unix-socket path limit. The shared test
+Control helper uses a private temporary directory alias for long socket paths,
+keeping the actual socket with its test artifacts. The movement fixture pins
+its expected ring color instead of assuming a historical desktop default.
+
 ## Shine GPU synchronization (2026-11-06)
 
 Shine waits for implicit DMA-BUF write fences before applying surface commits.

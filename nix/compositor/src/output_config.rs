@@ -552,6 +552,12 @@ mod tests {
             "[decorations.shadow]\ncolor=[0.0,0.0,0.0,1.1]",
             "[decorations.shadow]\ncolor=[0.0,nan,0.0,0.5]",
             "[decorations.shadow]\nunknown=true",
+            "[decorations.inactive]\nscale=0.79",
+            "[decorations.inactive]\nscale=nan",
+            "[decorations.inactive]\nsaturation=1.1",
+            "[decorations.inactive]\nfog=-0.1",
+            "[decorations.inactive]\nfog_color=[0.0,nan,0.0]",
+            "[decorations.inactive]\nduration_ms=5001",
         ] {
             assert!(Settings::parse(invalid).is_err(), "{invalid}");
         }
