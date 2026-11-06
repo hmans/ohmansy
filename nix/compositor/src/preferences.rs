@@ -123,6 +123,7 @@ pub struct Decorations {
     pub focus_ring_width: u32,
     pub focus_ring_color: [f32; 4],
     pub shadow: Shadow,
+    pub inactive: Inactive,
 }
 impl Default for Decorations {
     fn default() -> Self {
@@ -131,6 +132,7 @@ impl Default for Decorations {
             focus_ring_width: 2,
             focus_ring_color: [0.55, 0.50, 0.62, 0.75],
             shadow: Shadow::default(),
+            inactive: Inactive::default(),
         }
     }
 }
@@ -148,7 +150,48 @@ impl Decorations {
         {
             return Err("Focus ring color needs four RGBA values from 0 to 1".into());
         }
+        self.inactive.validate()?;
         self.shadow.validate()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Inactive {
+    pub enabled: bool,
+    pub scale: f64,
+    pub saturation: f32,
+    pub fog: f32,
+    pub fog_color: [f32; 3],
+    pub duration_ms: u32,
+}
+impl Default for Inactive {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            scale: 0.985,
+            saturation: 0.85,
+            fog: 0.05,
+            fog_color: [0.5, 0.5, 0.55],
+            duration_ms: 160,
+        }
+    }
+}
+impl Inactive {
+    fn validate(&self) -> Result<(), String> {
+        if !self.scale.is_finite()
+            || !(0.8..=1.0).contains(&self.scale)
+            || self.duration_ms > 5000
+            || [self.saturation, self.fog]
+                .iter()
+                .chain(self.fog_color.iter())
+                .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err(
+                "Inactive scale must be 0.8–1, colors and strength 0–1, duration 0–5000 ms".into(),
+            );
+        }
+        Ok(())
     }
 }
 

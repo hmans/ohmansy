@@ -26,6 +26,8 @@ default_column_width={{pixels=200}}
 [animations]
 enabled={str(enabled).lower()}
 duration_ms={duration}
+[decorations]
+focus_ring_color=[0.67,0.57,0.78,1.0]
 ''')
         temporary.replace(config)
 

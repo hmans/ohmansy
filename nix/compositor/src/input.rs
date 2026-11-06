@@ -76,6 +76,27 @@ impl Smallvil {
         let keyboard = self.seat.get_keyboard().unwrap();
 
         let serial = SERIAL_COUNTER.next_serial();
+        let scaled_click = if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
+            self.window_under(pointer.current_location())
+                .and_then(|(window, location)| {
+                    use smithay::wayland::shell::wlr_layer::Layer;
+                    if self
+                        .layer_under(pointer.current_location(), &[Layer::Overlay, Layer::Top])
+                        .is_some()
+                    {
+                        return None;
+                    }
+                    let (_, origin) = self.surface_under(pointer.current_location())?;
+                    let local = self
+                        .window_input_point(window, pointer.current_location() - location.to_f64());
+                    Some((
+                        window.clone(),
+                        local - (pointer.current_location() - origin),
+                    ))
+                })
+        } else {
+            None
+        };
 
         if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
             use smithay::wayland::shell::wlr_layer::Layer;
@@ -119,6 +140,22 @@ impl Smallvil {
                 time,
             },
         );
+        if let Some((window, surface_offset)) = scaled_click {
+            if let Some(start_data) = pointer.grab_start_data() {
+                // Replace only the implicit click grab; clients may have installed
+                // their own popup or drag grab before this button arrived.
+                pointer.set_grab(
+                    self,
+                    crate::grabs::scaled_click::ScaledClickGrab {
+                        start_data,
+                        window,
+                        surface_offset,
+                    },
+                    serial,
+                    smithay::input::pointer::Focus::Keep,
+                );
+            }
+        }
         pointer.frame(self);
     }
 

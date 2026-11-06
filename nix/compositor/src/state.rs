@@ -31,6 +31,7 @@ use crate::layout::WindowId;
 use crate::CalloopData;
 
 pub struct Smallvil {
+    pub inactive: crate::inactive::Effects,
     pub image_capture: crate::image_capture::CaptureState,
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
@@ -145,6 +146,7 @@ impl Smallvil {
         let loop_signal = event_loop.get_signal();
 
         Self {
+            inactive: Default::default(),
             image_capture: crate::image_capture::CaptureState::new(&dh),
             start_time,
             display_handle: dh.clone(),
@@ -288,8 +290,9 @@ impl Smallvil {
         self.layer_under(pos, &[Layer::Overlay, Layer::Top])
             .or_else(|| {
                 self.window_under(pos).and_then(|(window, location)| {
-                    self.window_surface_at(window, pos - location.to_f64())
-                        .map(|(s, p)| (s, (p + location).to_f64()))
+                    let local = self.window_input_point(window, pos - location.to_f64());
+                    self.window_surface_at(window, local)
+                        .map(|(s, p)| (s, pos - (local - p.to_f64())))
                 })
             })
             .or_else(|| self.layer_under(pos, &[Layer::Bottom, Layer::Background]))
@@ -303,8 +306,11 @@ impl Smallvil {
                 return None;
             }
             let location = self.space.element_location(window)? - window.geometry().loc;
-            self.window_surface_at(window, pos - location.to_f64())
-                .map(|_| (window, location))
+            self.window_surface_at(
+                window,
+                self.window_input_point(window, pos - location.to_f64()),
+            )
+            .map(|_| (window, location))
         })
     }
 
@@ -722,7 +728,7 @@ impl Smallvil {
                 });
                 let geometry = self.layout.geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
                 let target_geometry = self.layout.target_geometries().into_iter().find(|geometry| geometry.0 == *id).map(|(_, x, y, w, h)| (x,y,w,h));
-                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"target_geometry":target_geometry,"moving":layout.is_some_and(|l| l.is_moving(*id)),"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
+                serde_json::json!({"id":id,"title":metadata.title,"app_id":metadata.app_id,"output":owner.map(|i|&self.layout.monitors[i].name),"workspace":workspace.map(|i| i + 1),"width":width,"buffer_scale":scale,"render_density":density,"logical_buffer_size":size,"surface_size":surface_size,"geometry":geometry,"target_geometry":target_geometry,"moving":layout.is_some_and(|l| l.is_moving(*id)),"inactive_amount":self.inactive_amount(*id),"visual_scale":self.window_visual_scale(*id),"client_geometry":[client_geometry.loc.x,client_geometry.loc.y,client_geometry.size.w,client_geometry.size.h],"popups":popups,"focused":self.layout.focused()==Some(*id)})
             })
         }).collect();
         let keyboard_focus = self
