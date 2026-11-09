@@ -19,7 +19,9 @@ toml = "0.8"
 toml_edit = "0.22"
 bitflags = "2.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-smithay = { version = "=0.7.0", default-features = false, features = ["backend_winit", "wayland_frontend", "desktop", "backend_drm", "backend_gbm", "backend_libinput", "backend_udev", "backend_session_libseat"] }
+# Pixman is used only for cursor-buffer format/scale conversion before KMS
+# scanout. Both desktop backends continue to render with GlesRenderer.
+smithay = { version = "=0.7.0", default-features = false, features = ["backend_winit", "wayland_frontend", "desktop", "backend_drm", "backend_gbm", "backend_libinput", "backend_udev", "backend_session_libseat", "renderer_pixman"] }
 xcursor = "0.3"
 winit = { version = "0.30", default-features = false, features = ["wayland", "wayland-dlopen", "rwh_06"] }
 

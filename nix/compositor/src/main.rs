@@ -2,6 +2,8 @@
 
 mod client_scale;
 mod clipboard;
+#[cfg(test)]
+mod cursor_tests;
 mod decoration;
 mod desktop;
 mod frame_lighting;
@@ -394,6 +396,17 @@ fn main() -> Result<()> {
     }
     // Launch requests must not race satellite readiness and inherit no DISPLAY.
     let _control = ipc::start(&event_loop, control_path.clone())?;
+    if backend == "winit" && std::env::var_os("OHMANSY_SHINE_DEV_SESSION").is_some() {
+        // Update only the private preview bus, never the systemd user manager.
+        let status = std::process::Command::new("dbus-update-activation-environment")
+            .args(["WAYLAND_DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_CONFIG_HOME"])
+            .env("WAYLAND_DISPLAY", &data.state.socket_name)
+            .status()?;
+        anyhow::ensure!(
+            status.success(),
+            "Could not set preview D-Bus activation environment"
+        );
+    }
     if !client.is_empty() {
         let child = std::process::Command::new(&client[0])
             .args(&client[1..])

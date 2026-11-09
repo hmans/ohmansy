@@ -72,6 +72,36 @@ unit disk representing the visible hemisphere. The globe supports dragging,
 arrow keys and Home; its Save action persists lighting without replacing other
 preferences.
 
+`theme.palette` owns three RGB seeds: Atmosphere for background, neutral glass
+and inactive frames; Accent for focus, selection and the dominant ribbon;
+Companion for a contrasting ribbon. Shine derives shared OKLab tones with
+controlled lightness and chroma, reducing chroma into the sRGB gamut without
+shifting hue. `theme.color_intensity` (0–1, default 0.65) controls muted/vivid
+color while preserving lightness. The wallpaper keeps each ribbon's hue;
+texture varies brightness and highlights use the atmosphere's pale sheen.
+The `DesktopPalette` singleton animates these shared material colors, preserving
+configured glass alpha. Without a palette, configured frame colors remain active.
+Legacy primary/secondary/accent palettes migrate to accent/atmosphere/companion
+when loaded and save with the explicit role names.
+Use that singleton rather than QtQuick's unrelated `Palette` widget-role type.
+The lighting dropdown contains six curated theme cards directly, each with a
+name, three swatches and a selected checkmark. Theme selection preserves light
+settings; one Save persists lighting, colors, intensity and blur. Manual palettes appear as Custom. Keep the
+full color editor and submenu out of this flow.
+Curate contrasting hues and values within each palette. Theme selection and the
+checkmark update immediately; frame, workspace and ribbon colors share a
+1000 ms ease-in-out fade. Retarget from the displayed colors and respect the
+global animation setting and `theme.transition_duration_ms` (zero snaps).
+The dropdown's Backdrop blur slider adjusts terminal content and frame glass
+together (0–64 logical pixels; default 32). Config files can set them separately
+with `decorations.terminal_blur.radius` and `decorations.frame.glass.blur_radius`.
+Zero disables content blur; the terminal app ID policy still controls eligibility.
+Theme cards use generous rounded surfaces, overlapping color discs and 14 px
+semibold names. Their 84 px height and selected outline/badge make them easier
+to scan and click. Use FrameSurface and Theme's card material tokens so their
+bevel and grain follow the desktop light; hover and press scale feedback honors
+the global animation setting.
+
 Desktop notifications use `Ohmansy.Notifications`, shared by Shine and Niri.
 Their cards and history panel use `GlassSurface`, `GlassButton`, and `Theme`
 directly, so their font, corners, surfaces, and action roles stay consistent.

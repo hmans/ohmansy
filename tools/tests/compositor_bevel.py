@@ -131,6 +131,15 @@ color=[0.0,0.0,0.0,0.5]
                 colored = capture(f'central-colored-{glass}')
                 red,green,blue = pixel(colored,100,0)
                 assert red > green+20 and green == blue, (red,green,blue)
+                control('configure-lighting', lighting=central)
+                theme_palette = dict(primary=[1,.2,0], secondary=[0,1,0], accent=[0,0,1])
+                control('configure-palette', palette=theme_palette, save=True)
+                themed = capture(f'palette-frame-{glass}')
+                assert all(abs(a-b) <= 1 for a,b in zip(pixel(themed,100,10), (178,36,0))), 'Primary color missed the active frame'
+                assert pixel(themed,100,100) == (17,34,51), 'Palette changed client contents'
+                assert control()['preferences']['theme']['lighting']['strength'] == 0, 'Palette reset the light'
+                control('configure-lighting', lighting=dict(central, strength=1))
+                assert all(abs(a-b)<.0001 for a,b in zip(control()['preferences']['theme']['palette']['primary'], [1,.2,0])), 'Lighting edits reset the palette'
                 configure(glass=glass,bevel=True,width=0,inner_width=0)
                 assert edges(capture(f'zero-width-{glass}')) == baseline
                 configure(glass=glass,inset=True)

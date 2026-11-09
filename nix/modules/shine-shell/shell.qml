@@ -28,9 +28,34 @@ ShellRoot {
     IpcHandler {
         target: "lighting"
         function toggle(): void { root.toggleLighting(""); }
-        function status(): string { return JSON.stringify({ opened: root.lightingOpen, settings: Lighting.settings, error: root.lightingError, saved: root.lightingSaved }); }
+        function status(): string { return JSON.stringify({ opened: root.lightingOpen, settings: Lighting.settings, palette: DesktopPalette.settings,
+            displayedPalette: { primary: DesktopPalette.primary, secondary: DesktopPalette.secondary, accent: DesktopPalette.accent },
+            displayedFrame: [DesktopPalette.frameColor.r, DesktopPalette.frameColor.g, DesktopPalette.frameColor.b],
+            materials: DesktopPalette.materials, intensity: DesktopPalette.intensity,
+            transitioning: DesktopPalette.transitioning, theme: DesktopPalette.currentName, error: root.lightingError, saved: root.lightingSaved }); }
     }
     Binding { target: Lighting; property: "settings"; value: root.state.preferences?.theme?.lighting || ({}) }
+    Binding { target: DesktopPalette; property: "settings"; value: root.state.preferences?.theme?.palette || null }
+    Binding { target: DesktopPalette; property: "materialSettings"; value: root.state.preferences?.theme_materials || null }
+    Binding { target: DesktopPalette; property: "presets"; value: root.state.preferences?.theme_presets || null }
+    Binding { target: DesktopPalette; property: "intensity"; value: root.state.preferences?.theme?.color_intensity ?? 0.65 }
+    Binding { target: DesktopPalette; property: "transitionDuration"; value: root.state.preferences?.theme?.transition_duration_ms ?? 1000 }
+    Binding { target: DesktopPalette; property: "animationsEnabled"; value: root.state.preferences?.animations?.enabled !== false }
+    Binding { target: DesktopPalette; property: "legacyFrame"; value: root.state.preferences?.decorations?.frame?.active_color || [81/255,64/255,95/255] }
+    Binding { target: DesktopPalette; property: "legacyInactive"; value: root.state.preferences?.decorations?.frame?.inactive_color || [37/255,40/255,53/255] }
+    function configureAppearance(action, values) {
+        requests = requests.filter(r => r.action !== action || r.save).concat([Object.assign({ action: action }, values)]);
+        lightingError = "";
+        lightingSaved = false;
+        if (!control.connected) control.connected = true;
+    }
+    function configurePalette(palette, save) {
+        requests = requests.filter(r => r.action !== "configure-palette" || r.save).concat([
+            { action: "configure-palette", palette: palette, save: save }]);
+        lightingError = "";
+        lightingSaved = false;
+        if (!control.connected) control.connected = true;
+    }
     function configureLighting(settings, save) {
         // Coalesce drag events while retaining the final save operation.
         requests = requests.filter(r => r.action !== "configure-lighting" || r.save).concat([
@@ -60,16 +85,22 @@ ShellRoot {
                 MouseArea { anchors.fill: parent; onClicked: root.lightingOutput = "" }
                 GlassSurface {
                     anchors { right: parent.right; top: parent.top; rightMargin: 14; topMargin: 52 }
-                    width: Math.min(340, parent.width - 28)
-                    height: Math.min(510, parent.height - 66)
+                    width: Math.min(380, parent.width - 28)
+                    height: Math.min(720, parent.height - 66)
                     tint: Theme.solidSurface
                     MouseArea { anchors.fill: parent }
                     LightingControl {
                         id: lightingForm
+                        frameSettings: root.state.preferences?.decorations?.frame || ({})
+                        animationsEnabled: root.state.preferences?.animations?.enabled !== false
                         anchors { fill: parent; margins: 24 }
                         error: root.lightingError
                         saved: root.lightingSaved
+                        blurRadius: root.state.preferences?.decorations?.terminal_blur?.radius ?? 32
                         onEdited: (settings, save) => root.configureLighting(settings, save)
+                        onPaletteEdited: palette => root.configurePalette(palette, false)
+                        onIntensityEdited: value => root.configureAppearance("configure-theme", { color_intensity: value })
+                        onBlurEdited: radius => root.configureAppearance("configure-blur", { radius: radius })
                         Keys.onEscapePressed: root.lightingOutput = ""
                     }
                 }
@@ -135,6 +166,7 @@ ShellRoot {
         }
     }
     onStateChanged: {
+        if (state.pid) Qt.callLater(() => DesktopPalette.ready = true);
         const shot = state.screenshot;
         if (shot && shot.id !== screenshotResult) {
             screenshotResult = shot.id;
@@ -158,7 +190,7 @@ ShellRoot {
         path: controlPath.startsWith("/") ? controlPath : Quickshell.env("PWD") + "/" + controlPath
         onConnectedChanged: if (connected) {
             const request = root.requests.length ? root.requests[0] : { action: "status" };
-            savingLighting = request.action === "configure-lighting" && request.save;
+            savingLighting = (request.action === "configure-lighting" || request.action === "configure-palette") && request.save;
             if (root.requests.length) root.requests = root.requests.slice(1);
             write(JSON.stringify(request) + "\n");
             flush();
@@ -177,7 +209,12 @@ ShellRoot {
     }
     Timer { interval: 250; running: true; repeat: true; triggeredOnStart: true; onTriggered: if (!control.connected) control.connected = true }
     SystemClock { id: clock; precision: SystemClock.Minutes }
+    IpcHandler {
+        target: "wallpaperDiagnostics"
+        function status(): string { return JSON.stringify(wallpapers.instances.map(item => item.diagnostics())); }
+    }
     Variants {
+        id: wallpapers
         model: Quickshell.screens
         WallpaperWindow {
             required property var modelData

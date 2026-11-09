@@ -177,6 +177,8 @@ impl Native {
             }
             let head = self.heads.remove(i);
             data.state.output_info.remove(&head.output.name());
+            self.decorations.frost.remove_output(&head.output.name());
+            data.state.cursor_plane_outputs.remove(&head.output.name());
             data.state.space.unmap_output(&head.output);
             data.display_handle.remove_global::<Smallvil>(head.global);
         }
@@ -273,7 +275,9 @@ impl Native {
                     .iter()
                     .copied(),
                 self.drm.cursor_size(),
-                None,
+                // Supplying GBM enables DrmCompositor's cursor-plane buffers;
+                // the frame flag alone cannot activate a disabled cursor path.
+                Some(self.gbm.clone()),
             )?;
             let output = Output::new(
                 name.clone(),
@@ -414,7 +418,11 @@ impl Native {
                 &mut self.renderer,
                 &elements,
                 [0.035, 0.035, 0.055, 1.0],
-                FrameFlags::empty(),
+                // Let KMS move the pointer without repainting the desktop.
+                // Keep application scanout disabled so frame and color effects
+                // still pass through the compositor. Smithay falls back to
+                // compositing cursors that the hardware plane cannot display.
+                FrameFlags::ALLOW_CURSOR_PLANE_SCANOUT,
             ) {
                 Ok(result) => result,
                 Err(error) if head.mode != original_mode => {
@@ -423,6 +431,7 @@ impl Native {
                 }
                 Err(error) => return Err(error.into()),
             };
+            let cursor_plane = result.cursor_element.is_some();
             head.dirty = false;
             if !result.is_empty {
                 // KMS cannot always wait on the renderer's fence (for example,
@@ -444,6 +453,9 @@ impl Native {
             } else {
                 state.send_output_frames(&head.output);
             }
+            state
+                .cursor_plane_outputs
+                .insert(head.output.name(), cursor_plane);
         }
         state.popups.cleanup();
         Ok(())

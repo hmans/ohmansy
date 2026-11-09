@@ -40,6 +40,11 @@ default_column_width = { proportion = 0.62 }
 [decorations]
 corner_radius = 14
 
+[decorations.terminal_blur]
+enabled = true
+radius = 32 # Logical pixels (0–64); zero disables terminal blur
+# app_ids = ["foot", "my-terminal"] # Replaces the built-in terminal list
+
 [decorations.frame]
 enabled = true
 width = 7 # Sides and bottom, logical pixels (1–16)
@@ -58,9 +63,13 @@ inactive_color = [0.145098, 0.156863, 0.207843, 0.40]
 
 [decorations.frame.glass]
 enabled = true
-blur_radius = 12
+blur_radius = 32
 opacity = 0.9
 noise = 0.025
+
+[theme]
+transition_duration_ms = 1000 # Palette fade, 0 disables (0–5000)
+color_intensity = 0.65 # 0 = muted, 1 = vivid; preserves hue and lightness
 
 [theme.lighting]
 # Visible hemisphere: x right, y down, center [0,0] faces the viewer.
@@ -68,6 +77,11 @@ direction = [-0.70710678, -0.70710678]
 strength = 1.0 # 0–3; zero disables directional lighting
 highlight_color = [1.0, 1.0, 1.0] # RGB 0–1
 shadow_color = [0.0, 0.0, 0.0]
+
+[theme.palette]
+atmosphere = [0.270588, 0.333333, 0.423529] # Slate: background, glass and inactive frames
+accent = [0.650980, 0.517647, 1.0] # Violet: focus, selection and the dominant ribbon
+companion = [1.0, 0.823529, 0.188235] # Amber: contrasting ribbon
 
 [decorations.frame.bevel]
 enabled = true

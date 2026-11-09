@@ -27,6 +27,15 @@ Shine's **Desktop lighting** bar control aims a shared light with a draggable
 globe and adjusts its strength and colors. Frames, workspace buttons and animated
 ribbons respond together. Save the result to `[theme.lighting]` in Shine's
 `config.toml`; see [lighting settings](docs/compositor-development.md#frame-bevels-and-inset-shadows).
+Translucent terminals sample shared blurred wallpaper while keeping text sharp;
+adjust **Backdrop blur** in the lighting dropdown (default 32 px), or configure
+radius and terminal matching under `[decorations.terminal_blur]`.
+Choose a theme curated from Tailwind's official palette directly in the lighting
+dropdown: Twilight, Lagoon, Ember, Moss, Rose or Slate. Each coordinates active
+frames, workspace buttons and the wallpaper through Atmosphere, Accent and
+Companion colors. The **Muted–Vivid** slider controls color intensity; Save stores
+the colors under `[theme.palette]` and `theme.color_intensity`. Colors ease between themes over one second; set
+`theme.transition_duration_ms` to adjust the fade.
 
 Fish is the default interactive shell. Hosts and individual accounts can
 override the shell through the standard NixOS user options.

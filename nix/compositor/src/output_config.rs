@@ -100,6 +100,8 @@ pub struct OutputRule {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Settings {
+    #[serde(skip)]
+    pub materials: crate::theme::Materials,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<crate::theme::Theme>,
     #[serde(default, skip_serializing_if = "crate::preferences::is_default")]
@@ -142,7 +144,10 @@ impl Settings {
         Ok(settings)
     }
     pub fn resolve_lighting(&mut self) {
+        self.materials.clear();
+        self.materials = self.theme_materials();
         self.decorations.frame.lighting = self.theme.as_ref().map(|t| t.lighting.clone());
+        self.decorations.frame.theme_palette = self.theme.as_ref().and_then(|t| t.palette.clone());
     }
     pub fn effective_theme(&self) -> crate::theme::Theme {
         self.theme.clone().unwrap_or_else(|| {
@@ -153,9 +158,37 @@ impl Settings {
             theme
         })
     }
+    pub fn theme_materials(&self) -> crate::theme::Materials {
+        if !self.materials.is_empty() {
+            return self.materials.clone();
+        }
+        let theme = self.effective_theme();
+        let mut materials = theme.materials();
+        if theme.palette.is_none() {
+            let frame = &self.decorations.frame;
+            materials.insert(
+                "active_frame".into(),
+                frame.active_color[..3].try_into().unwrap(),
+            );
+            materials.insert(
+                "inactive_frame".into(),
+                frame.inactive_color[..3].try_into().unwrap(),
+            );
+        }
+        materials
+    }
     fn validate_preferences(&self) -> Result<(), String> {
         if let Some(theme) = &self.theme {
+            if !theme.color_intensity.is_finite() || !(0.0..=1.0).contains(&theme.color_intensity) {
+                return Err("Theme color intensity must be 0–1".into());
+            }
+            if theme.transition_duration_ms > 5000 {
+                return Err("Theme transition duration must be 0–5000 ms".into());
+            }
             theme.lighting.validate()?;
+            if let Some(palette) = &theme.palette {
+                palette.validate()?;
+            }
         }
         self.browser.validate()?;
         self.clipboard.validate()?;
@@ -384,7 +417,15 @@ impl ConfigFile {
         self.saved = Some(contents);
         Ok(())
     }
+    #[cfg(test)]
     pub fn save_theme(&mut self, theme: &crate::theme::Theme) -> Result<(), String> {
+        self.save_appearance(theme, None)
+    }
+    pub fn save_appearance(
+        &mut self,
+        theme: &crate::theme::Theme,
+        decorations: Option<&crate::preferences::Decorations>,
+    ) -> Result<(), String> {
         if self.read()? != self.saved {
             return Err("Configuration changed on disk; reload it before saving".into());
         }
@@ -402,6 +443,14 @@ impl ConfigFile {
         .parse::<toml_edit::DocumentMut>()
         .map_err(|e| e.to_string())?;
         document["theme"] = replacement["theme"].clone();
+        if let Some(d) = decorations {
+            document["decorations"]["terminal_blur"]["radius"] =
+                toml_edit::value(d.terminal_blur.radius as i64);
+            document["decorations"]["terminal_blur"]["enabled"] =
+                toml_edit::value(d.terminal_blur.enabled);
+            document["decorations"]["frame"]["glass"]["blur_radius"] =
+                toml_edit::value(d.frame.glass.blur_radius as i64);
+        }
         let contents = document.to_string();
         atomic_write(&self.path, &contents)?;
         self.observed = Some(contents.clone());
@@ -571,6 +620,56 @@ pub fn edid_identity(name: &str, bytes: &[u8]) -> (String, String, String) {
 mod tests {
     use super::*;
     #[test]
+    fn terminal_blur_settings_validate_and_roundtrip() {
+        let defaults = Settings::parse("").unwrap().decorations.terminal_blur;
+        assert!(
+            defaults.enabled
+                && defaults.radius == 32
+                && defaults.app_ids.iter().any(|id| id == "foot")
+        );
+        let settings = Settings::parse(
+            "[decorations.terminal_blur]\nenabled=false\nradius=20\napp_ids=['custom-terminal']",
+        )
+        .unwrap();
+        let saved = toml::to_string(&settings).unwrap();
+        assert_eq!(
+            Settings::parse(&saved).unwrap().decorations.terminal_blur,
+            settings.decorations.terminal_blur
+        );
+        for value in ["radius=65", "app_ids=['']"] {
+            assert!(Settings::parse(&format!("[decorations.terminal_blur]\n{value}")).is_err());
+        }
+    }
+    #[test]
+    fn palette_resolution_preserves_material_and_lighting() {
+        assert_eq!(crate::theme::Theme::default().transition_duration_ms, 1000);
+        assert!(Settings::parse("[theme]\ntransition_duration_ms=5001").is_err());
+        let settings = Settings::parse("[theme.lighting]\nstrength=2.0\n[theme.palette]\nprimary=[1.0,0.2,0.0]\n[decorations.frame]\nactive_color=[0.3,0.4,0.5,0.6]").unwrap();
+        let frame = &settings.decorations.frame;
+        assert_eq!(frame.active_color, [0.3, 0.4, 0.5, 0.6]);
+        assert_eq!(frame.lighting.as_ref().unwrap().strength, 2.0);
+        assert_eq!(
+            frame.theme_palette.as_ref().unwrap().accent,
+            [1.0, 0.2, 0.0]
+        );
+        assert_eq!(
+            settings.materials["active_frame"],
+            settings.effective_theme().materials()["active_frame"]
+        );
+        assert!(settings.materials["active_frame"][0] > settings.materials["active_frame"][1]);
+        let serialized = toml::to_string(&settings).unwrap();
+        assert_eq!(Settings::parse(&serialized).unwrap().theme, settings.theme);
+        assert!(!serialized.contains("theme_palette"));
+        for invalid in [
+            "primary=[1.1,0.0,0.0]",
+            "secondary=[nan,0.0,0.0]",
+            "accent=[0.0,-0.1,0.0]",
+            "accent=[0.0,0.0]",
+        ] {
+            assert!(Settings::parse(&format!("[theme.palette]\n{invalid}")).is_err());
+        }
+    }
+    #[test]
     fn central_lighting_validation_and_resolution() {
         let settings = Settings::parse(
             "[theme.lighting]\ndirection=[0.0,0.0]\nstrength=2.0\nhighlight_color=[1.0,0.8,0.5]",
@@ -610,6 +709,16 @@ mod tests {
         assert!(saved.contains("gap=24 # keep this"));
         assert_eq!(Settings::parse(&saved).unwrap().decorations.frame.width, 9);
         assert_eq!(Settings::parse(&saved).unwrap().theme.unwrap(), theme);
+        let mut decorations = crate::preferences::Decorations::default();
+        decorations.terminal_blur.radius = 47;
+        decorations.frame.glass.blur_radius = 47;
+        file.save_appearance(&theme, Some(&decorations)).unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        let parsed = Settings::parse(&saved).unwrap();
+        assert_eq!(parsed.decorations.frame.width, 9);
+        assert_eq!(parsed.decorations.terminal_blur.radius, 47);
+        assert_eq!(parsed.decorations.frame.glass.blur_radius, 47);
+        assert!(saved.contains("gap=24 # keep this"));
         std::fs::write(&path, "# edited elsewhere\n").unwrap();
         assert!(file.save_theme(&theme).is_err());
         assert_eq!(

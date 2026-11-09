@@ -28,6 +28,7 @@ let
       pkgs.udev
       pkgs.cairo
       pkgs.pango
+      pkgs.pixman
     ];
   };
   # Only Cargo manifests, the lock file, toolchain and build inputs determine

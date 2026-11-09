@@ -33,8 +33,14 @@ use crate::layout::WindowId;
 use crate::CalloopData;
 
 pub struct Smallvil {
+    pub blur_stats: crate::frost::Stats,
+    /// Cursor-plane selection for each output's most recently queued frame.
+    /// Nested outputs have no KMS planes and therefore no entry.
+    pub cursor_plane_outputs: BTreeMap<String, bool>,
     pub inactive: crate::inactive::Effects,
     pub frame_focus: crate::inactive::Effects,
+    pub theme_tint: crate::theme::TintTransition,
+    pub theme_neutral_tint: crate::theme::TintTransition,
     pub image_capture: crate::image_capture::CaptureState,
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
@@ -159,8 +165,12 @@ impl Smallvil {
         let loop_signal = event_loop.get_signal();
 
         Self {
+            blur_stats: Default::default(),
+            cursor_plane_outputs: BTreeMap::new(),
             inactive: Default::default(),
             frame_focus: Default::default(),
+            theme_tint: Default::default(),
+            theme_neutral_tint: Default::default(),
             image_capture: crate::image_capture::CaptureState::new(&dh),
             start_time,
             display_handle: dh.clone(),
@@ -888,7 +898,7 @@ impl Smallvil {
                 let geometry = map.layer_geometry(layer);
                 serde_json::json!({"namespace":layer.namespace(),"geometry":geometry.map(|g| (g.loc.x,g.loc.y,g.size.w,g.size.h))})
             }).collect();
-            serde_json::json!({"name":m.name,"id":info.map(|i|&i.id),"make":info.map(|i|&i.make),"model":info.map(|i|&i.model),"modes":info.map(|i|&i.modes),"mode":mode.map(|m|serde_json::json!({"width":m.size.w,"height":m.size.h,"refresh":m.refresh})),"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"work_area":m.layout.work_area,"layers":layers,"scale":m.scale,"workspace":m.layout.active+1,"primary":self.primary_output().as_deref()==Some(&m.name),"focused":i==self.layout.active_monitor})
+            serde_json::json!({"name":m.name,"cursor_plane_selected":self.cursor_plane_outputs.get(&m.name),"id":info.map(|i|&i.id),"make":info.map(|i|&i.make),"model":info.map(|i|&i.model),"modes":info.map(|i|&i.modes),"mode":mode.map(|m|serde_json::json!({"width":m.size.w,"height":m.size.h,"refresh":m.refresh})),"position":m.origin,"physical_size":m.physical_size,"logical_size":m.layout.size,"work_area":m.layout.work_area,"layers":layers,"scale":m.scale,"workspace":m.layout.active+1,"primary":self.primary_output().as_deref()==Some(&m.name),"focused":i==self.layout.active_monitor})
         }).collect();
         let workspaces: Vec<_> = if self.task_settings.workspaces.is_empty() {
             (1..=4)
@@ -901,7 +911,7 @@ impl Smallvil {
                 .map(|task| serde_json::json!({"id":task.id,"name":task.name}))
                 .collect()
         };
-        serde_json::json!({"graphics":self.graphics,"workspaces":workspaces,"task_startup_errors":self.task_startup_errors,"task_config_path":self.task_config_file.as_ref().map(|f|f.path.to_string_lossy()),"task_config_error":self.task_config_error,"task_config_revision":self.task_config_revision,"preferences":{"theme":self.output_settings.effective_theme(),"browser":self.output_settings.browser,"clipboard":self.output_settings.clipboard,"decorations":self.output_settings.decorations,"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift,"altgr":modifiers.iso_level3_shift,"level5":modifiers.iso_level5_shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
+        serde_json::json!({"graphics":self.graphics,"blur":self.blur_stats,"workspaces":workspaces,"task_startup_errors":self.task_startup_errors,"task_config_path":self.task_config_file.as_ref().map(|f|f.path.to_string_lossy()),"task_config_error":self.task_config_error,"task_config_revision":self.task_config_revision,"preferences":{"theme_presets":crate::theme::presets(),"theme_materials":self.output_settings.theme_materials(),"theme":self.output_settings.effective_theme(),"browser":self.output_settings.browser,"clipboard":self.output_settings.clipboard,"decorations":self.output_settings.decorations,"input":self.output_settings.input,"layout":self.output_settings.layout,"bindings":self.output_settings.bindings,"window_rules":self.output_settings.window_rules,"animations":self.output_settings.animations},"input_devices":self.input_devices,"config_path":self.config_file.as_ref().map(|f|f.path.to_string_lossy()),"config_error":self.config_error,"layout_warning":self.layout_warning,"config_revision":self.config_revision,"outputs":outputs,"backend":if self.native_mode {"drm"} else {"winit"},"active_output":self.layout.current().name,"pid":std::process::id(),"wayland_display":self.socket_name.to_string_lossy(),"workspace":self.layout.active+1,"focused":self.layout.focused(),"keyboard_focus":keyboard_focus,"modifiers":modifiers.map(|modifiers| serde_json::json!({"logo":modifiers.logo,"alt":modifiers.alt,"ctrl":modifiers.ctrl,"shift":modifiers.shift,"altgr":modifiers.iso_level3_shift,"level5":modifiers.iso_level5_shift})),"fullscreen":self.layout.workspace().fullscreen,"viewport_size":self.layout.size,"viewport":self.layout.workspace().scroll,"viewport_target":self.layout.workspace().target,"display_scale":self.ui_scale,"shortcut_modifier":self.shortcut_modifier.name(),"cursor":cursor,"cursor_rendered_elements":self.cursor_rendered_elements,"pointer_position":[pointer.x,pointer.y],"windows":windows,"surface_commits":self.commits,"rendered_frames":self.rendered_frames,"forwarded_keys":self.forwarded_keys,"selection_updates":self.selection_updates,"dmabuf_imports":self.dmabuf_imports,"dmabuf_failures":self.dmabuf_failures,"popup_events":self.popup_events,"popup_grabs":self.popup_grabs})
     }
 }
 

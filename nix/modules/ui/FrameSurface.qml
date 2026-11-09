@@ -30,8 +30,10 @@ Item {
     function rgba(values, fallback) {
         return values && values.length === 4 ? Qt.rgba(values[0], values[1], values[2], values[3]) : fallback;
     }
-    readonly property color activeTint: rgba(frameSettings.active_color, Theme.frameActive)
-    readonly property color inactiveTint: rgba(frameSettings.inactive_color, Theme.frameInactive)
+    readonly property color activeTint: DesktopPalette.settings || DesktopPalette.transitioning ? DesktopPalette.frameTint(frameSettings.active_color?.[3] ?? Theme.frameActive.a)
+        : rgba(frameSettings.active_color, Theme.frameActive)
+    readonly property color inactiveTint: DesktopPalette.settings || DesktopPalette.transitioning ? DesktopPalette.inactiveTint(frameSettings.inactive_color?.[3] ?? Theme.frameInactive.a)
+        : rgba(frameSettings.inactive_color, Theme.frameInactive)
     readonly property color tint: Qt.rgba(
         inactiveTint.r + (activeTint.r - inactiveTint.r) * activeAmount,
         inactiveTint.g + (activeTint.g - inactiveTint.g) * activeAmount,

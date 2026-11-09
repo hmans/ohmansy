@@ -81,6 +81,8 @@ def run():
             assert low['renderScale'] == .5 and low['particleMotionDetail'] == 0, low
             assert wallpaper('quality', 'balanced') == balanced
             wallpaper('pause', 'true')
+            # Keep input timing independent of software-rendered wallpaper cost.
+            wallpaper('configure', .25, 0, 0)
             time.sleep(.3)
             paused = capture('paused-first').crop((80, 80, 600, 500))
             time.sleep(.4)
@@ -119,19 +121,63 @@ def run():
                 control('pointer', x=x+target['logical_size'][0]+px, y=y+py)
                 control('button', pressed=True)
                 control('button', pressed=False)
-            panel_click(-169, 407)  # Warm preset.
-            trial.wait_for(lambda: abs(control()['preferences']['theme']['lighting']['highlight_color'][1] - .84) < .001,
-                           description='lighting color preset')
-            control('pointer', x=x+target['logical_size'][0]-152, y=y+363)
+            control('pointer', x=x+target['logical_size'][0]-166, y=y+304)
             control('button', pressed=True)
-            control('pointer', x=x+target['logical_size'][0]-220, y=y+363)
+            control('pointer', x=x+target['logical_size'][0]-240, y=y+304)
             control('button', pressed=False)
             trial.wait_for(lambda: control()['preferences']['theme']['lighting']['strength'] < 1.9,
                            description='lighting strength slider')
-            capture('lighting-control')
-            panel_click(-64, 521)  # Save the actual UI's edited values.
-            trial.wait_for(lambda: lighting('status')['saved'], description='lighting Save button')
-            assert '[theme.lighting]' in config.read_text()
+            palette_before = capture('themes-before').crop((950,100,1600,950))
+            original_light = control()['preferences']['theme']['lighting']
+            for name, px, py in [('Twilight',-318,398), ('Lagoon',-204,398),
+                                 ('Ember',-90,398), ('Moss',-318,492),
+                                 ('Rose',-204,492), ('Slate',-90,492)]:
+                panel_click(px, py)
+                trial.wait_for(lambda: lighting('status')['theme'] == name,
+                               description=f'{name} theme selection')
+                assert control()['preferences']['theme']['lighting'] == original_light, 'Theme changed the light'
+            custom = dict(primary=[1,.2,0], secondary=[0,1,0], accent=[0,0,1])
+            control('configure-palette', palette=custom)
+            trial.wait_for(lambda: lighting('status')['theme'] == 'Custom', description='custom config recognition')
+            panel_click(-90,398)  # Ember, directly in the lighting dropdown.
+            trial.wait_for(lambda: lighting('status')['theme'] == 'Ember')
+            time.sleep(.3)
+            palette_after = capture('curated-themes').crop((950,100,1600,950))
+            assert ImageChops.difference(palette_before,palette_after).getbbox(), 'Paused wallpaper ignored the selected theme'
+            panel_click(-280,617)  # Muted end of the new intensity slider.
+            trial.wait_for(lambda: control()['preferences']['theme']['color_intensity'] < .3,
+                           description='color intensity slider')
+            panel_click(-88,659)  # Stronger blur, live in both material layers.
+            trial.wait_for(lambda: control()['preferences']['decorations']['terminal_blur']['radius'] > 48,
+                           description='backdrop blur slider')
+            radius = control()['preferences']['decorations']['terminal_blur']['radius']
+            assert control()['preferences']['decorations']['frame']['glass']['blur_radius'] == radius
+            panel_click(-64,731)  # One Save persists lighting and the selected theme.
+            trial.wait_for(lambda: lighting('status')['saved'], description='theme Save button')
+            assert '[theme.palette]' in config.read_text() and '[theme.lighting]' in config.read_text()
+            saved_palette = control()['preferences']['theme']['palette']
+            control('reload-config')
+            assert control()['preferences']['theme']['palette'] == saved_palette
+            assert control()['preferences']['theme']['lighting'] == original_light
+            assert control()['preferences']['theme']['color_intensity'] < .3
+            assert control()['preferences']['decorations']['terminal_blur']['radius'] == radius
+            for action, values in [('configure-theme', {'color_intensity': 1.1}),
+                                   ('configure-blur', {'radius': 65}), ('configure-blur', {'radius': -1})]:
+                try:
+                    control(action, **values)
+                except AssertionError:
+                    pass
+                else:
+                    raise AssertionError(f'Invalid {action} was accepted')
+            palette_log = (artifacts / 'session.log').read_text()
+            assert 'TypeError:' not in palette_log and 'ReferenceError:' not in palette_log, 'Theme selector has broken QML bindings'
+            try:
+                control('configure-palette', palette=dict(saved_palette, accent=[2,0,0]))
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError('Invalid theme palette was accepted')
+            assert control()['preferences']['theme']['palette'] == saved_palette
             lighting('toggle')
             control('configure-lighting', lighting=dict(direction=[-.70710678,-.70710678], strength=1,
                 highlight_color=[1,1,1], shadow_color=[0,0,0]), save=True)
@@ -260,6 +306,8 @@ def run():
             frame = control()['preferences']['decorations']['frame']
             for x, field in [(104, 'active_color'), (136, 'inactive_color')]:
                 tint = frame[field]
+                key = 'active_frame' if field == 'active_color' else 'inactive_frame'
+                tint = control()['preferences']['theme_materials'][key] + [tint[3]]
                 alpha = tint[3] * frame['glass']['opacity']
                 expected = tuple(round(tint[i] * 255 * alpha + background[i] * (1-alpha)) for i in range(3))
                 actual = material.getpixel((round(x*scale),round(12*scale)))
@@ -315,7 +363,7 @@ def run():
     remaining = {w['id']: w['pid'] for w in trial.parent_windows()}
     assert all(remaining.get(ident) == pid for ident, pid in original.items())
     print('PASS: animated wallpapers, image override, software fallback, foot transparency, two panels, reserved space, '
-          'runtime fidelity, shared lighting globe/keyboard/presets/slider/save, validation, pause/resume, light/dark bar text, workspace/launcher clicks, keyboard focus, fullscreen, scale, clean shell exit '
+          'runtime fidelity, lighting globe/keyboard/slider, six curated themes, intensity/blur sliders, custom recognition, shared save/reload/wallpaper/frame material, validation, pause/resume, light/dark bar text, workspace/launcher clicks, keyboard focus, fullscreen, scale, clean shell exit '
           'and parent windows preserved')
 
 

@@ -107,18 +107,47 @@ impl Smallvil {
     }
     pub fn output_request(&mut self, action: &str, request: &Value) -> Result<(), String> {
         match action {
-            "configure-lighting" => {
-                let lighting: crate::theme::Lighting =
-                    serde_json::from_value(request["lighting"].clone())
-                        .map_err(|e| format!("Invalid lighting: {e}"))?;
-                lighting.validate()?;
-                let theme = crate::theme::Theme { lighting };
+            "configure-lighting" | "configure-palette" | "configure-theme" | "configure-blur" => {
+                let mut theme = self.output_settings.effective_theme();
+                let mut decorations = self.output_settings.decorations.clone();
+                if action == "configure-palette" {
+                    let palette: crate::theme::Palette =
+                        serde_json::from_value(request["palette"].clone())
+                            .map_err(|e| format!("Invalid palette: {e}"))?;
+                    palette.validate()?;
+                    theme.palette = Some(palette);
+                } else if action == "configure-theme" {
+                    theme.color_intensity =
+                        serde_json::from_value(request["color_intensity"].clone())
+                            .map_err(|e| format!("Invalid color intensity: {e}"))?;
+                    if !theme.color_intensity.is_finite()
+                        || !(0.0..=1.0).contains(&theme.color_intensity)
+                    {
+                        return Err("Color intensity must be 0–1".into());
+                    }
+                } else if action == "configure-blur" {
+                    let radius = request["radius"]
+                        .as_u64()
+                        .filter(|r| *r <= 64)
+                        .ok_or("Blur radius must be 0–64 logical pixels")?
+                        as u32;
+                    decorations.terminal_blur.radius = radius;
+                    decorations.terminal_blur.enabled = radius != 0;
+                    decorations.frame.glass.blur_radius = radius;
+                } else {
+                    let lighting: crate::theme::Lighting =
+                        serde_json::from_value(request["lighting"].clone())
+                            .map_err(|e| format!("Invalid lighting: {e}"))?;
+                    lighting.validate()?;
+                    theme.lighting = lighting;
+                }
                 if request["save"].as_bool().unwrap_or(false) {
                     self.config_file
                         .as_mut()
                         .ok_or("No configuration path")?
-                        .save_theme(&theme)?;
+                        .save_appearance(&theme, Some(&decorations))?;
                 }
+                self.output_settings.decorations = decorations;
                 self.output_settings.theme = Some(theme);
                 self.output_settings.resolve_lighting();
                 self.config_revision += 1;

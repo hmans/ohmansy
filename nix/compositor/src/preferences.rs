@@ -165,6 +165,7 @@ pub struct Decorations {
     pub inactive_ring_color: [f32; 4],
     pub shadow: Shadow,
     pub frame: Frame,
+    pub terminal_blur: TerminalBlur,
     // Accept old settings so upgrading does not discard the rest of the file.
     #[serde(skip_serializing, deserialize_with = "discard_halo")]
     pub halo: (),
@@ -180,6 +181,7 @@ impl Default for Decorations {
             inactive_ring_color: [0.55, 0.55, 0.60, 0.55],
             shadow: Shadow::default(),
             frame: Frame::default(),
+            terminal_blur: TerminalBlur::default(),
             halo: (),
             inactive: Inactive::default(),
         }
@@ -214,7 +216,40 @@ impl Decorations {
         }
         self.inactive.validate()?;
         self.frame.validate()?;
+        self.terminal_blur.validate()?;
         self.shadow.validate()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct TerminalBlur {
+    pub enabled: bool,
+    pub radius: u32,
+    pub app_ids: Vec<String>,
+}
+impl Default for TerminalBlur {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            radius: 32,
+            app_ids: crate::clipboard::Clipboard::default().terminal_app_ids,
+        }
+    }
+}
+impl TerminalBlur {
+    fn validate(&self) -> Result<(), String> {
+        if self.radius > 64
+            || self
+                .app_ids
+                .iter()
+                .any(|id| id.is_empty() || id.contains('\0'))
+        {
+            return Err(
+                "Terminal blur radius must be 0–64; app IDs must be nonempty and NUL-free".into(),
+            );
+        }
+        Ok(())
     }
 }
 
@@ -314,6 +349,8 @@ fn inactive_duration<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Resul
 #[serde(default, deny_unknown_fields)]
 pub struct Frame {
     #[serde(skip)]
+    pub theme_palette: Option<crate::theme::Palette>,
+    #[serde(skip)]
     pub lighting: Option<crate::theme::Lighting>,
     pub enabled: bool,
     pub width: u32,
@@ -337,6 +374,7 @@ impl Default for Frame {
     fn default() -> Self {
         Self {
             lighting: None,
+            theme_palette: None,
             enabled: true,
             width: 7,
             titlebar_height: 30,
@@ -424,7 +462,7 @@ impl Default for Glass {
     fn default() -> Self {
         Self {
             enabled: true,
-            blur_radius: 12,
+            blur_radius: 32,
             opacity: 0.9,
             noise: 0.025,
         }

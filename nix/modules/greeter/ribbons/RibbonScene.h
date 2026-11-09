@@ -4,10 +4,15 @@
 #include <cmath>
 #include <QVector2D>
 #include <QVector3D>
+#include <QVariantMap>
 
 class RibbonScene : public QQuickFramebufferObject {
     Q_OBJECT
     QML_ELEMENT
+    Q_PROPERTY(QVariantMap themeMaterials READ themeMaterials WRITE setThemeMaterials NOTIFY paletteChanged)
+    Q_PROPERTY(QVector3D themePrimary READ themePrimary WRITE setThemePrimary NOTIFY paletteChanged)
+    Q_PROPERTY(QVector3D themeSecondary READ themeSecondary WRITE setThemeSecondary NOTIFY paletteChanged)
+    Q_PROPERTY(QVector3D themeAccent READ themeAccent WRITE setThemeAccent NOTIFY paletteChanged)
     Q_PROPERTY(QVector2D lightDirection READ lightDirection WRITE setLightDirection NOTIFY lightingChanged)
     Q_PROPERTY(float lightStrength READ lightStrength WRITE setLightStrength NOTIFY lightingChanged)
     Q_PROPERTY(QVector3D lightHighlight READ lightHighlight WRITE setLightHighlight NOTIFY lightingChanged)
@@ -22,6 +27,26 @@ class RibbonScene : public QQuickFramebufferObject {
     Q_PROPERTY(int framesPerSecond READ framesPerSecond NOTIFY statisticsChanged)
     Q_PROPERTY(double frameTime READ frameTime NOTIFY statisticsChanged)
 public:
+    QVariantMap themeMaterials() const { return m_themeMaterials; }
+    void setThemeMaterials(const QVariantMap &value) {
+        if (value == m_themeMaterials) return;
+        m_themeMaterials = value; emit paletteChanged(); update();
+    }
+    QVector3D themePrimary() const { return m_themePrimary; }
+    QVector3D themeSecondary() const { return m_themeSecondary; }
+    QVector3D themeAccent() const { return m_themeAccent; }
+    void setThemePrimary(QVector3D value) {
+        if (value == m_themePrimary) return;
+        m_themePrimary = value; emit paletteChanged(); update();
+    }
+    void setThemeSecondary(QVector3D value) {
+        if (value == m_themeSecondary) return;
+        m_themeSecondary = value; emit paletteChanged(); update();
+    }
+    void setThemeAccent(QVector3D value) {
+        if (value == m_themeAccent) return;
+        m_themeAccent = value; emit paletteChanged(); update();
+    }
     QVector2D lightDirection() const { return m_lightDirection; }
     float lightStrength() const { return m_lightStrength; }
     QVector3D lightHighlight() const { return m_lightHighlight; }
@@ -106,6 +131,7 @@ public:
         m_fps = fps; m_frameTime = frameTime; emit statisticsChanged();
     }
 signals:
+    void paletteChanged();
     void lightingChanged();
     void elapsedChanged();
     void lightMixChanged();
@@ -116,6 +142,10 @@ signals:
     void failedChanged();
     void statisticsChanged();
 private:
+    QVariantMap m_themeMaterials;
+    QVector3D m_themePrimary = QVector3D(0.47, 0.26, 0.69);
+    QVector3D m_themeSecondary = QVector3D(0.20, 0.50, 0.83);
+    QVector3D m_themeAccent = QVector3D(0.12, 0.57, 0.57);
     QVector2D m_lightDirection = QVector2D(-0.70710678f, -0.70710678f);
     float m_lightStrength = 1;
     QVector3D m_lightHighlight = QVector3D(1, 1, 1);

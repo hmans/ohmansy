@@ -6,11 +6,35 @@ ColumnLayout {
     id: panel
     property string error: ""
     property bool saved: false
+    property var frameSettings: ({})
+    property bool animationsEnabled: true
     signal edited(var settings, bool save)
-    spacing: 12
+    signal paletteEdited(var palette)
+    signal intensityEdited(real value)
+    signal blurEdited(int radius)
+    property int blurRadius: 32
+    spacing: 10
     function change(direction, strength, highlight, shadow, save) {
         edited({ direction: direction, strength: strength,
             highlight_color: highlight, shadow_color: shadow }, save || false);
+    }
+    component MaterialSlider: Slider {
+        id: slider
+        implicitHeight: 32
+        background: Rectangle {
+            x: slider.leftPadding; y: (slider.height-height)/2
+            width: slider.availableWidth; height: 5; radius: 2.5
+            color: Theme.buttonSecondarySolid
+            Rectangle { width: parent.width*slider.visualPosition; height: parent.height; radius: 2.5; color: Theme.secondary }
+        }
+        handle: Rectangle {
+            x: slider.leftPadding + slider.visualPosition*(slider.availableWidth-width)
+            y: (slider.height-height)/2
+            width: 14; height: 14; radius: 7
+            color: Theme.text
+            border.width: slider.visualFocus || slider.pressed ? 2 : 0
+            border.color: Theme.buttonPrimarySolid
+        }
     }
     function aim(x, y) {
         const length = Math.max(1, Math.hypot(x, y));
@@ -20,8 +44,8 @@ ColumnLayout {
     Text { text: "Drag the light around the globe."; color: Theme.secondary; font.pixelSize: 13 }
     Item {
         Layout.alignment: Qt.AlignHCenter
-        Layout.preferredWidth: 190
-        Layout.preferredHeight: 190
+        Layout.preferredWidth: 140
+        Layout.preferredHeight: 140
         Rectangle {
             anchors.fill: parent
             radius: width / 2
@@ -30,6 +54,8 @@ ColumnLayout {
             border.width: 1
             Canvas {
                 id: globe
+                readonly property string lightingKey: JSON.stringify(Lighting.settings)
+                onLightingKeyChanged: requestPaint()
                 anchors.fill: parent
                 onPaint: {
                     const ctx = getContext("2d");
@@ -45,10 +71,6 @@ ColumnLayout {
                     ctx.strokeStyle = "#30ffffff"; ctx.lineWidth = 1;
                     ctx.beginPath(); ctx.ellipse(width/2-30, 1, 60, height-2); ctx.stroke();
                     ctx.beginPath(); ctx.ellipse(1, height/2-30, width-2, 60); ctx.stroke();
-                }
-                Connections {
-                    target: Lighting
-                    function onSettingsChanged() { globe.requestPaint(); }
                 }
             }
         }
@@ -82,7 +104,7 @@ ColumnLayout {
     }
     RowLayout {
         Text { text: "Strength"; color: Theme.text }
-        Slider {
+        MaterialSlider {
             id: strengthSlider
             Layout.fillWidth: true
             implicitHeight: 32
@@ -90,40 +112,88 @@ ColumnLayout {
             value: Lighting.strength
             Accessible.name: "Light strength"
             onMoved: panel.change(Lighting.direction, value, Lighting.highlight, Lighting.shadow)
-            background: Rectangle {
-                x: strengthSlider.leftPadding
-                y: (strengthSlider.height - height) / 2
-                width: strengthSlider.availableWidth
-                height: 3; radius: 1.5
-                color: Theme.buttonSecondarySolid
-                Rectangle { width: parent.width * strengthSlider.visualPosition; height: parent.height; radius: 1.5; color: Theme.secondary }
-            }
-            handle: Rectangle {
-                x: strengthSlider.leftPadding + strengthSlider.visualPosition * (strengthSlider.availableWidth - width)
-                y: (strengthSlider.height - height) / 2
-                width: 12; height: 12; radius: 6
-                color: Theme.text
-                border.width: strengthSlider.visualFocus ? 2 : 0
-                border.color: Theme.primaryGlass
-            }
+
         }
         Text { text: Math.round(Lighting.strength * 100) + "%"; color: Theme.secondary; Layout.preferredWidth: 42 }
     }
-    RowLayout {
+    Text { text: "Theme · " + DesktopPalette.currentName; color: Theme.secondary; font.pixelSize: 13 }
+    GridLayout {
+        columns: 3
+        columnSpacing: 10
+        rowSpacing: 10
+        Layout.fillWidth: true
         Repeater {
-            model: [
-                { name: "Neutral", highlight: [1,1,1], shadow: [0,0,0] },
-                { name: "Warm", highlight: [1,0.84,0.64], shadow: [0.04,0.025,0.08] },
-                { name: "Cool", highlight: [0.65,0.84,1], shadow: [0.02,0.04,0.10] }
-            ]
+            model: DesktopPalette.themes
             GlassButton {
+                id: themeCard
                 required property var modelData
-                text: modelData.name
-                implicitHeight: 32
-                padding: 8
-                font.pixelSize: 13
+                readonly property bool selected: DesktopPalette.matches(modelData.palette)
+                implicitHeight: 84
+                padding: 10
+                actionRole: selected ? "primary" : "secondary"
                 Layout.fillWidth: true
-                onClicked: panel.change(Lighting.direction, Lighting.strength, modelData.highlight, modelData.shadow)
+                Layout.preferredWidth: 90
+                Accessible.name: modelData.name + " theme"
+                Accessible.description: selected ? "Selected theme" : "Apply theme"
+                onClicked: panel.paletteEdited(modelData.palette)
+                scale: down ? 0.97 : hovered ? 1.025 : 1
+                Behavior on scale { NumberAnimation { duration: panel.animationsEnabled ? 120 : 0; easing.type: Easing.OutCubic } }
+                background: Item {
+                    FrameSurface {
+                        anchors.fill: parent
+                        active: themeCard.selected
+                        highlighted: themeCard.hovered
+                        pressed: themeCard.down
+                        animationsEnabled: panel.animationsEnabled
+                        frameSettings: Object.assign({}, panel.frameSettings, {
+                            outer_corner_radius: 20, inner_corner_radius: 16,
+                            active_color: [Theme.themeCardActive.r, Theme.themeCardActive.g, Theme.themeCardActive.b, Theme.themeCardActive.a],
+                            inactive_color: [Theme.themeCardInactive.r, Theme.themeCardInactive.g, Theme.themeCardInactive.b, Theme.themeCardInactive.a]
+                        })
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 20
+                        color: "transparent"
+                        border.width: themeCard.selected || themeCard.visualFocus ? 2 : 0
+                        border.color: themeCard.visualFocus ? Theme.text : Qt.rgba(
+                            DesktopPalette.primary[0] * 0.5 + 0.5,
+                            DesktopPalette.primary[1] * 0.5 + 0.5,
+                            DesktopPalette.primary[2] * 0.5 + 0.5, 0.9)
+                    }
+                }
+                contentItem: Column {
+                    spacing: 9
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: -8
+                        Repeater {
+                            model: themeCard.modelData.preview
+                            Rectangle {
+                                required property var modelData
+                                width: 32; height: 32; radius: 16
+                                color: DesktopPalette.color(modelData)
+                                border.width: 2
+                                border.color: Qt.rgba(1,1,1,0.16)
+                            }
+                        }
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: themeCard.modelData.name
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                    }
+                }
+                Rectangle {
+                    visible: themeCard.selected
+                    anchors { right: parent.right; top: parent.top; rightMargin: 5; topMargin: 5 }
+                    width: 17; height: 17; radius: 9
+                    color: Theme.text
+                    Text { anchors.centerIn: parent; text: "✓"; color: Theme.buttonSecondarySolid; font.pixelSize: 12; font.weight: Font.Bold }
+                }
             }
         }
     }
@@ -134,10 +204,33 @@ ColumnLayout {
         color: Theme.secondary
         font.pixelSize: 12
     }
+    Text { text: "Atmosphere · Accent · Companion"; color: Theme.secondary; font.pixelSize: 12 }
+    RowLayout {
+        Layout.fillWidth: true
+        Text { text: "Muted"; color: Theme.secondary; font.pixelSize: 13 }
+        MaterialSlider {
+            Layout.fillWidth: true
+            from: 0; to: 1; value: DesktopPalette.intensity
+            Accessible.name: "Color intensity"
+            onMoved: panel.intensityEdited(value)
+        }
+        Text { text: "Vivid"; color: Theme.secondary; font.pixelSize: 13 }
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        Text { text: "Backdrop blur"; color: Theme.secondary; font.pixelSize: 13 }
+        MaterialSlider {
+            Layout.fillWidth: true
+            from: 0; to: 64; stepSize: 1; value: panel.blurRadius
+            Accessible.name: "Backdrop blur radius"
+            onMoved: panel.blurEdited(Math.round(value))
+        }
+        Text { text: panel.blurRadius + " px"; color: Theme.secondary; font.pixelSize: 13; Layout.preferredWidth: 36 }
+    }
     Item { Layout.fillHeight: true }
     RowLayout {
         GlassButton {
-            text: "Reset"
+            text: "Reset light"
             implicitHeight: 34
             padding: 9
             font.pixelSize: 14

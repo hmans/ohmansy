@@ -14,9 +14,12 @@ use smithay::{
             element::{
                 memory::{MemoryRenderBuffer, MemoryRenderBufferRenderElement},
                 render_elements,
-                surface::{render_elements_from_surface_tree, WaylandSurfaceRenderElement},
+                surface::{
+                    render_elements_from_surface_tree, WaylandSurfaceRenderElement,
+                    WaylandSurfaceTexture,
+                },
                 utils::{CropRenderElement, RescaleRenderElement},
-                AsRenderElements, Kind,
+                AsRenderElements, Element, Kind,
             },
             gles::GlesRenderer,
         },
@@ -217,7 +220,8 @@ impl Smallvil {
             .collect();
         drop(layer_map);
         let fullscreen = monitor.layout.workspace().fullscreen.is_some();
-        let render_layers =
+        let mut direct_background = None;
+        let mut render_layers =
             |renderer: &mut GlesRenderer, kinds: &[smithay::wayland::shell::wlr_layer::Layer]| {
                 let mut rendered = Vec::new();
                 for kind in kinds {
@@ -226,20 +230,55 @@ impl Smallvil {
                         .rev()
                         .filter(|(layer, _)| layer.layer() == *kind)
                     {
-                        rendered.extend(
-                            layer
-                                .render_elements::<WaylandSurfaceRenderElement<GlesRenderer>>(
-                                    renderer,
-                                    (location.x, location.y).into(),
-                                    1.0.into(),
-                                    1.0,
-                                )
-                                .into_iter()
-                                .filter_map(|element| {
-                                    CropRenderElement::from_element(element, 1.0, crop)
-                                })
-                                .map(SceneElement::Window),
-                        );
+                        for element in layer
+                            .render_elements::<WaylandSurfaceRenderElement<GlesRenderer>>(
+                                renderer,
+                                (location.x, location.y).into(),
+                                1.0.into(),
+                                1.0,
+                            )
+                        {
+                            if layer.namespace() == "ohmansy-wallpaper"
+                                && element.geometry(1.0.into()).contains_rect(crop)
+                                && element.transform() == Transform::Normal
+                                && element.alpha() == 1.0
+                                // Let ordinary surface compositing normalize
+                                // inverted imports before the shared filter.
+                                && matches!(element.texture(), WaylandSurfaceTexture::Texture(texture) if !texture.is_y_inverted())
+                            {
+                                if let WaylandSurfaceTexture::Texture(texture) = element.texture() {
+                                    let geometry = element.geometry(1.0.into());
+                                    let src = element.src();
+                                    let ratio = src.size / geometry.size.to_f64();
+                                    let source = Rectangle::new(
+                                        (
+                                            src.loc.x
+                                                + (crop.loc.x - geometry.loc.x) as f64 * ratio.x,
+                                            src.loc.y
+                                                + (crop.loc.y - geometry.loc.y) as f64 * ratio.y,
+                                        )
+                                            .into(),
+                                        (
+                                            crop.size.w as f64 * ratio.x,
+                                            crop.size.h as f64 * ratio.y,
+                                        )
+                                            .into(),
+                                    );
+                                    direct_background = Some((
+                                        element.id().clone(),
+                                        crate::frost::DirectSource {
+                                            texture: texture.clone(),
+                                            source,
+                                        },
+                                    ));
+                                }
+                            }
+                            if let Some(element) =
+                                CropRenderElement::from_element(element, 1.0, crop)
+                            {
+                                rendered.push(SceneElement::Window(element));
+                            }
+                        }
                     }
                 }
                 rendered
@@ -251,7 +290,11 @@ impl Smallvil {
         }
         decorations.begin_output();
         let background = render_layers(renderer, &[Layer::Bottom, Layer::Background]);
-        let mut windows: Vec<SceneElement> = Vec::new();
+        let direct_background = direct_background
+            .as_ref()
+            .filter(|(id, _)| background.len() == 1 && background[0].id() == id)
+            .map(|(_, source)| source);
+        let mut windows: Vec<crate::frost::Layer> = Vec::new();
         let owned = self
             .windows
             .keys()
@@ -281,6 +324,7 @@ impl Smallvil {
                 + Point::from((frame_bounds.size.w / 2, frame_bounds.size.h / 2)))
             .to_physical_precise_round(1.0);
             let visual_scale = self.window_visual_scale(id);
+            let mut backdrop_bounds = frame_bounds;
             let mut visual = Vec::new();
             let amount = self.inactive_amount(id) as f32;
             let inactive = &self.output_settings.decorations.inactive;
@@ -305,6 +349,7 @@ impl Smallvil {
                     );
                     let bounds =
                         Rectangle::new(geometry.loc.to_logical(1), geometry.size.to_logical(1));
+                    backdrop_bounds = backdrop_bounds.merge(bounds);
                     visual.push(WindowVisual::Rounded(
                         decorations
                             .rounded(
@@ -384,6 +429,71 @@ impl Smallvil {
                     visual.push(WindowVisual::Surface(element));
                 }
             }
+            let terminal_blur = &style.terminal_blur;
+            let terminal = terminal_blur.enabled
+                && terminal_blur.radius > 0
+                && with_states(surface, |states| {
+                    let metadata = states
+                        .data_map
+                        .get::<smithay::wayland::shell::xdg::XdgToplevelSurfaceData>()
+                        .unwrap()
+                        .lock()
+                        .unwrap();
+                    metadata
+                        .app_id
+                        .as_ref()
+                        .is_some_and(|app| terminal_blur.app_ids.contains(app))
+                });
+            // Window::geometry also reads renderer surface state. Resolve it
+            // before taking that lock, including for partial opaque regions.
+            let client_geometry = window.geometry();
+            let opaque = terminal
+                && with_states(surface, |states| {
+                    states
+                        .data_map
+                        .get::<smithay::backend::renderer::utils::RendererSurfaceStateUserData>()
+                        .is_some_and(|data| {
+                            data.lock()
+                                .unwrap()
+                                .opaque_regions()
+                                .is_some_and(|regions| {
+                                    client_geometry
+                                        .subtract_rects(regions.iter().copied())
+                                        .is_empty()
+                                })
+                        })
+                });
+            if terminal
+                && !opaque
+                && frame_bounds.overlaps(Rectangle::from_size(crop.size.to_logical(1)))
+            {
+                let mut glass = style.frame.clone();
+                glass.glass.blur_radius = terminal_blur.radius;
+                if fullscreen || !glass.enabled {
+                    glass.width = 0;
+                    glass.titlebar_height = 0;
+                    glass.outer_corner_radius = if fullscreen { 0 } else { style.corner_radius };
+                    glass.inner_corner_radius = glass.outer_corner_radius;
+                }
+                match decorations.frost.element(
+                    renderer,
+                    &output.name(),
+                    id,
+                    frame_bounds,
+                    &glass,
+                    scale,
+                    visual_scale,
+                    canvas,
+                    crop.size.to_logical(1).to_physical_precise_round(scale),
+                    &windows,
+                    &background,
+                    direct_background,
+                    true,
+                ) {
+                    Ok(backdrop) => visual.push(WindowVisual::Frost(backdrop)),
+                    Err(error) => eprintln!("Terminal blur unavailable: {error:#}"),
+                }
+            }
             // Elements are ordered front to back: each shadow sits below its
             // own window and above windows behind it, with output-local clipping.
             if !fullscreen
@@ -405,6 +515,8 @@ impl Smallvil {
                     crop.size.to_logical(1).to_physical_precise_round(scale),
                     &windows,
                     &background,
+                    direct_background,
+                    false,
                 ) {
                     Ok(frame) => visual.push(WindowVisual::Frost(frame)),
                     Err(error) => {
@@ -429,12 +541,21 @@ impl Smallvil {
                     current.push(SceneElement::Visual(element));
                 }
             }
-            windows.splice(0..0, current);
+            windows.insert(
+                0,
+                crate::frost::Layer {
+                    id,
+                    bounds: backdrop_bounds,
+                    elements: current,
+                },
+            );
         }
         decorations.restore_draw_buffer |=
             std::mem::take(&mut decorations.frost.offscreen_rendered);
         decorations.finish_output(&self.windows.keys().copied().collect(), &owned);
-        elements.extend(windows);
+        decorations.frost.finish_output(&output.name());
+        self.blur_stats = decorations.frost.stats();
+        elements.extend(windows.into_iter().flat_map(|layer| layer.elements));
         elements.extend(background);
         elements
             .into_iter()

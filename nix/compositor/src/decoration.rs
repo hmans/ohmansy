@@ -128,6 +128,7 @@ impl Renderer {
     }
     pub fn begin_output(&mut self) {
         self.used.clear();
+        self.frost.begin_output();
     }
     pub fn finish_output(&mut self, live: &HashSet<WindowId>, owned: &HashSet<WindowId>) {
         self.titles.retain(live);

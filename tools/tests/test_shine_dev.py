@@ -14,6 +14,18 @@ SCRIPT = Path(__file__).resolve().parents[1] / 'dev/shine-dev.py'
 
 
 class ShineDevelopmentTests(unittest.TestCase):
+    def test_preview_portals_are_private_and_do_not_request_host_keyring(self):
+        prepare = runpy.run_path(str(SCRIPT))['preview_environment']
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = {'XDG_CONFIG_HOME': '/host/config', 'DBUS_SESSION_BUS_ADDRESS': 'host-bus'}
+            env = prepare(host, root)
+            self.assertEqual(host['XDG_CONFIG_HOME'], '/host/config')
+            self.assertEqual(env['DBUS_SESSION_BUS_ADDRESS'], 'host-bus')  # dbus-run-session replaces it.
+            self.assertEqual(env['XDG_CONFIG_HOME'], str(root / 'xdg-config'))
+            self.assertIn('org.freedesktop.impl.portal.Secret=none;',
+                          (root / 'xdg-config/xdg-desktop-portal/portals.conf').read_text())
+            self.assertEqual(env['OHMANSY_SHINE_DEV_SESSION'], '1')
     def test_altgr_parent_uses_control_option_without_changing_its_layout(self):
         select = runpy.run_path(str(SCRIPT))['modifier_for']
         parent = {'preferences': {'input': {'keyboard': {'layout': 'eu', 'options': 'lv3:lalt_switch'}}}}

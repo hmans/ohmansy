@@ -15,6 +15,15 @@ PanelWindow {
     readonly property string imageOverride: Quickshell.env("OHMANSY_WALLPAPER_IMAGE") || ""
     property real driftX: 0
     property real driftY: 0
+    function diagnostics() {
+        const item = animation.item;
+        return { output: screen?.name || "", loaded: !!item,
+            interval: item?.frameInterval ?? 0, fps: item?.framesPerSecond ?? 0,
+            moving: item?.moving ?? false, lightMix: item?.lightMix ?? 0,
+            targetLightMix: item?.targetLightMix ?? 0,
+            appearanceTransition: Appearance.transitioning,
+            paletteTransition: DesktopPalette.transitioning };
+    }
     Behavior on driftX { NumberAnimation { duration: 550; easing.type: Easing.OutCubic } }
     Behavior on driftY { NumberAnimation { duration: 650; easing.type: Easing.OutCubic } }
 
@@ -44,13 +53,14 @@ PanelWindow {
             item.lightStrength = Qt.binding(() => Lighting.strength);
             item.lightHighlight = Qt.binding(() => Qt.vector3d(...Lighting.highlight));
             item.lightShadow = Qt.binding(() => Qt.vector3d(...Lighting.shadow));
+            item.themeMaterials = Qt.binding(() => DesktopPalette.materials);
             // Reduce shader pixels while preserving window size and cadence.
             item.renderScale = Qt.binding(() => WallpaperQuality.renderScale);
             item.particleLayers = Qt.binding(() => WallpaperQuality.particleLayers);
             item.particleMotionDetail = Qt.binding(() => WallpaperQuality.particleMotionDetail);
             item.moving = Qt.binding(() => WallpaperQuality.moving);
             // About 15 fps at rest; keep the short appearance fade smooth.
-            item.frameInterval = Qt.binding(() => Appearance.transitioning ? 16 : 66);
+            item.frameInterval = Qt.binding(() => Appearance.transitioning || DesktopPalette.transitioning ? 16 : 66);
             item.targetLightMix = Qt.binding(() => Appearance.lightMix);
             item.lightMix = Appearance.lightMix;
         }

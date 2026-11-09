@@ -33,7 +33,9 @@ The balanced default keeps two particle layers with full particle motion.
 The background stays stationary while columns and workspaces change; Niri's
 parallax is not yet connected to Shine. Saved wallpaper images are honored,
 with a static fallback when ribbon rendering is unavailable. Foot's shared
-defaults provide a translucent background; Shine does not yet blur it.
+defaults provide a translucent background; Shine blurs the scene behind matched
+terminal windows while keeping their text sharp. Frame glass and terminal blur
+have independent settings.
 Niri's panel, wallpaper service, and other services remain tied to Niri.
 
 Workspace buttons echo Shine's window frames: purple/slate translucent surfaces,
@@ -265,6 +267,16 @@ its own config/workspaces under `.local/shine-dev/`. Build/session logs and the
 current preview's control socket information are saved there too. `preview.png`
 captures the desktop after startup and is replaced after each Rust restart.
 
+Preview apps use a separate XDG configuration home in
+`.local/shine-dev/xdg-config`. Its portal configuration uses GTK for desktop
+dialogs/settings and wlr for capture interfaces, with the secret/keyring portal
+disabled on the private bus. This avoids the roughly 25-second keyring
+activation timeout. The nested compositor publishes its Wayland socket to that
+private bus before launching apps; it does not import into the real systemd
+user manager or restart host portal services. The renderer still requires
+hardware acceleration. `tools/tests/compositor_preview_startup.py` measures
+real portal, Quickshell and editor readiness on the private test display.
+
 Fragment shaders and `rounded-coverage.glsl` reload on save without restarting
 the preview. The explicit `OHMANSY_SHINE_SHADER_DIR` override loads checkout
 sources; without it, packaged builds use embedded shaders. A successful shader
@@ -435,6 +447,32 @@ a `default` theme alias. The session, standalone package, and development shell 
 cursor assets while honoring existing `XCURSOR_THEME`, `XCURSOR_SIZE`, and
 `XCURSOR_PATH` preferences. These Xcursor settings also apply to Wayland cursor
 images; they are not limited to X11.
+
+Native hardware cursors require a GBM cursor allocator, the cursor-plane
+scanout flag, and Smithay's `renderer_pixman` fallback for format and scale
+conversion. The direct-copy path accepts only unscaled buffers matching the
+plane's ARGB format; named RGBA cursors and fractional output scales need the
+conversion path. Pixman prepares only the small cursor bitmap. Both desktop
+backends continue to use OpenGL for application and wallpaper rendering.
+
+Each output's IPC `cursor_plane_selected` reports whether its most recently
+queued frame selected a KMS cursor plane. Nested outputs report `null`.
+Check this value on the monitor containing the pointer, then cross-check its
+KMS cursor framebuffer after a native session update. A successful build or
+GBM allocation alone does not establish that hardware cursor scanout is active.
+
+Cursor conversion regressions cover RGBA/ARGB colors, transparent padding and
+1×, 1.2×, 1.25× and 2× scaling. The ignored Rust test
+`cursor_tests::driver_cursor_buffer_conversion` additionally exercises temporary
+GBM cursor buffers on the device explicitly named by
+`OHMANSY_TEST_DRM_CURSOR_DEVICE`. It does not acquire DRM master, set a mode or
+assign a plane. Run it with Cargo's `--ignored --nocapture` test options inside
+`nix develop .#spatial`; normal package tests do not open a live DRM device.
+For compositor-only updates, run `mise run os-test`, then sign out and back in
+when ready to close the current session. The greeter reads the updated
+`/etc/ohmansy/greeter-sessions.json` when it starts. This does not require a
+reboot or restarting greetd from the desktop. Verify cursor-plane selection
+before making the tested configuration the next-boot default with `os-boot`.
 
 The login session uses `--backend drm`; development uses `--backend winit`
 inside the parent desktop. Native output support currently covers connectors
@@ -629,7 +667,7 @@ inactive_color = [0.145098, 0.156863, 0.207843, 0.40]
 
 [decorations.frame.glass]
 enabled = true
-blur_radius = 12
+blur_radius = 32
 opacity = 0.9
 noise = 0.025
 
@@ -673,6 +711,58 @@ cached until lower surfaces, their geometry or frame settings change. A changing
 wallpaper updates the blur too. Individual-window sharing excludes frames.
 `python3 tools/tests/compositor_glass.py` checks real blur, transparency, grain,
 background updates and scaling on the private test display.
+
+### Terminal blur
+
+```toml
+[decorations.terminal_blur]
+enabled = true
+radius = 32
+# app_ids = ["foot", "my-terminal"]
+```
+
+Radius defaults to 32 and accepts 0–64 logical pixels; zero or `enabled = false` disables the
+effect. The default app list includes Foot, Kitty, Alacritty, Ghostty, WezTerm,
+GNOME Terminal/Console and the nested demo terminal. Supplying `app_ids` replaces
+that list with exact Wayland app IDs. The terminal must have a translucent
+background (Foot defaults to alpha 0.85); opaque terminals remain opaque and
+skip the blur pass when their surface declares full opacity.
+Foot makes its fullscreen buffer opaque; Shine preserves that choice.
+
+The GPU backdrop sits below the client surface tree, so glyphs and app buffers
+are not blurred. Terminal backgrounds sample the wallpaper, including when a
+terminal floats over another app. They clip to client/outer corners and follow
+scale and fullscreen. The lighting dropdown's **Backdrop blur**
+slider changes content blur and frame glass together; config files can set
+`decorations.terminal_blur.radius` and `decorations.frame.glass.blur_radius`
+separately. It works with frame glass or frames
+disabled, updates with the wallpaper and does not animate when idle.
+
+The common path imports the full-screen wallpaper's GPU texture directly.
+Shine prefilters it at reduced resolution, applies horizontal and vertical
+Gaussian passes, and shares the result across all consumers on that monitor.
+Each source retains at most the frame and terminal blur radii. Moving a window,
+typing, focus changes and cursor movement do not rebuild that background blur.
+Multiple background surfaces are composited once into a shared source when a
+single imported texture cannot represent them.
+
+Tiled frames share that same background. A frame overlapping lower windows uses
+a scene-color layer containing those windows and the background, in stacking
+order. Identical lower stacks share their capture and blurred textures; unused
+layers are released when the overlap ends. The current window, foreground
+windows and cursor never enter its backdrop. Separate input/output textures
+avoid feedback. Frames do not pull in non-overlapping neighbouring windows just
+because the blur kernel extends beyond their footprint.
+
+The final frame/content shader samples a cached texture once per pixel. There
+is no CPU readback. IPC `blur` counters expose wallpaper imports, scene captures,
+background/scene blur builds, filter passes, cache hits and retained sources.
+`tools/tests/compositor_shared_blur.py` verifies two outputs/four windows need
+two shared background blurs and zero captures, input/content changes do not
+invalidate them, and overlapping frames add/release a scene layer. Pixel tests
+also cover scale, output offsets, texture orientation and wallpaper-only content.
+This is an app-ID policy; client-requested blur-region protocols are not yet
+implemented. Individual-window capture still excludes compositor backdrops.
 
 ### Frame bevels and inset shadows
 
@@ -724,6 +814,58 @@ and shell; it can be tested together in a disposable preview.
 Existing `decorations.frame.bevel.light_direction` values remain supported and
 normalized when the theme section is absent. Once `theme.lighting` is supplied,
 it takes precedence and becomes the source shared by all three renderers.
+
+Choose a theme directly in **Desktop lighting**. Each combines three official
+[Tailwind CSS v4.3.0 colors](https://github.com/tailwindlabs/tailwindcss/blob/v4.3.0/packages/tailwindcss/theme.css):
+
+| Theme | Atmosphere | Accent | Companion |
+| --- | --- | --- | --- |
+| Twilight | slate-600 | violet-400 | amber-300 |
+| Lagoon | teal-600 | cyan-500 | orange-400 |
+| Ember | orange-400 | orange-400 | sky-400 |
+| Moss | teal-600 | emerald-400 | rose-400 |
+| Rose | violet-300 | rose-500 | sky-200 |
+| Slate | slate-600 | slate-400 | amber-300 |
+
+Atmosphere seeds the background, neutral glass, inactive frames and pale sheen.
+Accent marks focus and selection and colors the dominant ribbon. Companion
+colors a contrasting ribbon. Shine derives hue-preserving OKLab tones with
+controlled lightness and chroma, reducing chroma to fit sRGB instead of clipping
+channels. Each ribbon keeps its hue; silk texture changes brightness. The light
+appearance uses lighter tones from the same seeds. Frames, workspace buttons,
+shell controls, background and particles share these material colors.
+
+Tailwind's OKLCH seeds are converted to clipped 8-bit sRGB. The selected card
+shows a checkmark and three derived material swatches. Legacy palettes map
+primary → accent, secondary → atmosphere and old accent → companion, then save
+with explicit role names. Ambiguous mixtures of old and new keys are rejected.
+Manual palettes show **Custom**. Without a palette, configured frame colors
+remain active and the wallpaper uses the default Twilight colors.
+
+The **Muted–Vivid** slider adjusts `color_intensity` without shifting hue or
+lightness. Theme selection preserves lighting. One **Save** persists colors,
+intensity, lighting and blur while keeping other handwritten settings and
+comments. Concurrent file edits are rejected until reload. Changes also reach
+paused wallpapers. Selection updates immediately; all derived material colors
+ease together over one second, including inactive frames and background.
+Retargeting continues from visible colors; startup loads saved colors directly.
+
+```toml
+[theme]
+transition_duration_ms = 1000 # 0–5000; zero snaps
+color_intensity = 0.65 # 0–1, muted to vivid
+
+[theme.palette]
+atmosphere = [0.270588, 0.333333, 0.423529] # slate-600
+accent = [0.650980, 0.517647, 1.0] # violet-400
+companion = [1.0, 0.823529, 0.188235] # amber-300
+```
+
+Each seed is RGB from 0–1. Configured frame alpha, opacity, noise, bevels and
+focus fade still control the material. Global `[animations] enabled = false`
+also snaps theme changes; rendering stops when a fade settles, while normal
+wallpaper motion retains its cadence. Test the compositor and Quickshell
+dependencies together in `shine-dev` before a planned login update.
 
 The optional inset shadow is cast inward **over app content**, making the app
 look recessed beneath its frame. Shine draws a separate translucent overlay

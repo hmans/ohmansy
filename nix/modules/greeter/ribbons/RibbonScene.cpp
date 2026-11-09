@@ -28,6 +28,10 @@ public:
         lightStrength = owner->lightStrength();
         lightHighlight = owner->lightHighlight();
         lightShadow = owner->lightShadow();
+        themePrimary = owner->themePrimary();
+        themeMaterials = owner->themeMaterials();
+        themeSecondary = owner->themeSecondary();
+        themeAccent = owner->themeAccent();
         particleLayers = owner->particleLayers();
         particleMotionDetail = owner->particleMotionDetail();
         if (renderScale != owner->renderScale()) {
@@ -131,6 +135,25 @@ private:
         program.setUniformValue("lightStrength", lightStrength);
         program.setUniformValue("lightHighlight", lightHighlight);
         program.setUniformValue("lightShadow", lightShadow);
+        const auto material = [&](const char *key, QVector3D fallback) {
+            const auto values = themeMaterials.value(QString::fromLatin1(key)).toList();
+            if (values.size() == 3) fallback = QVector3D(values[0].toFloat(), values[1].toFloat(), values[2].toFloat());
+            program.setUniformValue(key, fallback);
+        };
+        // Legacy standalone/greeter clients can still supply three colors.
+        // The desktop supplies perceptual role tones from Shine's theme model.
+        material("ribbon_accent", themePrimary);
+        material("ribbon_atmosphere", themeSecondary);
+        material("ribbon_companion", themeAccent);
+        const QVector3D white(1, 1, 1);
+        material("ribbon_accent_light", themePrimary * .58f + white * .42f);
+        material("ribbon_atmosphere_light", themeSecondary * .58f + white * .42f);
+        material("ribbon_companion_light", themeAccent * .58f + white * .42f);
+        material("background_top", QVector3D(.065, .077, .12));
+        material("background_bottom", QVector3D(.12, .15, .20));
+        material("background_top_light", QVector3D(.80, .83, .89));
+        material("background_bottom_light", QVector3D(.70, .76, .85));
+        material("sheen", QVector3D(.94, .96, 1));
     }
     void initialize() {
         attempted = true;
@@ -201,6 +224,8 @@ private:
     QVector2D lightDirection;
     float lightStrength = 1;
     QVector3D lightHighlight, lightShadow;
+    QVector3D themePrimary, themeSecondary, themeAccent;
+    QVariantMap themeMaterials;
     float renderScale = 1;
     int particleLayers = 3;
     float particleMotionDetail = 1;

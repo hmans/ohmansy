@@ -93,9 +93,49 @@ impl Smallvil {
     pub fn frame_focus_color(&self, id: WindowId) -> [f32; 4] {
         let frame = &self.output_settings.decorations.frame;
         let amount = self.frame_focus_amount(id) as f32;
-        std::array::from_fn(|i| {
-            frame.inactive_color[i] + (frame.active_color[i] - frame.inactive_color[i]) * amount
-        })
+        let target = self
+            .output_settings
+            .materials
+            .get("active_frame")
+            .copied()
+            .unwrap_or(frame.active_color[..3].try_into().unwrap());
+        let neutral = self
+            .output_settings
+            .materials
+            .get("inactive_frame")
+            .copied()
+            .unwrap_or(frame.inactive_color[..3].try_into().unwrap());
+        let active = [target[0], target[1], target[2], frame.active_color[3]];
+        let rgb = self
+            .theme_tint
+            .value(self.start_time.elapsed().as_secs_f64())
+            .unwrap_or([active[0], active[1], active[2]]);
+        let active = if !self.output_settings.animations.enabled
+            || self
+                .output_settings
+                .effective_theme()
+                .transition_duration_ms
+                == 0
+        {
+            active
+        } else {
+            [rgb[0], rgb[1], rgb[2], active[3]]
+        };
+        let neutral = if !self.output_settings.animations.enabled
+            || self
+                .output_settings
+                .effective_theme()
+                .transition_duration_ms
+                == 0
+        {
+            neutral
+        } else {
+            self.theme_neutral_tint
+                .value(self.start_time.elapsed().as_secs_f64())
+                .unwrap_or(neutral)
+        };
+        let inactive = [neutral[0], neutral[1], neutral[2], frame.inactive_color[3]];
+        std::array::from_fn(|i| inactive[i] + (active[i] - inactive[i]) * amount)
     }
     pub fn update_frame_focus(&mut self) -> bool {
         let frame = &self.output_settings.decorations.frame;

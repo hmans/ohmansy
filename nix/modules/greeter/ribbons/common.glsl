@@ -6,6 +6,17 @@ uniform vec2 lightDirection;
 uniform float lightStrength;
 uniform vec3 lightHighlight;
 uniform vec3 lightShadow;
+uniform vec3 ribbon_accent;
+uniform vec3 ribbon_atmosphere;
+uniform vec3 ribbon_companion;
+uniform vec3 ribbon_accent_light;
+uniform vec3 ribbon_atmosphere_light;
+uniform vec3 ribbon_companion_light;
+uniform vec3 background_top;
+uniform vec3 background_bottom;
+uniform vec3 background_top_light;
+uniform vec3 background_bottom_light;
+uniform vec3 sheen;
 
 vec3 desktopLight() {
     // Wallpaper world y points up; theme coordinates point down.

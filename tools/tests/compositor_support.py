@@ -12,6 +12,32 @@ ROOT = Path(__file__).resolve().parents[2]
 BINARY = ROOT / ".build/spatial/debug/ohmansy-compositor"
 
 
+class WallpaperFixture:
+    """An opaque patterned wallpaper in the private child compositor."""
+    def __init__(self, control, log):
+        state = control()
+        self.environment = dict(os.environ, WAYLAND_DISPLAY=state['wayland_display'],
+                                QT_QPA_PLATFORM='wayland')
+        self.environment.pop('WAYLAND_SOCKET', None)
+        self.process = subprocess.Popen(['quickshell', '--path',
+            str(ROOT / 'tools/tests/compositor_wallpaper_fixture.qml')],
+            env=self.environment, stdout=log, stderr=log)
+        wait_for(lambda: all(any(layer['namespace'] == 'ohmansy-wallpaper' and layer['geometry']
+                                 for layer in output['layers']) for output in control()['outputs']),
+                 description='patterned wallpaper on every output')
+        time.sleep(.25)
+
+    def advance(self):
+        subprocess.run(['quickshell', 'ipc', '--pid', str(self.process.pid),
+                        'call', 'fixture', 'advance'], env=self.environment,
+                       stdout=subprocess.DEVNULL, check=True)
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.terminate()
+            self.process.wait(timeout=10)
+
+
 def ensure_test_display():
     """Graphical automation is headless unless the caller explicitly opts in."""
     mode = os.environ.get('OHMANSY_TEST_DISPLAY')

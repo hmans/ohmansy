@@ -109,10 +109,35 @@ int main(int argc, char **argv) {
             scene->setLightStrength(1);
             scene->setLightHighlight(QVector3D(1, 1, 1));
             scene->setLightShadow(QVector3D(0, 0, 0));
-        } else {
+        } else if (step == 15) {
             if (frame != dark) qFatal("Lighting round trip changed the scene");
+            scene->setThemePrimary(QVector3D(1, 0.15, 0.05));
+        } else if (step == 16) {
+            if (frame == dark) qFatal("Primary theme color did not change the scene");
+            light = frame;
+            scene->setThemeSecondary(QVector3D(0.1, 0.8, 0.3));
+            scene->setThemeAccent(QVector3D(0.9, 0.65, 0.05));
+        } else if (step == 17) {
+            if (frame == light) qFatal("Secondary theme colors did not change the scene");
+            scene->setThemePrimary(QVector3D(0.47, 0.26, 0.69));
+            scene->setThemeSecondary(QVector3D(0.20, 0.50, 0.83));
+            scene->setThemeAccent(QVector3D(0.12, 0.57, 0.57));
+        } else if (step == 18) {
+            if (frame != dark) qFatal("Palette round trip changed the scene");
+            scene->setThemeMaterials({{"ribbon_accent", QVariantList{0.9, 0.1, 0.1}}});
+        } else if (step == 19) {
+            if (frame == dark) qFatal("Semantic accent material did not change the scene");
+            light = frame;
+            scene->setThemeMaterials({{"ribbon_accent", QVariantList{0.9, 0.1, 0.1}},
+                {"background_top", QVariantList{0.1, 0.2, 0.05}},
+                {"background_bottom", QVariantList{0.2, 0.3, 0.1}}});
+        } else if (step == 20) {
+            if (frame == light) qFatal("Atmosphere materials did not change the scene");
+            scene->setThemeMaterials({});
+        } else {
+            if (frame != dark) qFatal("Material round trip changed the scene");
             qInfo() << (es ? "ES" : "Desktop GL")
-                    << "ribbons: palettes, motion, resize, fidelity, shared lighting and GL checks passed";
+                    << "ribbons: palettes, motion, resize, fidelity, shared lighting/theme colors and GL checks passed";
             app.quit();
         }
         ++step;

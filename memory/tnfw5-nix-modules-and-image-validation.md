@@ -7,6 +7,248 @@ data:
 id: tnfw5
 title: Nix modules and image validation
 ---
+## Shared GPU transparency backdrops (2026-11-09)
+
+User approved wallpaper-only terminal backgrounds and shared forward-style
+scene-color sampling. Terminals now always sample the shared background, even
+when floating over another app. Matched opaque terminals still skip blur and
+Foot's fullscreen opacity remains respected. App buffers/text stay sharp;
+single-window capture excludes compositor backdrops as before.
+
+scene.rs groups lower windows and their popup bounds in stacking order. Tiled
+frames share the same background as terminals. An overlapping frame uses only
+lower groups intersecting its footprint, excluding its own/foreground/cursor
+content. Non-overlapping neighbours are excluded even if a blur kernel would
+reach sideways. General sources are keyed by output and lower-window IDs;
+multiple consumers of an identical stack share its capture/filter results.
+No fully composited screenshot is fed back into the current frame.
+
+A single full-cover ohmansy-wallpaper surface with normal transform/orientation
+exposes its already imported GlesTexture via WaylandSurfaceRenderElement.
+It is prefiltered directly, avoiding a full-resolution scene capture. Crop and
+buffer-to-logical ratios account for output scale, buffer viewport and output
+origin. Multiple/inverted/transformed background surfaces use one shared GPU
+composition source instead. Each source retains at most2radii; appearances are
+keyed separately by window/content flag. Moving/typing/focus/pointer updates
+do not invalidate a wallpaper source. Wallpaper buffer commits, mode/scale or
+source changes do. Unused overlap sources and dead windows/output entries are
+released. Source pixels stay on GPU, with separate source and destination
+textures. Never mutate a client buffer while filtering.
+
+All sampled offscreen source/filter targets use Transform::Normal. The PNG
+readback path uses Flipped180; reusing that transform for sampled textures
+vertically inverted the wallpaper/scene. Asymmetric gradient and reference
+pixel tests caught this; do not restore the old offscreen flip. Keep the canvas
+offset only while composing general scene sources with rounded-surface shader
+coordinates, then crop/normalize to an output-local filtered texture.
+
+IPC blur counters report wallpaper_imports, scene_captures, blur_builds,
+background_blur_builds, scene_blur_builds, filter_passes, cache_hits and sources.
+They count real buffer/source revisions, not QML paint requests; a Canvas may
+commit an old and new image for one logical update. Four tiled windows/two
+outputs initialize2shared background blurs,6filter passes,0scene captures;
+input and own-client updates add no imports/builds. Wallpaper commits filter
+once per source/radius, and one overlapping frame adds/releases one scene layer.
+
+Verified68Rusttests/fmt/strictClippy, Git-backed compositor-session and packaged
+example validation. compositor_shared_blur.py covers two outputs/four windows,
+cache reuse, input/content invalidation, radii, layer cleanup, exact screen UVs,
+orientation and general-scene reference pixels. Updated terminal pixel fixture
+covers wallpaper-only sampling over another app, sharp glyphs, enabled/app-ID
+policy, fullscreen/opacity/frameless/idle. NVIDIA sharing/terminal matrix passes
+fresh sessions at1/1.25/2x with strict GL error checks; generic glass pixels and
+full shell/theme/focus regressions pass. Mesa also covers dynamic scale changes.
+Private NVIDIA uses a static Qt software/SHM wallpaper producer because a second
+nested Qt EGL display cannot initialize on this driver; compositor/filter render
+on actual NVIDIA GL ES3.2 with renderer assertion. Production remains GLES.
+
+Known separate issue: rapid scale changes in the Qt SHM producer can emit
+out-of-range GL TexSubImage uploads from accumulated old-size damage. Reproduced
+with the previous pre-refactor package even without windows; do not misattribute
+to shared blur or ignore GL errors in new tests. NVIDIA SHM matrix uses fresh
+fixed-scale sessions (OHMANSY_TEST_FIXED_SCALE); Mesa retains dynamic transitions.
+Native GPU wallpaper buffers do not use that SHM upload path. The shared renderer
+and hardware cursor were subsequently verified in the native session. Build/private
+GPU tests alone are not a live-session latency measurement; see the pointer
+investigation outcome below.
+
+## Native pointer responsiveness and animated wallpaper (2026-11-09)
+
+Later evidence: the user reported no freezes after switching from the Logitech
+wireless receiver to a wired mouse, with animated wallpaper and blur still
+running. This makes the wireless input path the leading suspect; it does not
+establish a specific hardware defect or prove every compositor stall absent.
+Keep the shared GPU blur cache and hardware cursor improvements as independent
+features, not as a claimed fix for the intermittent 2–5 second mouse freezes.
+The native session was verified on NVIDIA GLES with cursor-plane selection and
+actual KMS cursor coordinates. A five-minute trace review found one 269ms status
+response, no multi-second timeouts, and no sustained changing-pointer/static-KMS
+coordinate mismatch. No user-confirmed freeze was timestamped in that review.
+On-demand wallpaper diagnostics reported the intended 15fps with neither theme
+transition active. The temporary high-frequency pointer recorder was stopped;
+normal wallpaper animation remains enabled. Keep diagnostic counters available
+on demand rather than running indefinite background tracing.
+
+A live native session showed globally choppy pointer motion with animated
+wallpaper; pausing WallpaperQuality through its IPC restored smoothness per
+user confirmation, and GPU load dropped from about31% to0–2%. Brief comparison
+runs re-enabled motion; user reported stutter again but later could not confirm
+the timing relative to animation. Correlation is a lead, not a complete causal
+diagnosis. A later session has the wallpaper running normally; do not apply the
+earlier temporary pause as a standing workaround. Blur-disabled animation
+still used about30% GPU in this session, so do not attribute the entire problem
+to terminal blur. Reduced wallpaper quality with blur enabled did not eliminate
+load. GPU acceleration itself was correctly active, not a software fallback.
+These are live observations, not a complete render-latency profile.
+
+Native hardware cursors require three prerequisites together:
+Some(gbm.clone()) in DrmCompositor::new, ALLOW_CURSOR_PLANE_SCANOUT, and Smithay
+renderer_pixman for cursor format/scale conversion. A None allocator disables
+cursor state. Without renderer_pixman, the copy-only path rejects any scaling,
+cropping/transform or pixel format other than the plane's ARGB8888. Named
+cursor memory is ABGR8888 and fractional outputs rescale it; compositor-wide
+GLES rendering does not automatically provide a cursor conversion fallback.
+Earlier flags-only and allocator-only builds were booted and both still had
+KMS cursor fb_id0 plus cursor_plane_selected=false. Audit the complete path;
+don't request repeated reboots based only on another initializer or build.
+
+Source now enables renderer_pixman and explicit pkgs.pixman in package/devshell.
+Only three required crates were added to Cargo.lock (pixman, pixman-sys, paste);
+other dependency versions and flake.lock are unchanged. Both desktop backends
+still use GlesRenderer. Pixman prepares only a small cursor bitmap; it does not
+switch apps or wallpaper to software rendering. KMS cursor planes support AR24.
+State output cursor_plane_selected reports the latest queued frame's selection
+and is null for nested outputs. Cross-check actual KMS framebuffer after login.
+
+cursor_tests.rs guards RGBA/ARGB channel conversion, transparency/padding and
+1/1.2/1.25/2x scaling; it requires the conversion feature at compile time. The
+ignored driver_cursor_buffer_conversion test requires an explicit DRM device
+via OHMANSY_TEST_DRM_CURSOR_DEVICE. It uses GBM CURSOR|WRITE buffers and the same
+Pixman conversion as Smithay, checks resulting pixels, and releases resources
+without requesting master, changing modes or assigning planes. All8format/scale
+combinations passed in real256x256 NVIDIA cursor buffers.68unit tests and strict
+Clippy/fmt passed; Git-backed compositor package built. Private GPU blur test
+still reports NVIDIA GL ES3.2, with scale, sharp glyphs, opacity and idle passing.
+No private display can prove assignment on the login's KMS cursor plane; this
+path was subsequently verified active in the native session using both status
+and KMS plane properties.
+
+For compositor-only iterations, a full reboot is unnecessary after os-test:
+the greeter shell reads /etc/ohmansy/greeter-sessions.json and its compositor
+reads /etc/ohmansy/greeter.kdl when launched. os-test updates these paths while
+the running greetd unit has X-RestartIfChanged=false. A planned sign-out/sign-in
+loads the new session entry. Never restart greetd from the active desktop.
+Authentication may require the user to run os-test in their own terminal.
+Keep the distinction between built code, conversion tests, selected cursor plane
+and actual smooth pointer movement. Other rendering stalls may remain.
+
+## Semantic desktop colors and cached GPU blur (2026-11-09)
+
+Theme.palette uses atmosphere/accent/companion RGB seeds (0–1). Atmosphere
+owns neutral glass, inactive frames, background and pale sheen; Accent owns
+focus, selection and the dominant ribbon; Companion owns the contrasting ribbon.
+Rust theme.rs derives shared OKLab tones with controlled lightness/chroma and
+chroma reduction into sRGB. No shader channel shuffling or adjacent-ribbon hue
+mixing. Theme.color_intensity defaults0.65, range0–1, exposed as Muted–Vivid.
+Official Tailwind v4.3.0 seeds and six curated preset definitions live in theme.rs;
+IPC preferences.theme_presets supplies role-aware swatch previews. Palette
+primary/secondary/old accent migrates to accent/atmosphere/companion; ambiguous
+mixed formats reject. Saving uses canonical keys. No palette preserves explicit
+legacy frame colors. Configured alpha, glass opacity/noise, bevels and focus fade
+still apply. See docs/compositor-development.md and config.example.toml.
+
+Settings caches derived material colors during resolve_lighting(), never in
+per-pixel/per-window rendering. IPC preferences.theme_materials feeds
+DesktopPalette, Theme and RibbonScene.themeMaterials. QML interpolates all
+material vectors with one progress animation; selected preset matches target
+seeds immediately. Preset JSON signature avoids rebuilding cards on each poll.
+TintTransition animates active and inactive native frames separately from focus.
+Default theme transition1000ms, range0–5000; zero/global animations disabled
+snap. Startup snaps; reversal starts at displayed values; settling stops ticks.
+Lighting globe repaints only when its JSON signature changes, not every poll.
+
+Terminal blur defaults enabled/radius32logicalpx/common terminal app IDs;
+frame glass also defaults32. Both accept0–64. Dropdown Backdrop blur changes
+both radii live, enabling/disabling terminal blur with nonzero/zero radius.
+Files can set them independently. Exact app_ids replaces the built-in policy;
+this is not client blur-region protocol support. Fully opaque terminals skip
+content blur; Foot's fullscreen opacity remains respected. Client buffers and
+text stay sharp; blur renders beneath them. Never call Window::geometry while
+holding RendererSurfaceStateUserData: compute geometry first to avoid lock
+re-entry and compositor freeze.
+
+frost.rs now shares scene-color sources by output/lower-window stack rather
+than capturing per window (see shared GPU backdrop guidance above). Wallpaper
+imports and the frame/terminal radii are shared. blur.frag prefilters before
+reduction and runs33-tap horizontal/vertical Gaussian passes; frost.frag samples
+the cached result once. Old7x7 sparse kernels aliased at large radii. Offscreen
+passes set restore_draw_buffer for nested rendering. Sampled offscreen targets
+use Normal orientation, not the Flipped180 PNG readback transform.
+
+configure-theme validates color_intensity; configure-blur validates radius;
+configure-palette and configure-lighting retain other theme fields. One Save
+uses ConfigFile.save_appearance to atomically merge theme and live blur values
+while preserving other sections/comments and rejecting concurrent external edits.
+Do not broadly serialize current Settings over a user's handwritten config.
+
+Verified67Rusttests/fmt/strictClippy, Git-backed compositor-session and desktop
+GL/ES ribbon material checks, packaged config validation. Private graphics:
+compositor_shell.py (all6themes, both sliders, saved/reloaded settings, errors,
+material pixels and preserved windows), compositor_theme_transition.py
+(intermediate/retarget/zero/global-disable/idle), compositor_glass.py and
+compositor_frame_focus.py. compositor_terminal_blur.py measures radius32 softer
+than14, sharp glyphs, app matching/disable, opaque/fullscreen, frameless and
+100/125/200% density. Passed llvmpipe and actual NVIDIA RTX3060Ti GL ES3.2.
+NVIDIA headless EGL can omit EGLDevice so strict preview gate reports unknown;
+normal shine-dev retains its hardware gate. For private hardware blur tests,
+run compositor-test-display.py -- env WAYLAND_DISPLAY=headless python3
+ tools/tests/compositor_terminal_blur.py with NVIDIA vendor JSON and
+OHMANSY_TEST_EXPECT_RENDERER='NVIDIA GeForce RTX 3060 Ti'; this skips a second
+nested Shine EGL display unsupported by this driver. It stays fully headless.
+Timed CPU tests use wallpaper scale0.25, particles0 and paused motion to avoid
+spurious key repeats; don't diagnose production input from overloaded llvmpipe.
+Built and privately tested, not installed/booted/native-session replaced.
+
+## Optional 1Password integration (2026-11-09)
+
+`ohmansy.apps.onepassword.enable` enables the upstream NixOS GUI and CLI
+modules, including their setgid browser/CLI helpers. It defaults off. Hosts
+must permit the unfree packages and specify `programs._1password-gui.polkitPolicyOwners`;
+personal accounts and SSH/Git signing settings are not shared defaults.
+See `nix/apps/README.md` for setup and browser limitations.
+
+Shine previously never started the Niri-owned authentication agent. Its login
+setup now starts `ohmansy-polkit.service` after publishing the display environment,
+and cleanup stops it only while that session still owns the display. Nested
+previews leave the parent agent alone. A missing unit does not abort standalone
+session packages. The current installed service was started successfully without
+replacing the compositor or opening test windows.
+
+Git-backed x86 builds passed for GUI 8.12.21, CLI 2.34.0, compositor-session and
+ohmansy-apply. Module evaluation checked enabled/disabled behavior and setgid
+helpers; the generated policy contains the configured owner and `op --version`
+passed. Installed configuration and activation still require local sudo
+authentication; no end-to-end account/browser unlock was verified.
+
+## shine-dev portal startup delay fixed (2026-11-06)
+
+The roughly30second Quickshell delay was a25second desktop-portal keyring
+activation timeout on the private D-Bus session, not Cargo or GPU initialization.
+`preview_environment` in tools/dev/shine-dev.py now supplies a private XDG config
+home under the preview directory, with GTK portal defaults, wlr capture backends
+and Secret=none. It retains dbus-run-session isolation and GPU enforcement.
+
+For the flagged winit preview only, main.rs updates its private bus activation
+environment (Wayland socket/current desktop/config home) before starting apps.
+It does not use --systemd, alter the host user-manager environment or restart host
+portals. The flag is ignored on DRM sessions. Native installed configuration is
+unchanged; demo editor/browser profiles remain isolated as before.
+
+A real private portal + Quickshell + GTK editor test measured1.87seconds to mapped
+shell layers and editor, with no secret-service activation or portal timeout.
+Lifecycle/unit checks also pass. Cold Nix/Cargo build time is separate from this
+measurement. The test is tools/tests/compositor_preview_startup.py.
+
 ## Shared desktop lighting (2026-11-06)
 
 `theme.lighting` centralizes a screen-space light for Shine frames, workspace

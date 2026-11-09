@@ -63,6 +63,23 @@ def modifier_for(parent, requested='auto'):
     return 'ctrl-alt' if 'lv3:lalt_switch' in {part.strip() for part in options.split(',')} else 'super-alt'
 
 
+def preview_environment(environment, directory):
+    """Portal activation on the private bus must not start the host keyring."""
+    env = dict(environment)
+    config = directory / 'xdg-config'
+    portals = config / 'xdg-desktop-portal'
+    portals.mkdir(parents=True, exist_ok=True)
+    (portals / 'portals.conf').write_text(
+        '[preferred]\ndefault=gtk;\n'
+        'org.freedesktop.impl.portal.Secret=none;\n'
+        'org.freedesktop.impl.portal.ScreenCast=wlr;\n'
+        'org.freedesktop.impl.portal.Screenshot=wlr;\n')
+    env['XDG_CONFIG_HOME'] = str(config)
+    env['XDG_CURRENT_DESKTOP'] = 'ohmansy-preview'
+    env['OHMANSY_SHINE_DEV_SESSION'] = '1'
+    return env
+
+
 def run(root=ROOT):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--outputs', type=int, choices=range(1, 9), default=1)
@@ -78,7 +95,7 @@ def run(root=ROOT):
     workspaces = directory / 'workspaces.toml'
     if not workspaces.exists():
         workspaces.write_text('# Private preview; do not launch personal task workspaces.\n')
-    env = os.environ.copy()
+    env = preview_environment(os.environ, directory)
     parent = {}
     parent_control = env.get('OHMANSY_COMPOSITOR_CONTROL')
     if args.mod_key == 'auto' and parent_control:
