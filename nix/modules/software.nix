@@ -10,6 +10,8 @@ in
       git
       tig
       lazygit
+      kubectl
+      k9s
       tmux
       mise
       vim
