@@ -30,6 +30,8 @@ let
       ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd \
         DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
         XDG_SESSION_TYPE SSH_AUTH_SOCK
+      # Shine does not start niri.service, which owns the agent in Niri.
+      ${pkgs.systemd}/bin/systemctl --user --no-block start ohmansy-polkit.service || true
       ${pkgs.lib.optionalString enableKeyring ''
         # PAM unlocks a login-mode daemon. Finish its initialization before
         # applications activate a replacement daemon with a locked keyring.
@@ -58,6 +60,7 @@ let
     done < <(${pkgs.systemd}/bin/systemctl --user show-environment)
     # Another login may already have published its own display.
     if [ "$current" = "$owned" ]; then
+      ${pkgs.systemd}/bin/systemctl --user stop ohmansy-polkit.service || true
       ${pkgs.dbus}/bin/dbus-update-activation-environment \
         WAYLAND_DISPLAY= DISPLAY= XDG_CURRENT_DESKTOP= XDG_SESSION_DESKTOP= XDG_SESSION_TYPE=
       ${pkgs.systemd}/bin/systemctl --user unset-environment \

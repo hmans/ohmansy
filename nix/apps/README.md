@@ -11,6 +11,7 @@ Create `~/.config/ohmansy/apps.nix` containing:
 { ... }: {
   ohmansy.apps.obs.enable = true;
   ohmansy.apps.steam.enable = true;
+  ohmansy.apps.onepassword.enable = true;
   # Optional; changes kernel configuration:
   # ohmansy.apps.obs.virtualCamera.enable = true;
 }
@@ -27,6 +28,23 @@ replace a policy that also permits the machine's NVIDIA driver.
 Steam Remote Play and dedicated-server firewall openings remain opt-in through
 the upstream `programs.steam` options. OBS virtual camera is also opt-in.
 Disabling a layer removes its contributions, without deleting personal app data.
+
+1Password installs the native desktop app and `op` CLI through their NixOS
+modules, including the browser and CLI privilege helpers. In the host's local
+configuration, set `programs._1password-gui.polkitPolicyOwners = [ "your-login" ];`
+and permit `1password`, `1password-gui`, and `1password-cli` in the existing
+unfree license policy. Preserve any existing NVIDIA or Steam allowances.
+The shared authentication agent runs in both Shine and Niri login sessions.
+In 1Password, enable system authentication under Security and CLI integration
+under Developer. Account sign-in and these preferences remain personal.
+
+Install the 1Password browser extension in a native NixOS browser. Firefox,
+Chrome and Brave integration is handled upstream; Flatpak browsers cannot use
+this integration. For other browsers, follow the
+[NixOS 1Password guide](https://wiki.nixos.org/wiki/1Password) to add their actual
+executable names to `/etc/1password/custom_allowed_browsers`. SSH-agent and Git
+signing configuration remain opt-in; this layer does not change existing keys
+or SSH-agent selection.
 
 Run `ohmansy-switch` to build and activate, or `ohmansy-boot` to build and select
 the next boot without changing the running desktop. Run these as your normal

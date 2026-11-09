@@ -1,4 +1,4 @@
 { ... }:
 {
-  imports = [ ./obs.nix ./steam.nix ];
+  imports = [ ./obs.nix ./steam.nix ./onepassword.nix ];
 }
