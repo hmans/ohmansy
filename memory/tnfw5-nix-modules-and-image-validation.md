@@ -1928,6 +1928,16 @@ NixOS image configurations evaluated with all four tools on their respective
 ARM/x86 platforms; the native x86 customization check passed. No image build,
 boot test, or installed-system activation was performed.
 
+Build utilities (2026-11-12): the default software bundle also includes `clang`,
+`unzip`, and `file`; `pkg-config` was already present. Git-backed x86 factory
+evaluation verified all four in `environment.systemPackages`, and their package
+builds and the native customization check passed. No installed activation was
+performed.
+
+The same bundle also includes `sdl3` and `vulkan-loader`. Git-backed x86 factory
+evaluation verified both in `environment.systemPackages`; both package builds
+and the native customization check passed. Installed activation remains pending.
+
 Mise packaging (2026-11-04): `nix/modules/mise-package.nix` packages upstream
 2026.11.0 musl release archives with separate SHA-256 pins for x86 and ARM.
 The shared overlay supplies the optional software bundle and both development

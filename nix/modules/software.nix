@@ -20,6 +20,8 @@ in
       zed-editor
       curl
       wget
+      unzip
+      file
       glib.bin # Includes gio.
       fzf
       ripgrep
@@ -28,9 +30,12 @@ in
       satty
       jq
       gcc
+      clang
       gnumake
       python3
       pkg-config
+      sdl3
+      vulkan-loader
       fastfetch
       (if config.ohmansy.btopStyle.enable then btop.package else pkgs.btop)
       htop
